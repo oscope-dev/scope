@@ -1,7 +1,7 @@
 use anyhow::Result;
-use clap::{ArgGroup, Args, Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 use human_panic::setup_panic;
-use tracing::error;
+use tracing::{error, info};
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
     fmt::{
@@ -12,6 +12,7 @@ use tracing_subscriber::{
     Registry,
 };
 use pity_doctor::prelude::*;
+use pity_report::prelude::{report_root, ReportArgs};
 
 /// Pity the Fool
 ///
@@ -29,19 +30,19 @@ struct Cli {
     command: Command,
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("logging"))]
 pub struct LoggingOpts {
     /// A level of verbosity, and can be used multiple times
-    #[clap(short, long, parse(from_occurrences), global(true), group = "logging")]
-    pub debug: u64,
+    #[arg(short, long, action = clap::ArgAction::Count, global(true), group = "logging")]
+    pub debug: u8,
 
     /// Enable warn logging
-    #[clap(short, long, global(true), group = "logging")]
+    #[arg(short, long, global(true), group = "logging")]
     pub warn: bool,
 
     /// Disable everything but error logging
-    #[clap(short, long, global(true), group = "logging")]
+    #[arg(short, long, global(true), group = "logging")]
     pub error: bool,
 }
 
@@ -67,6 +68,8 @@ impl LoggingOpts {
 enum Command {
     /// Run checks that will "checkup" your machine.
     Doctor(DoctorArgs),
+    /// Generate a bug report based from a command that was ran
+    Report(ReportArgs)
 }
 
 #[tokio::main]
@@ -75,7 +78,7 @@ async fn main() {
     dotenv::dotenv().ok();
     let opts = Cli::parse();
 
-    let _gaurd = configure_logging(&opts.logging);
+    let _guard = configure_logging(&opts.logging);
     let error_code = match handle_commands(&opts.command).await {
         Ok(_) => 0,
         Err(e) => {
@@ -88,7 +91,13 @@ async fn main() {
 }
 
 fn configure_logging(logging_opts: &LoggingOpts) -> tracing_appender::non_blocking::WorkerGuard {
-    let file_appender = tracing_appender::rolling::hourly("/tmp/pity", "doctor.log");
+
+    let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
+    let now = chrono::Local::now();
+    let current_time = now.format("%Y%m%d");
+    let file_name = format!("pity-{}-{}.log", current_time.to_string(), id);
+    let full_path = format!("/tmp/pity/{}", file_name);
+    let file_appender = tracing_appender::rolling::never("/tmp/pity", file_name);
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     let file_output = tracing_subscriber::fmt::layer()
@@ -108,11 +117,14 @@ fn configure_logging(logging_opts: &LoggingOpts) -> tracing_appender::non_blocki
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    info!(target: "user", "More details logs at {}", full_path);
+
     guard
 }
 
 async fn handle_commands(command: &Command) -> Result<()> {
     match command {
         Command::Doctor(args) => doctor_root(args).await,
+        Command::Report(args) => report_root(args).await,
     }
 }

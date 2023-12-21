@@ -1,14 +1,14 @@
 use crate::check::CheckRuntime;
 use anyhow::Result;
-use clap::Args;
+use clap::{Parser};
 use colored::*;
 use std::collections::BTreeMap;
 use tracing::{error, info, warn};
 
-#[derive(Debug, Args)]
+#[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
     /// When set, only the checks listed will run
-    #[clap(short, long, multiple_values(true), multiple_occurrences(true))]
+    #[arg(short, long)]
     only: Option<Vec<String>>,
 
     /// Override the configuration to be used.

@@ -1,2 +1,3 @@
 [workspace]
-members = ["pity", "pity-doctor"]
+members = ["pity", "pity-doctor", "pity-report"]
+resolver = "2"

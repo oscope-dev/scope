@@ -14,7 +14,7 @@ pub struct DoctorListArgs {
 pub async fn doctor_list(args: &DoctorListArgs) -> Result<()> {
     let config = crate::config::read_config(&args.config).await?;
     info!("Loaded config {:?}", config);
-    info!(target: "user", "Avaliable checks that will run");
+    info!(target: "user", "Available checks that will run");
     info!(target: "user", "{:^20}{:^40}", "Name".white().bold(), "Description".white().bold());
     for check in config.checks {
         info!(target: "user", "{:^20}{:^40}", check.name().white().bold(), check.description());

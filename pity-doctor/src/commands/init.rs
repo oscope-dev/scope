@@ -7,6 +7,6 @@ pub struct DoctorInitArgs {
     output: String,
 }
 
-pub async fn doctor_init(args: &DoctorInitArgs) -> Result<()> {
+pub async fn doctor_init(_args: &DoctorInitArgs) -> Result<()> {
     Ok(())
 }
