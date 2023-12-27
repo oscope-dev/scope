@@ -1,0 +1,4 @@
+build:
+    rm -rf {{justfile_directory()}}/target/darwin || true
+    mkdir -p {{justfile_directory()}}/target/darwin
+    gcc -dynamiclib -current_version 1.0 {{justfile_directory()}}/src/intercept.c -o {{justfile_directory()}}/target/darwin/intercept.dylib
