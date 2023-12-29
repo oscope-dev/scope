@@ -1,7 +1,8 @@
 [package]
-name = "pity"
+name = "pity-lib"
 version = "0.1.0"
 edition = "2021"
+
 
 [dependencies]
 clap = { version = "4.4.11", features = ["derive", "env"]}
@@ -9,8 +10,9 @@ human-panic = "1.0.3"
 anyhow = "1.0.57"
 thiserror = "1.0.30"
 tracing = "0.1.34"
+tracing-subscriber = { version = "0.3", features = ["json", "local-time" ] }
 tokio = { version = "1", features = ["full"] }
 dotenv = "0.15.0"
-pity-doctor = { path = "../pity-doctor" }
-pity-report = { path = "../pity-report" }
-pity-lib = { path = "../pity-lib" }
+tracing-appender = "0.2.2"
+chrono = "0.4"
+nanoid = "0.4"
