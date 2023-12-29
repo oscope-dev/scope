@@ -1,0 +1,8 @@
+apiVersion: pity.github.com/v1alpha
+kind: PityKnownError
+metadata:
+  name: error-exists
+spec:
+  description: Check if the word error is in the logs
+  pattern: error
+  help: The command had an error, try reading the logs around there to find out what happened.

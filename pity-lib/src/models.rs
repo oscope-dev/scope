@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use derivative::Derivative;
+use regex::Regex;
+use crate::UserListing;
+
+pub const FILE_PATH_ANNOTATION: &str = "pity.github.com/file-path";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ModelMetadata {
@@ -33,43 +38,88 @@ impl<V> ModelRoot<V> {
     }
 }
 
+impl UserListing for ModelRoot<DoctorExecCheck> {
+    fn name(&self) -> &str {
+        &self.metadata.name
+    }
+    fn description(&self) -> &str {
+        &self.spec.description
+    }
+
+    fn location(&self) -> String {
+        self.metadata.annotations.get(FILE_PATH_ANNOTATION).cloned().unwrap_or_default()
+    }
+}
+
+impl UserListing for ModelRoot<KnownError> {
+    fn name(&self) -> &str {
+        &self.metadata.name
+    }
+    fn description(&self) -> &str {
+        &self.spec.description
+    }
+
+    fn location(&self) -> String {
+        self.metadata.annotations.get(FILE_PATH_ANNOTATION).cloned().unwrap_or_default()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
-pub struct ExecCheck {
+pub struct DoctorExecCheck {
     pub target: PathBuf,
     pub description: String,
     pub help_text: String,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum ParsedConfig {
-    DoctorExec(ModelRoot<ExecCheck>),
+#[derive(Derivative)]
+#[derivative(PartialEq)]
+#[derive(Debug, Clone)]
+pub struct KnownError {
+    pub description: String,
+    pub pattern: String,
+    #[derivative(PartialEq="ignore")]
+    pub regex: Regex,
+    pub help_text: String,
 }
 
-pub fn parse_config(base_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
+#[derive(Debug, PartialEq)]
+pub enum ParsedConfig {
+    DoctorCheck(ModelRoot<DoctorExecCheck>),
+    KnownError(ModelRoot<KnownError>),
+}
+
+pub fn parse_config(file_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
     let parsed: Value = serde_yaml::from_str(config)?;
     let values = match parsed {
         Value::Sequence(arr) => {
             let mut result = Vec::new();
             for item in arr {
-                result.push(parse_value(base_path, item)?);
+                result.push(parse_value(file_path, item)?);
             }
             result
         }
-        Value::Mapping(_) => vec![parse_value(base_path, parsed)?],
+        Value::Mapping(_) => vec![parse_value(file_path, parsed)?],
         _ => return Err(anyhow!("Input file wasn't an array or an object")),
     };
     Ok(values)
 }
 
-fn parse_value(base_path: &Path, value: Value) -> Result<ParsedConfig> {
-    let root: ModelRoot<Value> = serde_yaml::from_value(value)?;
+fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
+    let mut root: ModelRoot<Value> = serde_yaml::from_value(value)?;
     let api_version: &str = &root.api_version.trim().to_ascii_lowercase();
     let kind: &str = &root.kind.trim().to_ascii_lowercase();
 
+    root.metadata.annotations.insert(FILE_PATH_ANNOTATION.to_string(), file_path.display().to_string());
+
+    let containing_dir = file_path.parent().unwrap();
     let parsed = match (api_version, kind) {
-        ("pity.github.com/v1alpha", "ExecCheck") => {
-            let exec_check = parser::parse_v1_exec_check(base_path, &root.spec)?;
-            ParsedConfig::DoctorExec(root.with_spec(exec_check))
+        ("pity.github.com/v1alpha", "pitydoctorcheck") => {
+            let exec_check = parser::parse_v1_doctor_check(containing_dir, &root.spec)?;
+            ParsedConfig::DoctorCheck(root.with_spec(exec_check))
+        },
+        ("pity.github.com/v1alpha", "pityknownerror") => {
+            let known_error = parser::parse_v1_known_error(&root.spec)?;
+            ParsedConfig::KnownError(root.with_spec(known_error))
         }
         (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind)),
     };
@@ -81,50 +131,116 @@ mod parser {
     use serde::{Deserialize, Serialize};
     use serde_yaml::Value;
     use std::path::Path;
+    use anyhow::Result;
+    use regex::Regex;
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
-    struct ExecCheckV1Alpha {
-        target: String,
+    enum DoctorCheckTypeV1Alpha {
+        Exec{ target: String }
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    struct DoctorCheckV1Alpha {
+        #[serde(flatten)]
+        run_type: DoctorCheckTypeV1Alpha,
         description: String,
         help: String,
     }
 
-    pub(super) fn parse_v1_exec_check(
+    pub(super) fn parse_v1_doctor_check(
         base_path: &Path,
         value: &Value,
-    ) -> anyhow::Result<super::ExecCheck> {
-        let parsed: ExecCheckV1Alpha = serde_yaml::from_value(value.clone())?;
-        Ok(super::ExecCheck {
+    ) -> Result<super::DoctorExecCheck> {
+        let parsed: DoctorCheckV1Alpha = serde_yaml::from_value(value.clone())?;
+        let target = match parsed.run_type {
+            DoctorCheckTypeV1Alpha::Exec { target} => base_path.join(target)
+        };
+        Ok(super::DoctorExecCheck {
             help_text: parsed.help,
-            target: base_path.join(parsed.target),
+            target,
             description: parsed.description,
+        })
+    }
+
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    struct KnownErrorV1Alpha {
+        description: String,
+        help: String,
+        pattern: String,
+    }
+    pub(super) fn parse_v1_known_error(
+        value: &Value,
+    ) -> Result<super::KnownError> {
+        let parsed: KnownErrorV1Alpha = serde_yaml::from_value(value.clone())?;
+        let regex = Regex::new(&parsed.pattern)?;
+        Ok(super::KnownError {
+            pattern: parsed.pattern,
+            regex,
+            help_text: parsed.help,
+            description: parsed.description
         })
     }
 }
 
 #[test]
-fn test_parse() {
+fn test_parse_pity_doctor_check_exec() {
     let text = "apiVersion: pity.github.com/v1alpha
-kind: ExecCheck
+kind: PityDoctorCheck
 metadata:
   name: path-exists
 spec:
-  target: scripts/does-path-env-exist.sh
+  exec:
+    target: scripts/does-path-env-exist.sh
   description: Check your shell for basic functionality
   help: You're shell does not have a path env. Reload your shell.";
 
-    let path = Path::new("/foo/bar");
+    let path = Path::new("/foo/bar/file.yaml");
     let configs = parse_config(path, text).unwrap();
     assert_eq!(1, configs.len());
-    let doctor_exec = &configs[0];
-    let ParsedConfig::DoctorExec(model) = doctor_exec;
-    assert_eq!(
-        ExecCheck {
-            description: "Check your shell for basic functionality".to_string(),
-            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-            target: path.join("scripts/does-path-env-exist.sh"),
-        },
-        model.spec
-    );
+    if let ParsedConfig::DoctorCheck(model) = &configs[0] {
+        assert_eq!(
+            DoctorExecCheck {
+                description: "Check your shell for basic functionality".to_string(),
+                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+                target: PathBuf::from("/foo/bar/scripts/does-path-env-exist.sh"),
+            },
+            model.spec
+        );
+    } else {
+        unreachable!();
+    }
+}
+
+
+#[test]
+fn test_parse_pity_known_error() {
+    let text = "apiVersion: pity.github.com/v1alpha
+kind: PityKnownError
+metadata:
+  name: error-exists
+spec:
+  description: Check if the word error is in the logs
+  pattern: error
+  help: The command had an error, try reading the logs around there to find out what happened.";
+
+    let path = Path::new("/foo/bar/file.yaml");
+    let configs = parse_config(path, text).unwrap();
+    assert_eq!(1, configs.len());
+    if let ParsedConfig::KnownError(model) = &configs[0] {
+        assert_eq!(
+            KnownError {
+                description: "Check if the word error is in the logs".to_string(),
+                help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
+                pattern: "error".to_string(),
+                regex: Regex::new("error").unwrap()
+            },
+            model.spec
+        );
+    } else {
+        unreachable!()
+    }
 }

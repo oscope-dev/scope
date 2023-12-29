@@ -324,6 +324,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.92",
+]
+
+[[package]]
 name = "directories"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -816,6 +827,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pathdiff"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
+
+[[package]]
 name = "petgraph"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -843,8 +860,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "colored",
  "dotenv",
  "human-panic",
+ "pathdiff",
  "pity-doctor",
  "pity-lib",
  "pity-report",
@@ -894,10 +913,13 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "derivative",
  "directories 5.0.1",
  "dotenv",
  "human-panic",
+ "log",
  "nanoid",
+ "regex",
  "serde 1.0.193",
  "serde_yaml",
  "thiserror",

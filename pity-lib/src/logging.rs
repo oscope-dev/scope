@@ -83,7 +83,7 @@ impl LoggingOpts {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        info!(target: "user", "More details logs at {}", full_path);
+        info!(target: "user", "More detailed logs at {}", full_path);
 
         guard
     }

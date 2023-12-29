@@ -4,8 +4,9 @@ use human_panic::setup_panic;
 use pity_doctor::prelude::*;
 use pity_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
 use pity_report::prelude::{report_root, ReportArgs};
-
-use tracing::error;
+use tracing::{error, info};
+use pity_lib::UserListing;
+use colored::Colorize;
 
 /// Pity the Fool
 ///
@@ -26,12 +27,15 @@ struct Cli {
     command: Command,
 }
 
+
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Run checks that will "checkup" your machine.
     Doctor(DoctorArgs),
     /// Generate a bug report based from a command that was ran
     Report(ReportArgs),
+    /// List the found config files, and resources detected
+    Config
 }
 
 #[tokio::main]
@@ -68,5 +72,34 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
     match command {
         Command::Doctor(args) => doctor_root(found_config, args).await,
         Command::Report(args) => report_root(args).await,
+        Command::Config => show_config(found_config)
+    }
+}
+
+fn show_config(found_config: &FoundConfig) -> Result<()> {
+    if !found_config.exec_check.is_empty() {
+        info!(target: "user", "Doctor Checks");
+        print_details(found_config.exec_check.values().collect());
+    }
+
+    if !found_config.known_error.is_empty() {
+        info!(target: "user", "Known Errors");
+        print_details(found_config.known_error.values().collect());
+    }
+    Ok(())
+}
+
+fn print_details<T>(config: Vec<&T>) where T: UserListing {
+    info!(target: "user", "{:^20}{:^60}{:^40}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
+    let working_dir = std::env::current_dir().unwrap();
+    for check in config {
+        let mut loc = check.location();
+        let diff_path = pathdiff::diff_paths(&loc, &working_dir);
+        if let Some(diff) = diff_path {
+            loc = diff.display().to_string();
+        } else if loc.len() > 35 {
+            loc = format!("...{}", loc.split_off(loc.len() - 35));
+        }
+        info!(target: "user", "{:^20} {:^60} {:^40}", check.name().white().bold(), check.description(), loc);
     }
 }

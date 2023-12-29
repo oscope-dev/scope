@@ -1,4 +1,4 @@
-use crate::models::{parse_config, ExecCheck, ModelRoot, ParsedConfig};
+use crate::models::{parse_config, DoctorExecCheck, ModelRoot, ParsedConfig, KnownError};
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
 use directories::{BaseDirs, UserDirs};
@@ -25,16 +25,20 @@ pub struct ConfigOptions {
 
 #[derive(Default, Debug, Clone)]
 pub struct FoundConfig {
-    pub exec_check: BTreeMap<String, ModelRoot<ExecCheck>>,
+    pub exec_check: BTreeMap<String, ModelRoot<DoctorExecCheck>>,
+    pub known_error: BTreeMap<String, ModelRoot<KnownError>>,
 }
 
 impl FoundConfig {
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
-            ParsedConfig::DoctorExec(exec) => {
-                self.exec_check.insert(exec.metadata.name.clone(), exec)
+            ParsedConfig::DoctorCheck(exec) => {
+                self.exec_check.insert(exec.metadata.name.clone(), exec);
+            },
+            ParsedConfig::KnownError(known_error) => {
+                self.known_error.insert(known_error.metadata.name.clone(), known_error);
             }
-        };
+        }
     }
 }
 
@@ -43,7 +47,14 @@ impl ConfigOptions {
         let mut found_config = FoundConfig::default();
         for file_path in self.find_config_files()? {
             let file_contents = fs::read_to_string(&file_path)?;
-            for config in parse_config(file_path.parent().unwrap(), &file_contents)? {
+            let parsed_file_contents = match parse_config(file_path.as_path(), &file_contents) {
+                Ok(configs) => configs,
+                Err(e) => {
+                    warn!(target: "user", "Unable to parse {} because {:?}", file_path.display().to_string(), e);
+                    continue;
+                }
+            };
+            for config in parsed_file_contents {
                 found_config.add_model(config);
             }
         }

@@ -14,3 +14,5 @@ dotenv = "0.15.0"
 pity-doctor = { path = "../pity-doctor" }
 pity-report = { path = "../pity-report" }
 pity-lib = { path = "../pity-lib" }
+colored = "2.0.0"
+pathdiff = "0.2.1"

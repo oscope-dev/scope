@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use pity_lib::prelude::{ExecCheck, ModelRoot};
+use pity_lib::prelude::{DoctorExecCheck, ModelRoot};
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use thiserror::Error;
@@ -40,7 +40,7 @@ pub trait CheckRuntime {
 }
 
 #[async_trait]
-impl CheckRuntime for ModelRoot<ExecCheck> {
+impl CheckRuntime for ModelRoot<DoctorExecCheck> {
     async fn exec(&self) -> Result<RuntimeResult, RuntimeError> {
         let path = &self.spec.target;
         if !path.exists() {
