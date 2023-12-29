@@ -1,10 +1,11 @@
+use std::fs;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use human_panic::setup_panic;
 use tracing::{error};
 use pity_doctor::prelude::*;
 use pity_report::prelude::{report_root, ReportArgs};
-use pity_lib::prelude::{LoggingOpts};
+use pity_lib::prelude::{LoggingOpts, parse_config, ParsedConfig};
 
 /// Pity the Fool
 ///
@@ -49,8 +50,40 @@ async fn main() {
 }
 
 async fn handle_commands(command: &Command) -> Result<()> {
+    let configs = find_configs().await?;
     match command {
-        Command::Doctor(args) => doctor_root(args).await,
+        Command::Doctor(args) => doctor_root(configs, args).await,
         Command::Report(args) => report_root(args).await,
     }
+}
+
+async fn find_configs() -> Result<Vec<ParsedConfig>> {
+    let mut search_dir = std::env::current_dir()?;
+
+    let mut configs = Vec::new();
+
+    loop {
+        let pity_dir = search_dir.join(".pity");
+        if pity_dir.exists() {
+            for dir_entry in fs::read_dir(&pity_dir)? {
+                if let Ok(entry) = dir_entry {
+                    let file_contents = fs::read_to_string(entry.path())?;
+                    configs.extend(parse_config(pity_dir.as_path(), &file_contents)?);
+                }
+            }
+        }
+
+        let parent_dir = search_dir.parent();
+        if let Some(dir) = parent_dir {
+            if dir == search_dir.as_path() {
+                break;
+            } else {
+                search_dir = dir.to_path_buf();
+            }
+        } else {
+            break;
+        }
+    }
+
+    Ok(configs)
 }

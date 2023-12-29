@@ -17,3 +17,4 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9.27"
 tempfile = "3.3.0"
 colored = "2.0.0"
+pity-lib = { path = "../pity-lib" }

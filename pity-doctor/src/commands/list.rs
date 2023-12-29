@@ -3,20 +3,17 @@ use anyhow::Result;
 use clap::Args;
 use colored::*;
 use tracing::info;
+use pity_lib::prelude::{ExecCheck, ModelRoot};
 
 #[derive(Debug, Args)]
 pub struct DoctorListArgs {
-    /// Override the configuration to be used.
-    #[clap(long, env = "PITY_DOCTOR_CONFIG_FILE")]
-    config: Option<String>,
 }
 
-pub async fn doctor_list(args: &DoctorListArgs) -> Result<()> {
-    let config = crate::config::read_config(&args.config).await?;
-    info!("Loaded config {:?}", config);
+pub async fn doctor_list(configs: Vec<ModelRoot<ExecCheck>>, _args: &DoctorListArgs) -> Result<()> {
+    info!("Loaded config {:?}", configs);
     info!(target: "user", "Available checks that will run");
     info!(target: "user", "{:^20}{:^40}", "Name".white().bold(), "Description".white().bold());
-    for check in config.checks {
+    for check in configs {
         info!(target: "user", "{:^20}{:^40}", check.name().white().bold(), check.description());
     }
     Ok(())

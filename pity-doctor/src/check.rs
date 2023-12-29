@@ -1,9 +1,8 @@
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
 use std::process::Command;
 use thiserror::Error;
+use pity_lib::prelude::{ModelRoot, ExecCheck};
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
@@ -40,33 +39,24 @@ pub trait CheckRuntime {
     fn name(&self) -> String;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ExecCheck {
-    target: String,
-    description: String,
-    help_text: String,
-    name: String,
-}
-
 #[async_trait]
-impl CheckRuntime for ExecCheck {
+impl CheckRuntime for ModelRoot<ExecCheck> {
     async fn exec(&self) -> Result<RuntimeResult, RuntimeError> {
-        let path = PathBuf::from(&self.target);
+        let path = &self.spec.target;
         if !path.exists() {
             return Err(RuntimeError::MissingShExec {
-                name: self.target.to_owned(),
+                name: path.display().to_string()
             });
         }
         let metadata = std::fs::metadata(path)?;
         let permissions = metadata.permissions().mode();
         if permissions & 0x700 == 0 {
             return Err(RuntimeError::MissingShExec {
-                name: self.target.to_owned(),
+                name: path.display().to_string(),
             });
         }
 
-        let output = Command::new(&self.target).output()?;
+        let output = Command::new(&path).output()?;
 
         Ok(RuntimeResult {
             success: output.status.success(),
@@ -76,12 +66,12 @@ impl CheckRuntime for ExecCheck {
     }
 
     fn description(&self) -> String {
-        self.description.to_owned()
+        self.spec.description.to_owned()
     }
     fn help_text(&self) -> String {
-        self.help_text.to_owned()
+        self.spec.help_text.to_owned()
     }
     fn name(&self) -> String {
-        self.name.to_owned()
+        self.metadata.name.to_owned()
     }
 }

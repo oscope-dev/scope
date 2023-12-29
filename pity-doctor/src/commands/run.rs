@@ -4,24 +4,20 @@ use clap::{Parser};
 use colored::*;
 use std::collections::BTreeMap;
 use tracing::{error, info, warn};
+use pity_lib::prelude::{ExecCheck, ModelRoot};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
     /// When set, only the checks listed will run
     #[arg(short, long)]
     only: Option<Vec<String>>,
-
-    /// Override the configuration to be used.
-    #[clap(long, env = "PITY_DOCTOR_CONFIG_FILE")]
-    config: Option<String>,
 }
 
-pub async fn doctor_run(args: &DoctorRunArgs) -> Result<()> {
-    let config = crate::config::read_config(&args.config).await?;
+pub async fn doctor_run(configs: Vec<ModelRoot<ExecCheck>>, args: &DoctorRunArgs) -> Result<()> {
 
-    let mut check_map: BTreeMap<String, crate::config::CheckConfig> = Default::default();
+    let mut check_map: BTreeMap<String, ModelRoot<ExecCheck>> = Default::default();
     let mut check_order: Vec<String> = Default::default();
-    for check in config.checks {
+    for check in configs {
         let name = check.name();
         if let Some(old) = check_map.insert(name.clone(), check.clone()) {
             warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());

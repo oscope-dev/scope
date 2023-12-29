@@ -1,6 +1,5 @@
 mod check;
 mod error;
-mod config;
 mod cli;
 mod commands;
 
