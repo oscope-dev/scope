@@ -1,11 +1,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use directories::{BaseDirs, UserDirs};
 use human_panic::setup_panic;
 use pity_doctor::prelude::*;
 use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig};
 use pity_report::prelude::{report_root, ReportArgs};
 use std::ffi::OsStr;
 use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
 
 /// Pity the Fool
@@ -68,29 +70,7 @@ async fn find_configs() -> Result<Vec<ParsedConfig>> {
 
     loop {
         let pity_dir = search_dir.join(".pity");
-        debug!(target: "user", "Searching dir {:?}", pity_dir);
-        if pity_dir.exists() {
-            for dir_entry in fs::read_dir(&pity_dir)? {
-                if let Ok(entry) = dir_entry {
-                    if !entry.path().is_file() {
-                        continue;
-                    }
-                    let file_path = entry.path();
-                    let extension = file_path.extension();
-                    if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml"))
-                    {
-                        debug!(target: "user", "Found file {:?}", file_path);
-                        let file_contents = fs::read_to_string(entry.path())?;
-                        match parse_config(pity_dir.as_path(), &file_contents) {
-                            Ok(parsed) => configs.extend(parsed),
-                            Err(e) => {
-                                warn!(target: "user", "Unable to parse {:?}: {}", entry.path(), e);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        configs.extend(parse_dir(pity_dir)?);
 
         let parent_dir = search_dir.parent();
         if let Some(dir) = parent_dir {
@@ -104,7 +84,44 @@ async fn find_configs() -> Result<Vec<ParsedConfig>> {
         }
     }
 
+    if let Some(user_dirs) = UserDirs::new() {
+        configs.extend(parse_dir(user_dirs.home_dir().join(".pity"))?);
+    }
+
+    if let Some(base_dirs) = BaseDirs::new() {
+        configs.extend(parse_dir(base_dirs.config_dir().join(".pity"))?);
+    }
+
     debug!(target: "user", "Found config {:?}", configs);
+
+    Ok(configs)
+}
+
+fn parse_dir(pity_dir: PathBuf) -> Result<Vec<ParsedConfig>> {
+    let mut configs = Vec::new();
+
+    debug!(target: "user", "Searching dir {:?}", pity_dir);
+    if pity_dir.exists() {
+        for dir_entry in fs::read_dir(&pity_dir)? {
+            if let Ok(entry) = dir_entry {
+                if !entry.path().is_file() {
+                    continue;
+                }
+                let file_path = entry.path();
+                let extension = file_path.extension();
+                if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml")) {
+                    debug!(target: "user", "Found file {:?}", file_path);
+                    let file_contents = fs::read_to_string(entry.path())?;
+                    match parse_config(pity_dir.as_path(), &file_contents) {
+                        Ok(parsed) => configs.extend(parsed),
+                        Err(e) => {
+                            warn!(target: "user", "Unable to parse {:?}: {}", entry.path(), e);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Ok(configs)
 }
