@@ -56,7 +56,7 @@ impl CheckRuntime for ModelRoot<ExecCheck> {
             });
         }
 
-        let output = Command::new(&path).output()?;
+        let output = Command::new(path).output()?;
 
         Ok(RuntimeResult {
             success: output.status.success(),

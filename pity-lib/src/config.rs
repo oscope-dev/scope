@@ -68,7 +68,7 @@ fn parse_value(base_path: &Path, value: Value) -> anyhow::Result<ParsedConfig> {
 
     let parsed = match (api_version, kind) {
         ("pity.github.com/v1alpha", "ExecCheck") => {
-            let exec_check = config::parse_v1_exec_check(base_path, &root.spec)?;
+            let exec_check = parser::parse_v1_exec_check(base_path, &root.spec)?;
             ParsedConfig::DoctorExec(root.with_spec(exec_check))
         }
         (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind)),
@@ -77,7 +77,7 @@ fn parse_value(base_path: &Path, value: Value) -> anyhow::Result<ParsedConfig> {
     Ok(parsed)
 }
 
-mod config {
+mod parser {
     use serde::{Deserialize, Serialize};
     use serde_yaml::Value;
     use std::path::Path;
@@ -118,9 +118,7 @@ spec:
     let configs = parse_config(path, text).unwrap();
     assert_eq!(1, configs.len());
     let doctor_exec = &configs[0];
-    let model = match doctor_exec {
-        ParsedConfig::DoctorExec(model) => model,
-    };
+    let ParsedConfig::DoctorExec(model) = doctor_exec;
     assert_eq!(
         ExecCheck {
             description: "Check your shell for basic functionality".to_string(),

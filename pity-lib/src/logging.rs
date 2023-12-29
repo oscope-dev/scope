@@ -58,7 +58,7 @@ impl LoggingOpts {
         let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
         let now = chrono::Local::now();
         let current_time = now.format("%Y%m%d");
-        let file_name = format!("pity-{}-{}-{}.log", prefix, current_time.to_string(), id);
+        let file_name = format!("pity-{}-{}-{}.log", prefix, current_time, id);
         let full_path = format!("/tmp/pity/{}", file_name);
         let file_appender = tracing_appender::rolling::never("/tmp/pity", file_name);
         let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);

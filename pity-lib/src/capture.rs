@@ -90,7 +90,7 @@ impl OutputCapture {
         Ok(Self {
             stdout: captured_stdout,
             stderr: captured_stderr,
-            exit_code: command_result.ok().map(|x| x.code()).flatten(),
+            exit_code: command_result.ok().and_then(|x| x.code()),
             start_time,
             end_time,
             command: args.join(" "),
@@ -103,7 +103,7 @@ impl OutputCapture {
             .iter()
             .map(|(time, line)| {
                 let offset: Duration = *time - self.start_time;
-                (time.clone(), format!("{} OUT: {}", offset, line))
+                (*time, format!("{} OUT: {}", offset, line))
             })
             .collect();
 
@@ -112,7 +112,7 @@ impl OutputCapture {
             .iter()
             .map(|(time, line)| {
                 let offset: Duration = *time - self.start_time;
-                (time.clone(), format!("{} ERR: {}", offset, line))
+                (*time, format!("{} ERR: {}", offset, line))
             })
             .collect();
 
@@ -120,7 +120,7 @@ impl OutputCapture {
         output.extend(stdout);
         output.extend(stderr);
 
-        output.sort_by(|(l_time, _), (r_time, _)| l_time.cmp(&r_time));
+        output.sort_by(|(l_time, _), (r_time, _)| l_time.cmp(r_time));
 
         let text: String = output
             .iter()
@@ -132,24 +132,24 @@ impl OutputCapture {
 
     pub fn create_report_text(&self) -> anyhow::Result<String> {
         let mut f = String::new();
-        write!(&mut f, "= Command Results\n")?;
-        write!(&mut f, "Ran command `/usr/bin/env -S {}`\n", self.command)?;
-        write!(
+        writeln!(&mut f, "= Command Results")?;
+        writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
+        writeln!(
             &mut f,
-            "Execution started: {}; finished: {}\n",
+            "Execution started: {}; finished: {}",
             self.start_time, self.end_time
         )?;
-        write!(
+        writeln!(
             &mut f,
-            "Result of command: {}\n",
-            self.exit_code.unwrap_or_else(|| -1)
+            "Result of command: {}",
+            self.exit_code.unwrap_or(-1)
         )?;
         write!(&mut f, "\n== Output\n")?;
         write!(&mut f, "\n[source,text]\n")?;
-        write!(&mut f, "....\n")?;
-        write!(&mut f, "{}\n", self.generate_output())?;
-        write!(&mut f, "....\n")?;
-        write!(&mut f, "\n")?;
+        writeln!(&mut f, "....")?;
+        writeln!(&mut f, "{}", self.generate_output())?;
+        writeln!(&mut f, "....")?;
+        writeln!(&mut f)?;
         Ok(f)
     }
 

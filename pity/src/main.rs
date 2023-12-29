@@ -7,7 +7,7 @@ use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig};
 use pity_report::prelude::{report_root, ReportArgs};
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{debug, error, warn};
 
 /// Pity the Fool
@@ -102,21 +102,19 @@ fn parse_dir(pity_dir: PathBuf) -> Result<Vec<ParsedConfig>> {
 
     debug!(target: "user", "Searching dir {:?}", pity_dir);
     if pity_dir.exists() {
-        for dir_entry in fs::read_dir(&pity_dir)? {
-            if let Ok(entry) = dir_entry {
-                if !entry.path().is_file() {
-                    continue;
-                }
-                let file_path = entry.path();
-                let extension = file_path.extension();
-                if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml")) {
-                    debug!(target: "user", "Found file {:?}", file_path);
-                    let file_contents = fs::read_to_string(entry.path())?;
-                    match parse_config(pity_dir.as_path(), &file_contents) {
-                        Ok(parsed) => configs.extend(parsed),
-                        Err(e) => {
-                            warn!(target: "user", "Unable to parse {:?}: {}", entry.path(), e);
-                        }
+        for dir_entry in fs::read_dir(&pity_dir)?.flatten() {
+            if !dir_entry.path().is_file() {
+                continue;
+            }
+            let file_path = dir_entry.path();
+            let extension = file_path.extension();
+            if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml")) {
+                debug!(target: "user", "Found file {:?}", file_path);
+                let file_contents = fs::read_to_string(&file_path)?;
+                match parse_config(pity_dir.as_path(), &file_contents) {
+                    Ok(parsed) => configs.extend(parsed),
+                    Err(e) => {
+                        warn!(target: "user", "Unable to parse {:?}: {}", &file_path, e);
                     }
                 }
             }
