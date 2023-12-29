@@ -1,12 +1,12 @@
+use crate::models::{parse_config, ExecCheck, ModelRoot, ParsedConfig};
+use anyhow::Result;
+use clap::{ArgGroup, Parser};
+use directories::{BaseDirs, UserDirs};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
-use clap::{Parser, ArgGroup};
 use tracing::{debug, warn};
-use crate::models::{ExecCheck, ModelRoot, parse_config, ParsedConfig};
-use anyhow::Result;
-use directories::{BaseDirs, UserDirs};
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -25,19 +25,20 @@ pub struct ConfigOptions {
 
 #[derive(Default, Debug, Clone)]
 pub struct FoundConfig {
-    pub exec_check: BTreeMap<String, ModelRoot<ExecCheck>>
+    pub exec_check: BTreeMap<String, ModelRoot<ExecCheck>>,
 }
 
 impl FoundConfig {
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
-            ParsedConfig::DoctorExec(exec) => self.exec_check.insert(exec.metadata.name.clone(), exec)
+            ParsedConfig::DoctorExec(exec) => {
+                self.exec_check.insert(exec.metadata.name.clone(), exec)
+            }
         };
     }
 }
 
 impl ConfigOptions {
-
     pub fn load_config(&self) -> Result<FoundConfig> {
         let mut found_config = FoundConfig::default();
         for file_path in self.find_config_files()? {
@@ -45,7 +46,6 @@ impl ConfigOptions {
             for config in parse_config(file_path.parent().unwrap(), &file_contents)? {
                 found_config.add_model(config);
             }
-
         }
 
         debug!("Loaded config {:?}", found_config);
@@ -83,7 +83,6 @@ impl ConfigOptions {
             }
         }
 
-
         let mut config_files = Vec::new();
         for path in config_paths {
             config_files.extend(expand_path(&path)?);
@@ -95,7 +94,7 @@ impl ConfigOptions {
 
 fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {
     if !path.exists() {
-        return Ok(Vec::new())
+        return Ok(Vec::new());
     }
 
     if path.is_file() {
@@ -104,7 +103,7 @@ fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {
 
     if path.is_dir() {
         let mut files = Vec::new();
-        for dir_entry in fs::read_dir(&path)?.flatten() {
+        for dir_entry in fs::read_dir(path)?.flatten() {
             if !dir_entry.path().is_file() {
                 continue;
             }

@@ -1,7 +1,7 @@
 use crate::commands::*;
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use pity_lib::prelude::{FoundConfig, ParsedConfig};
+use pity_lib::prelude::FoundConfig;
 
 #[derive(Debug, Args)]
 pub struct DoctorArgs {

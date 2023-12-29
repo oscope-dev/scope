@@ -2,12 +2,10 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use human_panic::setup_panic;
 use pity_doctor::prelude::*;
-use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig, ConfigOptions, FoundConfig};
+use pity_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
 use pity_report::prelude::{report_root, ReportArgs};
-use std::ffi::OsStr;
-use std::fs;
-use std::path::PathBuf;
-use tracing::{debug, error, warn};
+
+use tracing::error;
 
 /// Pity the Fool
 ///
@@ -54,7 +52,7 @@ async fn run_subcommand(opts: Cli) -> i32 {
             error!(target: "user", "Failed to load configuration: {}", e);
             return 2;
         }
-        Ok(c) => c
+        Ok(c) => c,
     };
 
     match handle_commands(&loaded_config, &opts.command).await {
