@@ -2,12 +2,11 @@ use crate::check::CheckRuntime;
 use anyhow::Result;
 use clap::Args;
 use colored::*;
-use tracing::info;
 use pity_lib::prelude::{ExecCheck, ModelRoot};
+use tracing::info;
 
 #[derive(Debug, Args)]
-pub struct DoctorListArgs {
-}
+pub struct DoctorListArgs {}
 
 pub async fn doctor_list(configs: Vec<ModelRoot<ExecCheck>>, _args: &DoctorListArgs) -> Result<()> {
     info!("Loaded config {:?}", configs);

@@ -1,8 +1,8 @@
+use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use anyhow::anyhow;
-use serde::{Serialize, Deserialize};
-use serde_yaml::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ModelMetadata {
@@ -19,16 +19,16 @@ pub struct ModelRoot<V> {
     pub api_version: String,
     pub kind: String,
     pub metadata: ModelMetadata,
-    pub spec: V
+    pub spec: V,
 }
 
-impl <V> ModelRoot<V> {
+impl<V> ModelRoot<V> {
     pub fn with_spec<T>(&self, spec: T) -> ModelRoot<T> {
         ModelRoot {
             api_version: self.api_version.clone(),
             kind: self.kind.clone(),
             metadata: self.metadata.clone(),
-            spec
+            spec,
         }
     }
 }
@@ -37,12 +37,12 @@ impl <V> ModelRoot<V> {
 pub struct ExecCheck {
     pub target: PathBuf,
     pub description: String,
-    pub help_text: String
+    pub help_text: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ParsedConfig {
-    DoctorExec(ModelRoot<ExecCheck>)
+    DoctorExec(ModelRoot<ExecCheck>),
 }
 
 pub fn parse_config(base_path: &Path, config: &str) -> anyhow::Result<Vec<ParsedConfig>> {
@@ -54,9 +54,9 @@ pub fn parse_config(base_path: &Path, config: &str) -> anyhow::Result<Vec<Parsed
                 result.push(parse_value(base_path, item)?);
             }
             result
-        },
+        }
         Value::Mapping(_) => vec![parse_value(base_path, parsed)?],
-        _ => { return Err(anyhow!("Input file wasn't an array or an object")) }
+        _ => return Err(anyhow!("Input file wasn't an array or an object")),
     };
     Ok(values)
 }
@@ -70,17 +70,17 @@ fn parse_value(base_path: &Path, value: Value) -> anyhow::Result<ParsedConfig> {
         ("pity.github.com/v1alpha", "ExecCheck") => {
             let exec_check = config::parse_v1_exec_check(base_path, &root.spec)?;
             ParsedConfig::DoctorExec(root.with_spec(exec_check))
-        },
-        (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind))
+        }
+        (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind)),
     };
 
     Ok(parsed)
 }
 
 mod config {
-    use std::path::{Path};
+    use serde::{Deserialize, Serialize};
     use serde_yaml::Value;
-    use serde::{Serialize, Deserialize};
+    use std::path::Path;
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -90,7 +90,10 @@ mod config {
         help: String,
     }
 
-    pub(super) fn parse_v1_exec_check(base_path: &Path, value: &Value) -> anyhow::Result<super::ExecCheck> {
+    pub(super) fn parse_v1_exec_check(
+        base_path: &Path,
+        value: &Value,
+    ) -> anyhow::Result<super::ExecCheck> {
         let parsed: ExecCheckV1Alpha = serde_yaml::from_value(value.clone())?;
         Ok(super::ExecCheck {
             help_text: parsed.help,
@@ -118,10 +121,12 @@ spec:
     let model = match doctor_exec {
         ParsedConfig::DoctorExec(model) => model,
     };
-    assert_eq!(ExecCheck {
-        description: "Check your shell for basic functionality".to_string(),
-        help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-        target: path.join("scripts/does-path-env-exist.sh"),
-    }, model.spec);
+    assert_eq!(
+        ExecCheck {
+            description: "Check your shell for basic functionality".to_string(),
+            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+            target: path.join("scripts/does-path-env-exist.sh"),
+        },
+        model.spec
+    );
 }
-

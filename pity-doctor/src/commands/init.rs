@@ -8,6 +8,9 @@ pub struct DoctorInitArgs {
     output: String,
 }
 
-pub async fn doctor_init(_configs: Vec<ModelRoot<ExecCheck>>, _args: &DoctorInitArgs) -> Result<()> {
+pub async fn doctor_init(
+    _configs: Vec<ModelRoot<ExecCheck>>,
+    _args: &DoctorInitArgs,
+) -> Result<()> {
     Ok(())
 }

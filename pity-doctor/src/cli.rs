@@ -23,7 +23,7 @@ pub async fn doctor_root(configs: Vec<ParsedConfig>, args: &DoctorArgs) -> Resul
     let mut exec_config = Vec::new();
     for raw_config in configs {
         match raw_config {
-            ParsedConfig::DoctorExec(exec) => exec_config.push(exec)
+            ParsedConfig::DoctorExec(exec) => exec_config.push(exec),
         }
     }
     match &args.command {

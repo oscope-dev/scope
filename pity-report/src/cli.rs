@@ -1,7 +1,7 @@
 use anyhow::Result;
-use clap::{Args};
-use tracing::{info};
-use pity_lib::prelude::{OutputCapture, OutputDestination, write_to_report_file};
+use clap::Args;
+use pity_lib::prelude::{write_to_report_file, OutputCapture, OutputDestination};
+use tracing::info;
 
 #[derive(Debug, Args)]
 pub struct ReportArgs {
@@ -22,4 +22,3 @@ pub async fn report_root(args: &ReportArgs) -> Result<()> {
 
     Ok(())
 }
-

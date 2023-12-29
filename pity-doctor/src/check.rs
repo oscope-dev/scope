@@ -1,8 +1,8 @@
 use async_trait::async_trait;
+use pity_lib::prelude::{ExecCheck, ModelRoot};
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use thiserror::Error;
-use pity_lib::prelude::{ModelRoot, ExecCheck};
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
@@ -45,7 +45,7 @@ impl CheckRuntime for ModelRoot<ExecCheck> {
         let path = &self.spec.target;
         if !path.exists() {
             return Err(RuntimeError::MissingShExec {
-                name: path.display().to_string()
+                name: path.display().to_string(),
             });
         }
         let metadata = std::fs::metadata(path)?;

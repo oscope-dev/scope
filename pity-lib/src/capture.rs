@@ -1,13 +1,13 @@
-use std::process::Stdio;
 use chrono::{DateTime, Duration, Utc};
+use std::fmt::Write;
+use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
-use std::fmt::Write;
 
 #[derive(Debug, Default)]
 struct RwLockOutput {
-    output: RwLock<Vec<(DateTime<Utc>, String)>>
+    output: RwLock<Vec<(DateTime<Utc>, String)>>,
 }
 
 impl RwLockOutput {
@@ -28,14 +28,19 @@ pub struct OutputCapture {
 
 pub enum OutputDestination {
     StandardOut,
-    Logging
+    Logging,
 }
 
 impl OutputCapture {
-    pub async fn capture_output(args: &[String], output: &OutputDestination) -> anyhow::Result<Self> {
+    pub async fn capture_output(
+        args: &[String],
+        output: &OutputDestination,
+    ) -> anyhow::Result<Self> {
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
-        let mut child = command.arg("-S").args(args)
+        let mut child = command
+            .arg("-S")
+            .args(args)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
@@ -51,7 +56,7 @@ impl OutputCapture {
                     captured.add_line(&line).await;
                     match output {
                         OutputDestination::Logging => info!("{}", line),
-                        OutputDestination::StandardOut => println!("{}", line)
+                        OutputDestination::StandardOut => println!("{}", line),
                     }
                 }
 
@@ -67,7 +72,7 @@ impl OutputCapture {
                     captured.add_line(&line).await;
                     match output {
                         OutputDestination::Logging => error!("{}", line),
-                        OutputDestination::StandardOut => eprintln!("{}", line)
+                        OutputDestination::StandardOut => eprintln!("{}", line),
                     }
                 }
 
@@ -93,15 +98,23 @@ impl OutputCapture {
     }
 
     pub fn generate_output(&self) -> String {
-        let stdout: Vec<_> = self.stdout.iter().map(|(time, line)| {
-            let offset: Duration = *time - self.start_time;
-            (time.clone(), format!("{} OUT: {}", offset, line))
-        }).collect();
+        let stdout: Vec<_> = self
+            .stdout
+            .iter()
+            .map(|(time, line)| {
+                let offset: Duration = *time - self.start_time;
+                (time.clone(), format!("{} OUT: {}", offset, line))
+            })
+            .collect();
 
-        let stderr: Vec<_> = self.stderr.iter().map(|(time, line)| {
-            let offset: Duration = *time - self.start_time;
-            (time.clone(), format!("{} ERR: {}", offset, line))
-        }).collect();
+        let stderr: Vec<_> = self
+            .stderr
+            .iter()
+            .map(|(time, line)| {
+                let offset: Duration = *time - self.start_time;
+                (time.clone(), format!("{} ERR: {}", offset, line))
+            })
+            .collect();
 
         let mut output = Vec::new();
         output.extend(stdout);
@@ -109,30 +122,50 @@ impl OutputCapture {
 
         output.sort_by(|(l_time, _), (r_time, _)| l_time.cmp(&r_time));
 
-        let text: String = output.iter().map(|(_, line)| line.clone()).collect::<Vec<_>>().join("\n");
+        let text: String = output
+            .iter()
+            .map(|(_, line)| line.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
         text
     }
 
     pub fn create_report_text(&self) -> anyhow::Result<String> {
         let mut f = String::new();
-            write!(&mut f, "= Command Results\n")?;
-            write!(&mut f, "Ran command `/usr/bin/env -S {}`\n", self.command)?;
-            write!(&mut f, "Execution started: {}; finished: {}\n", self.start_time, self.end_time)?;
-            write!(&mut f, "Result of command: {}\n", self.exit_code.unwrap_or_else(|| -1))?;
-            write!(&mut f, "\n== Output\n")?;
-            write!(&mut f, "\n[source,text]\n")?;
-            write!(&mut f, "....\n")?;
-            write!(&mut f, "{}\n", self.generate_output())?;
-            write!(&mut f, "....\n")?;
-            write!(&mut f, "\n")?;
-            Ok(f)
+        write!(&mut f, "= Command Results\n")?;
+        write!(&mut f, "Ran command `/usr/bin/env -S {}`\n", self.command)?;
+        write!(
+            &mut f,
+            "Execution started: {}; finished: {}\n",
+            self.start_time, self.end_time
+        )?;
+        write!(
+            &mut f,
+            "Result of command: {}\n",
+            self.exit_code.unwrap_or_else(|| -1)
+        )?;
+        write!(&mut f, "\n== Output\n")?;
+        write!(&mut f, "\n[source,text]\n")?;
+        write!(&mut f, "....\n")?;
+        write!(&mut f, "{}\n", self.generate_output())?;
+        write!(&mut f, "....\n")?;
+        write!(&mut f, "\n")?;
+        Ok(f)
     }
 
     pub fn get_stdout(&self) -> String {
-        self.stdout.iter().map(|(_, line)| line.clone()).collect::<Vec<_>>().join("\n")
+        self.stdout
+            .iter()
+            .map(|(_, line)| line.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     pub fn get_stderr(&self) -> String {
-        self.stderr.iter().map(|(_, line)| line.clone()).collect::<Vec<_>>().join("\n")
+        self.stderr
+            .iter()
+            .map(|(_, line)| line.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

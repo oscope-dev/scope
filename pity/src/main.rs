@@ -1,11 +1,12 @@
-use std::fs;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use human_panic::setup_panic;
-use tracing::{error};
 use pity_doctor::prelude::*;
+use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig};
 use pity_report::prelude::{report_root, ReportArgs};
-use pity_lib::prelude::{LoggingOpts, parse_config, ParsedConfig};
+use std::ffi::OsStr;
+use std::fs;
+use tracing::{debug, error, warn};
 
 /// Pity the Fool
 ///
@@ -28,7 +29,7 @@ enum Command {
     /// Run checks that will "checkup" your machine.
     Doctor(DoctorArgs),
     /// Generate a bug report based from a command that was ran
-    Report(ReportArgs)
+    Report(ReportArgs),
 }
 
 #[tokio::main]
@@ -38,15 +39,19 @@ async fn main() {
     let opts = Cli::parse();
 
     let _guard = opts.logging.configure_logging("root");
-    let error_code = match handle_commands(&opts.command).await {
-        Ok(_) => 0,
-        Err(e) => {
-            error!("Critical Error. {}", e);
-            1
-        }
-    };
+    let error_code = run_subcommand(opts).await;
 
     std::process::exit(error_code);
+}
+
+async fn run_subcommand(opts: Cli) -> i32 {
+    match handle_commands(&opts.command).await {
+        Ok(_) => 0,
+        Err(e) => {
+            error!(target: "user", "Critical Error. {}", e);
+            1
+        }
+    }
 }
 
 async fn handle_commands(command: &Command) -> Result<()> {
@@ -59,16 +64,30 @@ async fn handle_commands(command: &Command) -> Result<()> {
 
 async fn find_configs() -> Result<Vec<ParsedConfig>> {
     let mut search_dir = std::env::current_dir()?;
-
     let mut configs = Vec::new();
 
     loop {
         let pity_dir = search_dir.join(".pity");
+        debug!(target: "user", "Searching dir {:?}", pity_dir);
         if pity_dir.exists() {
             for dir_entry in fs::read_dir(&pity_dir)? {
                 if let Ok(entry) = dir_entry {
-                    let file_contents = fs::read_to_string(entry.path())?;
-                    configs.extend(parse_config(pity_dir.as_path(), &file_contents)?);
+                    if !entry.path().is_file() {
+                        continue;
+                    }
+                    let file_path = entry.path();
+                    let extension = file_path.extension();
+                    if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml"))
+                    {
+                        debug!(target: "user", "Found file {:?}", file_path);
+                        let file_contents = fs::read_to_string(entry.path())?;
+                        match parse_config(pity_dir.as_path(), &file_contents) {
+                            Ok(parsed) => configs.extend(parsed),
+                            Err(e) => {
+                                warn!(target: "user", "Unable to parse {:?}: {}", entry.path(), e);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -84,6 +103,8 @@ async fn find_configs() -> Result<Vec<ParsedConfig>> {
             break;
         }
     }
+
+    debug!(target: "user", "Found config {:?}", configs);
 
     Ok(configs)
 }

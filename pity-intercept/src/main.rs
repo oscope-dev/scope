@@ -1,7 +1,7 @@
 use clap::Parser;
 use human_panic::setup_panic;
+use pity_lib::prelude::{write_to_report_file, LoggingOpts, OutputCapture, OutputDestination};
 use tracing::info;
-use pity_lib::prelude::{LoggingOpts, OutputCapture, OutputDestination, write_to_report_file};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
 /// and let the user know.

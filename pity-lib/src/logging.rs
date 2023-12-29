@@ -1,5 +1,5 @@
 use clap::{ArgGroup, Parser};
-use tracing::{info};
+use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
@@ -27,15 +27,14 @@ pub struct LoggingOpts {
     pub error: bool,
 
     #[arg(skip = LevelFilter::INFO)]
-    default_level: LevelFilter
+    default_level: LevelFilter,
 }
 
 impl LoggingOpts {
-
     pub fn with_new_default(&self, new_default: LevelFilter) -> Self {
         Self {
             debug: self.debug,
-            warn : self.warn,
+            warn: self.warn,
             error: self.error,
             default_level: new_default,
         }
@@ -76,10 +75,13 @@ impl LoggingOpts {
 
         let subscriber = Registry::default()
             .with(self.to_level_filter())
-            .with(console_output.with_filter(filter_fn(move |metadata| metadata.target() == "user")))
+            .with(
+                console_output.with_filter(filter_fn(move |metadata| metadata.target() == "user")),
+            )
             .with(file_output);
 
-        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
 
         info!(target: "user", "More details logs at {}", full_path);
 

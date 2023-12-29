@@ -1,10 +1,10 @@
 use crate::check::CheckRuntime;
 use anyhow::Result;
-use clap::{Parser};
+use clap::Parser;
 use colored::*;
+use pity_lib::prelude::{ExecCheck, ModelRoot};
 use std::collections::BTreeMap;
 use tracing::{error, info, warn};
-use pity_lib::prelude::{ExecCheck, ModelRoot};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -14,7 +14,6 @@ pub struct DoctorRunArgs {
 }
 
 pub async fn doctor_run(configs: Vec<ModelRoot<ExecCheck>>, args: &DoctorRunArgs) -> Result<()> {
-
     let mut check_map: BTreeMap<String, ModelRoot<ExecCheck>> = Default::default();
     let mut check_order: Vec<String> = Default::default();
     for check in configs {
