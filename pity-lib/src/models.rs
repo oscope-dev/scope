@@ -63,8 +63,8 @@ pub fn parse_config(base_path: &Path, config: &str) -> Result<Vec<ParsedConfig>>
 
 fn parse_value(base_path: &Path, value: Value) -> Result<ParsedConfig> {
     let root: ModelRoot<Value> = serde_yaml::from_value(value)?;
-    let api_version: &str = &root.api_version;
-    let kind: &str = &root.kind;
+    let api_version: &str = &root.api_version.trim().to_ascii_lowercase();
+    let kind: &str = &root.kind.trim().to_ascii_lowercase();
 
     let parsed = match (api_version, kind) {
         ("pity.github.com/v1alpha", "ExecCheck") => {
