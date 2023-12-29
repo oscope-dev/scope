@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Args;
-use pity_lib::prelude::{ExecCheck, ModelRoot};
+use pity_lib::prelude::{ExecCheck, FoundConfig, ModelRoot};
 
 #[derive(Debug, Args)]
 pub struct DoctorInitArgs {
@@ -9,7 +9,7 @@ pub struct DoctorInitArgs {
 }
 
 pub async fn doctor_init(
-    _configs: Vec<ModelRoot<ExecCheck>>,
+    _found_config: &FoundConfig,
     _args: &DoctorInitArgs,
 ) -> Result<()> {
     Ok(())

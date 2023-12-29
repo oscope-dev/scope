@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
@@ -45,7 +45,7 @@ pub enum ParsedConfig {
     DoctorExec(ModelRoot<ExecCheck>),
 }
 
-pub fn parse_config(base_path: &Path, config: &str) -> anyhow::Result<Vec<ParsedConfig>> {
+pub fn parse_config(base_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
     let parsed: Value = serde_yaml::from_str(config)?;
     let values = match parsed {
         Value::Sequence(arr) => {
@@ -61,7 +61,7 @@ pub fn parse_config(base_path: &Path, config: &str) -> anyhow::Result<Vec<Parsed
     Ok(values)
 }
 
-fn parse_value(base_path: &Path, value: Value) -> anyhow::Result<ParsedConfig> {
+fn parse_value(base_path: &Path, value: Value) -> Result<ParsedConfig> {
     let root: ModelRoot<Value> = serde_yaml::from_value(value)?;
     let api_version: &str = &root.api_version;
     let kind: &str = &root.kind;

@@ -843,7 +843,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "directories 5.0.1",
  "dotenv",
  "human-panic",
  "pity-doctor",
@@ -895,6 +894,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "directories 5.0.1",
  "dotenv",
  "human-panic",
  "nanoid",

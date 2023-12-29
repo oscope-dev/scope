@@ -1,7 +1,7 @@
 use crate::commands::*;
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use pity_lib::prelude::ParsedConfig;
+use pity_lib::prelude::{FoundConfig, ParsedConfig};
 
 #[derive(Debug, Args)]
 pub struct DoctorArgs {
@@ -19,16 +19,10 @@ enum DoctorCommands {
     Init(DoctorInitArgs),
 }
 
-pub async fn doctor_root(configs: Vec<ParsedConfig>, args: &DoctorArgs) -> Result<()> {
-    let mut exec_config = Vec::new();
-    for raw_config in configs {
-        match raw_config {
-            ParsedConfig::DoctorExec(exec) => exec_config.push(exec),
-        }
-    }
+pub async fn doctor_root(found_config: &FoundConfig, args: &DoctorArgs) -> Result<()> {
     match &args.command {
-        DoctorCommands::List(args) => doctor_list(exec_config, args).await,
-        DoctorCommands::Run(args) => doctor_run(exec_config, args).await,
-        DoctorCommands::Init(args) => doctor_init(exec_config, args).await,
+        DoctorCommands::List(args) => doctor_list(found_config, args).await,
+        DoctorCommands::Run(args) => doctor_run(found_config, args).await,
+        DoctorCommands::Init(args) => doctor_init(found_config, args).await,
     }
 }

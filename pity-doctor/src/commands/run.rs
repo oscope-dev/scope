@@ -2,7 +2,7 @@ use crate::check::CheckRuntime;
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use pity_lib::prelude::{ExecCheck, ModelRoot};
+use pity_lib::prelude::{ExecCheck, FoundConfig, ModelRoot};
 use std::collections::BTreeMap;
 use tracing::{error, info, warn};
 
@@ -13,10 +13,10 @@ pub struct DoctorRunArgs {
     only: Option<Vec<String>>,
 }
 
-pub async fn doctor_run(configs: Vec<ModelRoot<ExecCheck>>, args: &DoctorRunArgs) -> Result<()> {
+pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<()> {
     let mut check_map: BTreeMap<String, ModelRoot<ExecCheck>> = Default::default();
     let mut check_order: Vec<String> = Default::default();
-    for check in configs {
+    for check in found_config.exec_check.values() {
         let name = check.name();
         if let Some(old) = check_map.insert(name.clone(), check.clone()) {
             warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());

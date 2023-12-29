@@ -1,9 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use directories::{BaseDirs, UserDirs};
 use human_panic::setup_panic;
 use pity_doctor::prelude::*;
-use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig};
+use pity_lib::prelude::{parse_config, LoggingOpts, ParsedConfig, ConfigOptions, FoundConfig};
 use pity_report::prelude::{report_root, ReportArgs};
 use std::ffi::OsStr;
 use std::fs;
@@ -21,6 +20,9 @@ use tracing::{debug, error, warn};
 struct Cli {
     #[clap(flatten)]
     logging: LoggingOpts,
+
+    #[clap(flatten)]
+    config: ConfigOptions,
 
     #[clap(subcommand)]
     command: Command,
@@ -47,7 +49,15 @@ async fn main() {
 }
 
 async fn run_subcommand(opts: Cli) -> i32 {
-    match handle_commands(&opts.command).await {
+    let loaded_config = match opts.config.load_config() {
+        Err(e) => {
+            error!(target: "user", "Failed to load configuration: {}", e);
+            return 2;
+        }
+        Ok(c) => c
+    };
+
+    match handle_commands(&loaded_config, &opts.command).await {
         Ok(_) => 0,
         Err(e) => {
             error!(target: "user", "Critical Error. {}", e);
@@ -56,70 +66,9 @@ async fn run_subcommand(opts: Cli) -> i32 {
     }
 }
 
-async fn handle_commands(command: &Command) -> Result<()> {
-    let configs = find_configs().await?;
+async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Result<()> {
     match command {
-        Command::Doctor(args) => doctor_root(configs, args).await,
+        Command::Doctor(args) => doctor_root(found_config, args).await,
         Command::Report(args) => report_root(args).await,
     }
-}
-
-async fn find_configs() -> Result<Vec<ParsedConfig>> {
-    let mut search_dir = std::env::current_dir()?;
-    let mut configs = Vec::new();
-
-    loop {
-        let pity_dir = search_dir.join(".pity");
-        configs.extend(parse_dir(pity_dir)?);
-
-        let parent_dir = search_dir.parent();
-        if let Some(dir) = parent_dir {
-            if dir == search_dir.as_path() {
-                break;
-            } else {
-                search_dir = dir.to_path_buf();
-            }
-        } else {
-            break;
-        }
-    }
-
-    if let Some(user_dirs) = UserDirs::new() {
-        configs.extend(parse_dir(user_dirs.home_dir().join(".pity"))?);
-    }
-
-    if let Some(base_dirs) = BaseDirs::new() {
-        configs.extend(parse_dir(base_dirs.config_dir().join(".pity"))?);
-    }
-
-    debug!(target: "user", "Found config {:?}", configs);
-
-    Ok(configs)
-}
-
-fn parse_dir(pity_dir: PathBuf) -> Result<Vec<ParsedConfig>> {
-    let mut configs = Vec::new();
-
-    debug!(target: "user", "Searching dir {:?}", pity_dir);
-    if pity_dir.exists() {
-        for dir_entry in fs::read_dir(&pity_dir)?.flatten() {
-            if !dir_entry.path().is_file() {
-                continue;
-            }
-            let file_path = dir_entry.path();
-            let extension = file_path.extension();
-            if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml")) {
-                debug!(target: "user", "Found file {:?}", file_path);
-                let file_contents = fs::read_to_string(&file_path)?;
-                match parse_config(pity_dir.as_path(), &file_contents) {
-                    Ok(parsed) => configs.extend(parsed),
-                    Err(e) => {
-                        warn!(target: "user", "Unable to parse {:?}: {}", &file_path, e);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(configs)
 }
