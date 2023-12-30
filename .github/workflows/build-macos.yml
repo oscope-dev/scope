@@ -14,7 +14,6 @@ concurrency:
 jobs:
   build-for-macos:
     runs-on: macos-latest
-    needs: create-release
     steps:
       - uses: actions/checkout@v3
       - run: rustup update
