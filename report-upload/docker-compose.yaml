@@ -1,0 +1,15 @@
+version: "3.6"
+services:
+  server:
+    image: orhunp/rustypaste:${IMAGE_TAG:-latest}
+    container_name: rustypaste
+    restart: always
+    environment:
+      - RUST_LOG=debug
+    env_file:
+      - rusty-paste.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./rusty-paste/:/app/upload
+      - ./rusty-paste.config.toml:/app/config.toml
