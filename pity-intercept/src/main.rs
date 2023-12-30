@@ -1,8 +1,10 @@
 use clap::Parser;
 use human_panic::setup_panic;
-use pity_lib::prelude::{LoggingOpts, OutputCapture, OutputDestination, ConfigOptions, FoundConfig, ReportBuilder};
-use tracing::{debug, error, info, warn};
+use pity_lib::prelude::{
+    ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination, ReportBuilder,
+};
 use pity_lib::UserListing;
+use tracing::{debug, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
 /// and let the user know.
@@ -60,9 +62,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     let mut accepted_exit_codes = vec![0];
     accepted_exit_codes.extend(opts.successful_exit);
 
-    let exit_code = capture.exit_code.unwrap_or_else(|| -1);
+    let exit_code = capture.exit_code.unwrap_or(-1);
     if accepted_exit_codes.contains(&exit_code) {
-        return Ok(exit_code)
+        return Ok(exit_code);
     }
 
     error!(target: "user", "Command failed, checking for a known error");
@@ -87,7 +89,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
 
     let ans = inquire::Confirm::new("Do you want to upload a bug report?")
         .with_default(true)
-        .with_help_message("This will allow you to share the error with other engineers for support.")
+        .with_help_message(
+            "This will allow you to share the error with other engineers for support.",
+        )
         .prompt();
 
     if let Ok(true) = ans {

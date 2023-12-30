@@ -3,15 +3,13 @@ use time::macros::format_description;
 use time::UtcOffset;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
+use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
-    fmt::{
-        format::{Format, JsonFields, PrettyFields},
-    },
+    fmt::format::{Format, JsonFields, PrettyFields},
     layer::SubscriberExt,
     Registry,
 };
-use tracing_subscriber::fmt::time::OffsetTime;
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("logging"))]
@@ -70,10 +68,7 @@ impl LoggingOpts {
             .fmt_fields(JsonFields::new())
             .with_writer(non_blocking);
 
-        let offset_in_sec = chrono::Local::now()
-            .offset()
-            .local_minus_utc();
-
+        let offset_in_sec = chrono::Local::now().offset().local_minus_utc();
 
         let offset = UtcOffset::from_whole_seconds(offset_in_sec).unwrap_or(UtcOffset::UTC);
         let output_fmt = OffsetTime::new(offset, format_description!("[hour]:[minute]:[second]"));
@@ -84,11 +79,10 @@ impl LoggingOpts {
 
         let level_filter = self.to_level_filter();
         let subscriber = Registry::default()
-            .with(
-                console_output.with_filter(filter_fn(move |metadata| {
-                    metadata.target() == "user" && level_filter >= *metadata.level() || metadata.target() == "always"
-                })),
-            )
+            .with(console_output.with_filter(filter_fn(move |metadata| {
+                metadata.target() == "user" && level_filter >= *metadata.level()
+                    || metadata.target() == "always"
+            })))
             .with(file_output);
 
         tracing::subscriber::set_global_default(subscriber)

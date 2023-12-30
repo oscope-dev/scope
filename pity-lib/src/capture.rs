@@ -29,11 +29,10 @@ pub struct OutputCapture {
 pub enum OutputDestination {
     StandardOut,
     Logging,
-    Null
+    Null,
 }
 
 impl OutputCapture {
-
     pub async fn capture_output(
         args: &[String],
         output: &OutputDestination,
@@ -136,7 +135,7 @@ impl OutputCapture {
 
     pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
         let mut f = String::new();
-        let title = title.unwrap_or_else(|| "== Command Results");
+        let title = title.unwrap_or("== Command Results");
         writeln!(&mut f, "{}\n", title)?;
         writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
         writeln!(

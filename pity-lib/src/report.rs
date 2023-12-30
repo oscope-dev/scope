@@ -1,25 +1,28 @@
-use std::collections::{BTreeMap};
-use std::fs::File;
-use std::io::Write;
-use anyhow::Result;
-use tracing::{debug, info, warn};
 use crate::capture::{OutputCapture, OutputDestination};
 use crate::models::{ModelRoot, ReportUploadLocation, ReportUploadSpec};
+use anyhow::Result;
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::Write;
+use tracing::{debug, info, warn};
 
 pub struct ReportBuilder {
     command_capture: OutputCapture,
-    destinations: BTreeMap<String, ModelRoot<ReportUploadSpec>>
+    destinations: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
 }
 
 impl ReportBuilder {
-    pub fn new(capture: OutputCapture, destinations: &BTreeMap<String, ModelRoot<ReportUploadSpec>>) -> Self {
+    pub fn new(
+        capture: OutputCapture,
+        destinations: &BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+    ) -> Self {
         Self {
             command_capture: capture,
             destinations: destinations.clone(),
         }
     }
 
-    pub fn write_local_report(&self) -> Result<()>{
+    pub fn write_local_report(&self) -> Result<()> {
         let base_report = self.command_capture.create_report_text(None)?;
         let base_report_loc = write_to_report_file("base", &base_report)?;
         info!(target: "always", "The basic report was created at {}", base_report_loc);
@@ -32,10 +35,12 @@ impl ReportBuilder {
 
         let client = reqwest::Client::new();
 
-        for (_, dest) in &self.destinations {
+        for dest in self.destinations.values() {
             let mut dest_report = base_report.clone();
             for (name, command) in &dest.spec.additional_data {
-                let capture = OutputCapture::capture_output(&[command.to_string()], &OutputDestination::Null).await?;
+                let capture =
+                    OutputCapture::capture_output(&[command.to_string()], &OutputDestination::Null)
+                        .await?;
                 dest_report.push('\n');
                 dest_report.push_str(&capture.create_report_text(Some(&format!("== {}", name)))?);
             }
@@ -48,17 +53,16 @@ impl ReportBuilder {
 
                     let form = reqwest::multipart::Form::new().part("file", some_file);
 
-                    let res = client.post(url)
-                        .multipart(form)
-                        .send()
-                        .await;
+                    let res = client.post(url).multipart(form).send().await;
 
                     match res {
                         Ok(res) => {
                             debug!("API Response was {:?}", res);
                             let status = res.status();
                             match res.text().await {
-                                Err(e) => warn!(target: "user", "Unable to fetch body from Server: {:?}", e),
+                                Err(e) => {
+                                    warn!(target: "user", "Unable to fetch body from Server: {:?}", e)
+                                }
                                 Ok(body) => {
                                     let body = body.trim();
                                     if !status.is_success() {
@@ -66,11 +70,12 @@ impl ReportBuilder {
                                     } else {
                                         info!(target: "always", "Report upload failed for {}.", body)
                                     }
-
                                 }
                             }
-                        },
-                        Err(e) => warn!(target: "always", "Unable to upload report to server because {}", e)
+                        }
+                        Err(e) => {
+                            warn!(target: "always", "Unable to upload report to server because {}", e)
+                        }
                     }
                 }
             }

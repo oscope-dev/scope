@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
-use pity_lib::prelude::{OutputCapture, OutputDestination, ReportBuilder, FoundConfig};
-use tracing::{warn};
+use pity_lib::prelude::{FoundConfig, OutputCapture, OutputDestination, ReportBuilder};
+use tracing::warn;
 
 #[derive(Debug, Args)]
 pub struct ReportArgs {
@@ -16,7 +16,7 @@ pub struct ReportArgs {
 
 pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Result<i32> {
     let capture = OutputCapture::capture_output(&args.command, &OutputDestination::Logging).await?;
-    let exit_code= capture.exit_code.unwrap_or(-1);
+    let exit_code = capture.exit_code.unwrap_or(-1);
     let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
 
     if found_config.report_upload.is_empty() {

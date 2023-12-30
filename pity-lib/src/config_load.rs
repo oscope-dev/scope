@@ -1,4 +1,7 @@
-use crate::models::{parse_config, DoctorExecCheckSpec, ModelRoot, ParsedConfig, KnownErrorSpec, FILE_PATH_ANNOTATION, ReportUploadSpec};
+use crate::models::{
+    parse_config, DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportUploadSpec,
+    FILE_PATH_ANNOTATION,
+};
 use anyhow::Result;
 use clap::{ArgGroup, Parser};
 use directories::{BaseDirs, UserDirs};
@@ -36,21 +39,36 @@ impl FoundConfig {
             ParsedConfig::DoctorCheck(exec) => {
                 let name = exec.metadata.name.clone();
                 if let Some(old) = self.exec_check.insert(name, exec) {
-                    let path = old.metadata.annotations.get(FILE_PATH_ANNOTATION).cloned().unwrap_or_else(|| "unknown".to_string());
+                    let path = old
+                        .metadata
+                        .annotations
+                        .get(FILE_PATH_ANNOTATION)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
                     warn!(target: "user", "A DoctorCheck with duplicate name found, dropping check {} in {}", old.metadata.name, path);
                 }
-            },
+            }
             ParsedConfig::KnownError(known_error) => {
                 let name = known_error.metadata.name.clone();
                 if let Some(old) = self.known_error.insert(name, known_error) {
-                    let path = old.metadata.annotations.get(FILE_PATH_ANNOTATION).cloned().unwrap_or_else(|| "unknown".to_string());
+                    let path = old
+                        .metadata
+                        .annotations
+                        .get(FILE_PATH_ANNOTATION)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
                     warn!(target: "user", "A KnownError with duplicate name found, dropping KnownError {} in {}", old.metadata.name, path);
                 }
-            },
+            }
             ParsedConfig::ReportUpload(report_upload) => {
                 let name = report_upload.metadata.name.clone();
                 if let Some(old) = self.report_upload.insert(name, report_upload) {
-                    let path = old.metadata.annotations.get(FILE_PATH_ANNOTATION).cloned().unwrap_or_else(|| "unknown".to_string());
+                    let path = old
+                        .metadata
+                        .annotations
+                        .get(FILE_PATH_ANNOTATION)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
                     warn!(target: "user", "A ReportUpload with duplicate name found, dropping ReportUpload {} in {}", old.metadata.name, path);
                 }
             }

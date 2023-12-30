@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use human_panic::setup_panic;
 use pity_doctor::prelude::*;
 use pity_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
+use pity_lib::UserListing;
 use pity_report::prelude::{report_root, ReportArgs};
 use tracing::{error, info};
-use pity_lib::UserListing;
-use colored::Colorize;
 
 /// Pity the Fool
 ///
@@ -27,7 +27,6 @@ struct Cli {
     command: Command,
 }
 
-
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Run checks that will "checkup" your machine.
@@ -35,7 +34,7 @@ enum Command {
     /// Generate a bug report based from a command that was ran
     Report(ReportArgs),
     /// List the found config files, and resources detected
-    Config
+    Config,
 }
 
 #[tokio::main]
@@ -72,7 +71,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
     match command {
         Command::Doctor(args) => doctor_root(found_config, args).await.map(|_| 0),
         Command::Report(args) => report_root(found_config, args).await,
-        Command::Config => show_config(found_config).map(|_| 0)
+        Command::Config => show_config(found_config).map(|_| 0),
     }
 }
 
@@ -89,7 +88,10 @@ fn show_config(found_config: &FoundConfig) -> Result<()> {
     Ok(())
 }
 
-fn print_details<T>(config: Vec<&T>) where T: UserListing {
+fn print_details<T>(config: Vec<&T>)
+where
+    T: UserListing,
+{
     info!(target: "user", "{:^20}{:^60}{:^40}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
     let working_dir = std::env::current_dir().unwrap();
     for check in config {
