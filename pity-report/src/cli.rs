@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
-use pity_lib::prelude::{write_to_report_file, OutputCapture, OutputDestination};
-use tracing::info;
+use pity_lib::prelude::{OutputCapture, OutputDestination, ReportBuilder, FoundConfig};
+use tracing::{warn};
 
 #[derive(Debug, Args)]
 pub struct ReportArgs {
@@ -14,11 +14,19 @@ pub struct ReportArgs {
     command: Vec<String>,
 }
 
-pub async fn report_root(args: &ReportArgs) -> Result<()> {
+pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Result<i32> {
     let capture = OutputCapture::capture_output(&args.command, &OutputDestination::Logging).await?;
-    let file_path = write_to_report_file("report", &capture.create_report_text()?)?;
+    let exit_code= capture.exit_code.unwrap_or(-1);
+    let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
 
-    info!(target:"user", "Report created at {}", file_path);
+    if found_config.report_upload.is_empty() {
+        report_builder.write_local_report()?;
+        return Ok(exit_code);
+    }
 
-    Ok(())
+    if let Err(e) = report_builder.distribute_report().await {
+        warn!(target: "user", "Unable to upload report: {}", e);
+    }
+
+    Ok(exit_code)
 }

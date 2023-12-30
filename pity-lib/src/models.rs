@@ -38,7 +38,7 @@ impl<V> ModelRoot<V> {
     }
 }
 
-impl UserListing for ModelRoot<DoctorExecCheck> {
+impl UserListing for ModelRoot<DoctorExecCheckSpec> {
     fn name(&self) -> &str {
         &self.metadata.name
     }
@@ -51,7 +51,7 @@ impl UserListing for ModelRoot<DoctorExecCheck> {
     }
 }
 
-impl UserListing for ModelRoot<KnownError> {
+impl UserListing for ModelRoot<KnownErrorSpec> {
     fn name(&self) -> &str {
         &self.metadata.name
     }
@@ -65,7 +65,7 @@ impl UserListing for ModelRoot<KnownError> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct DoctorExecCheck {
+pub struct DoctorExecCheckSpec {
     pub target: PathBuf,
     pub description: String,
     pub help_text: String,
@@ -74,7 +74,7 @@ pub struct DoctorExecCheck {
 #[derive(Derivative)]
 #[derivative(PartialEq)]
 #[derive(Debug, Clone)]
-pub struct KnownError {
+pub struct KnownErrorSpec {
     pub description: String,
     pub pattern: String,
     #[derivative(PartialEq="ignore")]
@@ -82,10 +82,21 @@ pub struct KnownError {
     pub help_text: String,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ReportUploadLocation {
+    RustyPaste { url: String }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub struct ReportUploadSpec {
+    pub additional_data: BTreeMap<String, String>,
+    pub destination: ReportUploadLocation,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParsedConfig {
-    DoctorCheck(ModelRoot<DoctorExecCheck>),
-    KnownError(ModelRoot<KnownError>),
+    DoctorCheck(ModelRoot<DoctorExecCheckSpec>),
+    KnownError(ModelRoot<KnownErrorSpec>),
+    ReportUpload(ModelRoot<ReportUploadSpec>)
 }
 
 pub fn parse_config(file_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
@@ -120,6 +131,10 @@ fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
         ("pity.github.com/v1alpha", "pityknownerror") => {
             let known_error = parser::parse_v1_known_error(&root.spec)?;
             ParsedConfig::KnownError(root.with_spec(known_error))
+        },
+        ("pity.github.com/v1alpha", "pityreport") => {
+            let report_upload = parser::parse_v1_report(&root.spec)?;
+            ParsedConfig::ReportUpload(root.with_spec(report_upload))
         }
         (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind)),
     };
@@ -128,11 +143,13 @@ fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
 }
 
 mod parser {
+    use std::collections::BTreeMap;
     use serde::{Deserialize, Serialize};
     use serde_yaml::Value;
     use std::path::Path;
     use anyhow::Result;
     use regex::Regex;
+    use crate::models::ReportUploadLocation;
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -152,18 +169,17 @@ mod parser {
     pub(super) fn parse_v1_doctor_check(
         base_path: &Path,
         value: &Value,
-    ) -> Result<super::DoctorExecCheck> {
+    ) -> Result<super::DoctorExecCheckSpec> {
         let parsed: DoctorCheckV1Alpha = serde_yaml::from_value(value.clone())?;
         let target = match parsed.run_type {
             DoctorCheckTypeV1Alpha::Exec { target} => base_path.join(target)
         };
-        Ok(super::DoctorExecCheck {
+        Ok(super::DoctorExecCheckSpec {
             help_text: parsed.help,
             target,
             description: parsed.description,
         })
     }
-
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
@@ -174,14 +190,41 @@ mod parser {
     }
     pub(super) fn parse_v1_known_error(
         value: &Value,
-    ) -> Result<super::KnownError> {
+    ) -> Result<super::KnownErrorSpec> {
         let parsed: KnownErrorV1Alpha = serde_yaml::from_value(value.clone())?;
         let regex = Regex::new(&parsed.pattern)?;
-        Ok(super::KnownError {
+        Ok(super::KnownErrorSpec {
             pattern: parsed.pattern,
             regex,
             help_text: parsed.help,
             description: parsed.description
+        })
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    enum ReportDestinationV1Alpha {
+        RustyPaste { url: String }
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    struct ReportV1Alpha {
+        additional_data: BTreeMap<String, String>,
+        #[serde(with = "serde_yaml::with::singleton_map")]
+        destination: ReportDestinationV1Alpha,
+
+    }
+    pub(super) fn parse_v1_report(
+        value: &Value,
+    ) -> Result<super::ReportUploadSpec> {
+        let parsed: ReportV1Alpha = serde_yaml::from_value(value.clone())?;
+        let destination = match parsed.destination {
+            ReportDestinationV1Alpha::RustyPaste { url } => ReportUploadLocation::RustyPaste { url }
+        };
+        Ok(super::ReportUploadSpec {
+            additional_data: parsed.additional_data,
+            destination
         })
     }
 }
@@ -203,7 +246,7 @@ spec:
     assert_eq!(1, configs.len());
     if let ParsedConfig::DoctorCheck(model) = &configs[0] {
         assert_eq!(
-            DoctorExecCheck {
+            DoctorExecCheckSpec {
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 target: PathBuf::from("/foo/bar/scripts/does-path-env-exist.sh"),
@@ -232,11 +275,40 @@ spec:
     assert_eq!(1, configs.len());
     if let ParsedConfig::KnownError(model) = &configs[0] {
         assert_eq!(
-            KnownError {
+            KnownErrorSpec {
                 description: "Check if the word error is in the logs".to_string(),
                 help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
                 pattern: "error".to_string(),
                 regex: Regex::new("error").unwrap()
+            },
+            model.spec
+        );
+    } else {
+        unreachable!()
+    }
+}
+
+#[test]
+fn test_parse_pity_report() {
+    let text = "apiVersion: pity.github.com/v1alpha
+kind: PityReport
+metadata:
+  name: report
+spec:
+  additionalData:
+    env: env
+  destination:
+      rustyPaste:
+        url: https://foo.bar";
+
+    let path = Path::new("/foo/bar/file.yaml");
+    let configs = parse_config(path, text).unwrap();
+    assert_eq!(1, configs.len());
+    if let ParsedConfig::ReportUpload(model) = &configs[0] {
+        assert_eq!(
+            ReportUploadSpec {
+                destination: ReportUploadLocation::RustyPaste { url : "https://foo.bar".to_string() },
+                additional_data: [("env".to_string(), "env".to_string())].into()
             },
             model.spec
         );

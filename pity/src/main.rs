@@ -68,11 +68,11 @@ async fn run_subcommand(opts: Cli) -> i32 {
     }
 }
 
-async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Result<()> {
+async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Result<i32> {
     match command {
-        Command::Doctor(args) => doctor_root(found_config, args).await,
-        Command::Report(args) => report_root(args).await,
-        Command::Config => show_config(found_config)
+        Command::Doctor(args) => doctor_root(found_config, args).await.map(|_| 0),
+        Command::Report(args) => report_root(found_config, args).await,
+        Command::Config => show_config(found_config).map(|_| 0)
     }
 }
 

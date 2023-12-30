@@ -20,7 +20,7 @@ impl RwLockOutput {
 pub struct OutputCapture {
     stdout: Vec<(DateTime<Utc>, String)>,
     stderr: Vec<(DateTime<Utc>, String)>,
-    exit_code: Option<i32>,
+    pub exit_code: Option<i32>,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
     command: String,
@@ -29,9 +29,11 @@ pub struct OutputCapture {
 pub enum OutputDestination {
     StandardOut,
     Logging,
+    Null
 }
 
 impl OutputCapture {
+
     pub async fn capture_output(
         args: &[String],
         output: &OutputDestination,
@@ -57,6 +59,7 @@ impl OutputCapture {
                     match output {
                         OutputDestination::Logging => info!("{}", line),
                         OutputDestination::StandardOut => println!("{}", line),
+                        OutputDestination::Null => {}
                     }
                 }
 
@@ -73,6 +76,7 @@ impl OutputCapture {
                     match output {
                         OutputDestination::Logging => error!("{}", line),
                         OutputDestination::StandardOut => eprintln!("{}", line),
+                        OutputDestination::Null => {}
                     }
                 }
 
@@ -130,9 +134,10 @@ impl OutputCapture {
         text
     }
 
-    pub fn create_report_text(&self) -> anyhow::Result<String> {
+    pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
         let mut f = String::new();
-        writeln!(&mut f, "= Command Results")?;
+        let title = title.unwrap_or_else(|| "== Command Results");
+        writeln!(&mut f, "{}\n", title)?;
         writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
         writeln!(
             &mut f,
@@ -144,7 +149,7 @@ impl OutputCapture {
             "Result of command: {}",
             self.exit_code.unwrap_or(-1)
         )?;
-        write!(&mut f, "\n== Output\n")?;
+        write!(&mut f, "\n=== Output\n")?;
         write!(&mut f, "\n[source,text]\n")?;
         writeln!(&mut f, "....")?;
         writeln!(&mut f, "{}", self.generate_output())?;
