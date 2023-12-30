@@ -1,4 +1,4 @@
-name: Publish Image
+name: Build Darwin Artifacts
 
 on:
   workflow_call:
@@ -14,6 +14,7 @@ concurrency:
 jobs:
   build-for-macos:
     runs-on: macos-latest
+    needs: create-release
     steps:
       - uses: actions/checkout@v3
       - run: rustup update
@@ -21,9 +22,12 @@ jobs:
       - name: Build Artifacts
         run: |
           .github/bin/build-macos.sh ${{ inputs.version }}
-      - name: Upload Artifacts
-        env:
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Build Artifacts
         run: |
-          tar -C target/universal-apple-darwin/release/ -cvzf target/artifacts/pity-macos.tgz pity pity-intercept
-          gh release upload ${{ inputs.version }} target/artifacts/pity-macos.tgz
+          tar -C target/universal-apple-darwin/release/ -cvzf target/artifacts/pity-darwin.tgz pity pity-intercept
+      - name: Save Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: darwin
+          path: target/artifacts/pity-darwin.tgz
+          if-no-files-found: error
