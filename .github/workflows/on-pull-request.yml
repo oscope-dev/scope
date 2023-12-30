@@ -9,8 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: rustup toolchain install --profile minimal
-      - run: rustup component add clippy
+      - run: cargo help 2>&1 >/dev/null
       - uses: Swatinem/rust-cache@v2
       - name: cargo build
         run: cargo build

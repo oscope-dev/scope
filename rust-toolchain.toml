@@ -1,2 +1,4 @@
 [toolchain]
-channel = "nightly"
+channel = "1.75.0"
+components = ["clippy", "rustfmt"]
+targets = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
