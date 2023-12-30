@@ -1,0 +1,39 @@
+name: Publish Image
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      release-options:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-for-macos:
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      version: ${{ inputs.version }}
+
+  create-release:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs:
+      - build-for-macos
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: create-relase
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          gh release create --repo ${GITHUB_REPOSITORY} ${{ inputs.version }} --generate-notes ${{ inputs.release-options }} --target ${GITHUB_HEAD_REF} artifacts/*
