@@ -12,8 +12,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-      - run: rustup toolchain install --profile minimal
-      - run: rustup component add clippy
+      - run: rustup update
       - uses: Swatinem/rust-cache@v2
       - name: Build Artifacts
         run: |
