@@ -1,0 +1,26 @@
+name: Publish Image
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  build-for-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup toolchain install --profile minimal
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Artifacts
+        run: |
+          .github/bin/build-macos.sh ${{ inputs.version }}
+      - name: Upload Artifacts
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          tar -C target/universal-apple-darwin/release/ -cvzf target/artifacts/pity-macos.tgz pity pity-intercept
+          gh release upload ${{ inputs.version }} target/artifacts/pity-macos.tgz
