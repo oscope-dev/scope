@@ -1,0 +1,155 @@
+= Pity (the fool)
+:toc:
+:exampleDir: examples
+
+`pity` is a tool that allows developer experience teams to provide tooling for engineers.
+There are two tools engineers will use directly, `pity doctor` and `pity report`.
+
+`pity doctor` runs a set of user-defined scripts to help configure, debug, and fix an engineers environment.
+
+`pity report` is used to report local execution error.
+This is primarily used to generate a bug report, and upload it somewhere so that the responders have all the required into to respond.
+
+== Commands
+
+=== `pity doctor`
+
+Environments are hard to maintain and can fall out of sync with exceptions quickly.
+`pity doctor` is a way to codify what a working environment means and tell the user how to fix it.
+The aim is to reduce the need for engineers to ask others to fix their environment and distribute what "working" means to everyone.
+
+=== `pity report`
+
+Sometimes you need to report an error to others.
+Often the responding team wants the output that failed, and some other useful debugging information.
+
+By using `pity report some-command.sh`, pity will capture all the output with timestamps and then generate a "report" that can be uploaded to multiple destinations.
+
+=== `pity-intercept`
+
+`pity-intercept` is a https://en.wikipedia.org/wiki/Shebang_(Unix)[shebang] replacement for `env`.
+Behind the scene `env -S` is run to execute the script, however `pity-intercept` will watch all the output and then check for KnownErrors.
+This allows the engineer to see, in real time, suggestions for fixing errors.
+It also allows the engineer to upload a bug report immediately.
+
+== Config
+
+All `pity` config files look like Kubernetes yaml, requiring:
+
+- `apiVersion`
+- `kind`
+- `metadata`
+- `spec`
+
+Config files live inside a `.pity` directory, and `pity` will search for this directory walking up the file tree.
+A user can also add a specific file or folder with arguments or environment variables.
+
+[cols="1,2"]
+|===
+| Field
+| Description
+
+a| `metadata`
+a| Required field providing "metadata" about the resource.
+[cols="1,2"]
+!===
+! Field
+! Description
+
+a! `name`
+a! (required) Name of the resource, must be unique within the `kind`
+
+a! `labels`
+a! A map of `string:string` that can be used by user.
+
+a! `annotations`
+a! A map of `string:string` that can be used by user. Pity will set some specific annotations.
+
+!===
+
+a| `kind`
+a| The type of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
+
+Current supported options are: `PityDoctorCheck`, `PityReport`, `PityKnownError`.
+
+a| `apiVersion`
+a| The version of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
+
+The only supported value at the moment is `pity.github.com/v1alpha`.
+
+a| `spec`
+| A data structure that changes based on `apiVersion` and `kind`.
+
+|===
+
+
+=== `PityDoctorCheck`
+
+Used to diagnose errors with an engineers environment. Used when running `pity doctor`.
+
+**Example**
+
+[source,yaml]
+....
+include::{exampleDir}/doctor-check.yaml[]
+....
+
+From the example, when the check runs it will execute `scripts/does-path-env-exist.sh` which is defined relative to the file containing the check.
+
+If the process exits non-0, the help text will be shown to the user.
+
+=== `PityKnownError`
+
+When using `pity-intercept` or `pity report`, providing a KnownError file will allow pity to tell the user about known errors.
+This is useful for example if the owning team knows that the output will contain a message and the user should check for something before continuing.
+A common example is a dependency is missing, the node modules might need to be cleaned.
+
+**Example**
+
+[source,yaml]
+....
+include::{exampleDir}/known-error.yaml[]
+....
+
+[cols="1,2"]
+|===
+| Field
+| Description
+
+a| `.spec.description`
+| A short description of the error, for `pity config`
+
+a| `.spec.pattern`
+| A regex pattern to search all output for (standard error and standard out)
+
+a| `.spec.help`
+| The text that will be shown to a user when the pattern matches
+|===
+
+=== `PityReport`
+
+When using `pity-intercept` or `pity report`, a user is able to upload the error for sharing.
+`PityReport` defines where to upload, and any additional commands that should be and output included in the report.
+
+**Example**
+
+[source,yaml]
+....
+include::{exampleDir}/report.yaml[]
+....
+
+[cols="1,2"]
+|===
+| Field
+| Description
+
+a| `.spec.additionalData`
+| A map of `name` to `command`. Pity will run the command and capture the output as part of the report.
+
+a| `.spec.destination`
+a| Currently, supports https://github.com/orhun/rustypaste[`rustyPaste`] as a source.
+Additional options will be added in the future.
+
+a| `.spec.destination.rustyPaste.url`
+| URL to upload the report to.
+|===
