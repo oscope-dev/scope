@@ -36,4 +36,5 @@ jobs:
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
-          gh release create --repo ${GITHUB_REPOSITORY} ${{ inputs.version }} --generate-notes ${{ inputs.release-options }} --target ${GITHUB_HEAD_REF} artifacts/*
+          set -eux
+          gh release create --repo ${GITHUB_REPOSITORY} ${{ inputs.version }} --generate-notes ${{ inputs.release-options }} --target ${GITHUB_SHA} artifacts/*
