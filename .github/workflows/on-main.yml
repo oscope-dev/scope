@@ -56,6 +56,6 @@ jobs:
     needs: make-versions
     uses: ./.github/workflows/create-release.yml
     with:
-      version: ${{ needs.create-release.outputs.release-version }}
+      version: ${{ needs.make-versions.outputs.release-version }}
       release-options: ""
       environment: "release"
