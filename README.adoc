@@ -25,12 +25,18 @@ Often the responding team wants the output that failed, and some other useful de
 
 By using `pity report some-command.sh`, pity will capture all the output with timestamps and then generate a "report" that can be uploaded to multiple destinations.
 
+IMPORTANT: `pity` will redact anything it finds as "sensitive".
+This allows you to fetch env-vars, and no leak GH API tokens for example.
+
 === `pity-intercept`
 
 `pity-intercept` is a https://en.wikipedia.org/wiki/Shebang_(Unix)[shebang] replacement for `env`.
 Behind the scene `env -S` is run to execute the script, however `pity-intercept` will watch all the output and then check for KnownErrors.
 This allows the engineer to see, in real time, suggestions for fixing errors.
 It also allows the engineer to upload a bug report immediately.
+
+IMPORTANT: `pity` will redact anything it finds as "sensitive".
+This allows you to fetch env-vars, and no leak GH API tokens for example.
 
 == Config
 
@@ -146,6 +152,11 @@ a| `.spec.help`
 When using `pity-intercept` or `pity report`, a user is able to upload the error for sharing.
 `PityReport` defines where to upload, and any additional commands that should be and output included in the report.
 
+In order to use GitHub Issue as the destination, you MUST have the env var `GH_TOKEN` set to a valid https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens[Personal Access Token].
+If you do not, pity cannot publish the report.
+
+If your users won't always be logged into GitHub, we recommend using RustyPaste as an alternative.
+
 **Example**
 
 [source,yaml]
@@ -175,7 +186,7 @@ a| `.spec.additionalData`
 | A map of `name` to `command`. Pity will run the command and capture the output as part of the report.
 
 a| `.spec.destination`
-a| Currently, supports GitHubIssues and https://github.com/orhun/rustypaste[`rustyPaste`] as a source.
+a| Currently, supports GitHub Issues and https://github.com/orhun/rustypaste[`RustyPaste`] as a source.
 Additional options will be added in the future.
 
 a| `.spec.destination.githubIssue.owner`
@@ -190,3 +201,7 @@ a| List of tags to add to the issue.
 a| `.spec.destination.rustyPaste.url`
 a| URL to upload the report to.
 |===
+
+=== Special Thanks
+
+We took our redaction string from https://github.com/sirwart/ripsecrets[sirwart/ripsecrets].

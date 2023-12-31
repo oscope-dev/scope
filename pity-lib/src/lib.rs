@@ -2,6 +2,7 @@ mod capture;
 mod config_load;
 mod logging;
 mod models;
+mod redact;
 mod report;
 
 pub trait UserListing {

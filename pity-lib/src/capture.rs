@@ -1,3 +1,4 @@
+use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
 use std::fmt::Write;
 use std::process::Stdio;
@@ -130,7 +131,8 @@ impl OutputCapture {
             .map(|(_, line)| line.clone())
             .collect::<Vec<_>>()
             .join("\n");
-        text
+
+        Redactor::new().redact_text(&text).to_string()
     }
 
     pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
