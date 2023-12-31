@@ -201,3 +201,7 @@ a| List of tags to add to the issue.
 a| `.spec.destination.rustyPaste.url`
 a| URL to upload the report to.
 |===
+
+=== Special Thanks
+
+We took our redaction string from https://github.com/sirwart/ripsecrets[sirwart/ripsecrets].

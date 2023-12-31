@@ -4,6 +4,7 @@ pub struct Redactor {
     patterns: Vec<Regex>
 }
 
+// The search tokens were taken from https://github.com/sirwart/ripsecrets/blob/main/src/lib.rs#L22C1-L51C2
 const RANDOM_STRING_REGEX: &str = r#"(?:secret|token|key|password|Secret|SECRET|Token|TOKEN|Key|KEY|Password|PASSWORD)\w*['"]?]?\s*(?:=|:|:=)\s*['"` \t]?([A-Za-z0-9+/_\-.~=]{15,80})(?:['"` \t\n]|$)"#;
 
 impl Redactor {
