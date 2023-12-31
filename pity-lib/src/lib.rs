@@ -3,6 +3,7 @@ mod config_load;
 mod logging;
 mod models;
 mod report;
+mod redact;
 
 pub trait UserListing {
     fn name(&self) -> &str;

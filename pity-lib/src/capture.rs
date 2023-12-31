@@ -4,6 +4,7 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
+use crate::redact::Redactor;
 
 #[derive(Debug, Default)]
 struct RwLockOutput {
@@ -31,6 +32,7 @@ pub enum OutputDestination {
     Logging,
     Null,
 }
+
 
 impl OutputCapture {
     pub async fn capture_output(
@@ -130,7 +132,8 @@ impl OutputCapture {
             .map(|(_, line)| line.clone())
             .collect::<Vec<_>>()
             .join("\n");
-        text
+
+        Redactor::new().redact_text(&text).to_string()
     }
 
     pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
