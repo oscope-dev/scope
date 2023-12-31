@@ -135,7 +135,7 @@ impl OutputCapture {
 
     pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
         let mut f = String::new();
-        let title = title.unwrap_or("== Command Results");
+        let title = title.unwrap_or("## Command Results");
         writeln!(&mut f, "{}\n", title)?;
         writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
         writeln!(
@@ -148,11 +148,12 @@ impl OutputCapture {
             "Result of command: {}",
             self.exit_code.unwrap_or(-1)
         )?;
-        write!(&mut f, "\n=== Output\n")?;
-        write!(&mut f, "\n[source,text]\n")?;
-        writeln!(&mut f, "....")?;
-        writeln!(&mut f, "{}", self.generate_output())?;
-        writeln!(&mut f, "....")?;
+        writeln!(&mut f)?;
+        writeln!(&mut f, "### Output")?;
+        writeln!(&mut f)?;
+        writeln!(&mut f, "```text")?;
+        writeln!(&mut f, "{}", self.generate_output().trim())?;
+        writeln!(&mut f, "```")?;
         writeln!(&mut f)?;
         Ok(f)
     }

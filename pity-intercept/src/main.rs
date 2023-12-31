@@ -94,12 +94,13 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
+    let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
     if let Ok(true) = ans {
-        let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
-
         if let Err(e) = report_builder.distribute_report().await {
             warn!(target: "user", "Unable to upload report: {}", e);
         }
+    } else {
+        report_builder.write_local_report().ok();
     }
     Ok(exit_code)
 }

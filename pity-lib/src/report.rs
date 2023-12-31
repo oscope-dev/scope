@@ -1,6 +1,7 @@
 use crate::capture::{OutputCapture, OutputDestination};
 use crate::models::{ModelRoot, ReportUploadLocation, ReportUploadSpec};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
@@ -33,9 +34,7 @@ impl ReportBuilder {
     pub async fn distribute_report(&self) -> Result<()> {
         let base_report = self.command_capture.create_report_text(None)?;
 
-        let client = reqwest::Client::new();
-
-        for dest in self.destinations.values() {
+        for (name, dest) in &self.destinations {
             let mut dest_report = base_report.clone();
             for (name, command) in &dest.spec.additional_data {
                 let capture =
@@ -45,42 +44,130 @@ impl ReportBuilder {
                 dest_report.push_str(&capture.create_report_text(Some(&format!("== {}", name)))?);
             }
 
-            match &dest.spec.destination {
-                ReportUploadLocation::RustyPaste { url } => {
-                    let some_file = reqwest::multipart::Part::stream(dest_report)
-                        .file_name("file")
-                        .mime_str("text/plain")?;
+            if let Err(e) = &dest.spec.destination.upload(&dest_report).await {
+                warn!(target: "user", "Unable to upload to {}: {}", name, e);
+            }
+        }
 
-                    let form = reqwest::multipart::Form::new().part("file", some_file);
+        Ok(())
+    }
+}
 
-                    let res = client.post(url).multipart(form).send().await;
+impl ReportUploadLocation {
+    async fn upload(&self, report: &str) -> Result<()> {
+        match self {
+            ReportUploadLocation::RustyPaste { url } => {
+                ReportUploadLocation::upload_to_rusty_paste(url, report).await
+            }
+            ReportUploadLocation::GithubIssue { owner, repo, tags } => {
+                ReportUploadLocation::upload_to_github_issue(owner, repo, tags.clone(), report)
+                    .await
+            }
+        }
+    }
 
-                    match res {
-                        Ok(res) => {
-                            debug!("API Response was {:?}", res);
-                            let status = res.status();
-                            match res.text().await {
-                                Err(e) => {
-                                    warn!(target: "user", "Unable to fetch body from Server: {:?}", e)
+    async fn upload_to_github_issue(
+        owner: &str,
+        repo: &str,
+        tags: Vec<String>,
+        report: &str,
+    ) -> Result<()> {
+        let gh_auth = match std::env::var("GH_TOKEN") {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(anyhow!(
+                    "GH_TOKEN env var was not set with token to access GitHub"
+                ))
+            }
+        };
+
+        let body = json::object! {
+            title: "Pity bug report",
+            body: report,
+            labels: tags
+        };
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!(
+                "https://api.github.com/repos/{}/{}/issues",
+                owner, repo
+            ))
+            .header(ACCEPT, "application/vnd.github+json")
+            .header(AUTHORIZATION, format!("Bearer {}", gh_auth))
+            .header(USER_AGENT, "pity")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .body(body.dump())
+            .send()
+            .await;
+
+        match res {
+            Ok(res) => {
+                debug!("API Response was {:?}", res);
+                let status = res.status();
+                match res.text().await {
+                    Err(e) => {
+                        warn!(target: "user", "Unable to read Github response: {:?}", e)
+                    }
+                    Ok(body) => {
+                        let body = body.trim();
+                        if status.is_success() {
+                            match json::parse(body) {
+                                Ok(json_body) => {
+                                    info!(target: "always", "Report was uploaded to {}.", json_body["html_url"])
                                 }
-                                Ok(body) => {
-                                    let body = body.trim();
-                                    if !status.is_success() {
-                                        info!(target: "always", "Report was uploaded to {}.", body)
-                                    } else {
-                                        info!(target: "always", "Report upload failed for {}.", body)
-                                    }
+                                Err(e) => {
+                                    warn!(server = "github", "GitHub response {}", body);
+                                    warn!(server = "github", "GitHub parse error {:?}", e);
+                                    warn!(target: "always", server="github", "GitHub responded with weird response, please check the logs.");
                                 }
                             }
-                        }
-                        Err(e) => {
-                            warn!(target: "always", "Unable to upload report to server because {}", e)
+                        } else {
+                            info!(target: "always", server="github", "Report upload failed for {}.", body)
                         }
                     }
                 }
             }
+            Err(e) => {
+                warn!(target: "always", "Unable to upload report to server because {}", e)
+            }
         }
 
+        Ok(())
+    }
+
+    async fn upload_to_rusty_paste(url: &str, report: &str) -> Result<()> {
+        let client = reqwest::Client::new();
+        let some_file = reqwest::multipart::Part::stream(report.to_string())
+            .file_name("file")
+            .mime_str("text/plain")?;
+
+        let form = reqwest::multipart::Form::new().part("file", some_file);
+
+        let res = client.post(url).multipart(form).send().await;
+
+        match res {
+            Ok(res) => {
+                debug!(server = "RustyPaste", "API Response was {:?}", res);
+                let status = res.status();
+                match res.text().await {
+                    Err(e) => {
+                        warn!(target: "user",server="RustyPaste",  "Unable to fetch body from Server: {:?}", e)
+                    }
+                    Ok(body) => {
+                        let body = body.trim();
+                        if !status.is_success() {
+                            info!(target: "always", server="RustyPaste", "Report was uploaded to {}.", body)
+                        } else {
+                            info!(target: "always", server="RustyPaste", "Report upload failed for {}.", body)
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(target: "always", server="RustyPaste", "Unable to upload report to server because {}", e)
+            }
+        }
         Ok(())
     }
 }

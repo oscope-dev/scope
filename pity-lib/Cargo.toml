@@ -24,3 +24,4 @@ regex = "1"
 derivative = "2"
 reqwest = { version = "0.11.23", features = ["multipart"] }
 time = { version = "0.3.31", features = ["macros", "formatting", "local-offset"] }
+json = "0.12"

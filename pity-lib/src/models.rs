@@ -92,7 +92,14 @@ pub struct KnownErrorSpec {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReportUploadLocation {
-    RustyPaste { url: String },
+    RustyPaste {
+        url: String,
+    },
+    GithubIssue {
+        owner: String,
+        repo: String,
+        tags: Vec<String>,
+    },
 }
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReportUploadSpec {
@@ -107,20 +114,37 @@ pub enum ParsedConfig {
     ReportUpload(ModelRoot<ReportUploadSpec>),
 }
 
-pub fn parse_config(file_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
-    let parsed: Value = serde_yaml::from_str(config)?;
-    let values = match parsed {
-        Value::Sequence(arr) => {
-            let mut result = Vec::new();
-            for item in arr {
-                result.push(parse_value(file_path, item)?);
-            }
-            result
+#[cfg(test)]
+impl ParsedConfig {
+    fn get_report_upload_spec(&self) -> Option<ReportUploadSpec> {
+        match self {
+            ParsedConfig::ReportUpload(root) => Some(root.spec.clone()),
+            _ => None,
         }
-        Value::Mapping(_) => vec![parse_value(file_path, parsed)?],
-        _ => return Err(anyhow!("Input file wasn't an array or an object")),
-    };
-    Ok(values)
+    }
+
+    fn get_known_error_spec(&self) -> Option<KnownErrorSpec> {
+        match self {
+            ParsedConfig::KnownError(root) => Some(root.spec.clone()),
+            _ => None,
+        }
+    }
+
+    fn get_doctor_check_spec(&self) -> Option<DoctorExecCheckSpec> {
+        match self {
+            ParsedConfig::DoctorCheck(root) => Some(root.spec.clone()),
+            _ => None,
+        }
+    }
+}
+
+pub fn parse_config(file_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
+    let mut parsed_configs = Vec::new();
+    for doc in serde_yaml::Deserializer::from_str(config) {
+        let value = Value::deserialize(doc)?;
+        parsed_configs.push(parse_value(file_path, value)?)
+    }
+    Ok(parsed_configs)
 }
 
 fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
@@ -212,13 +236,24 @@ mod parser {
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
+    struct ReportDestinationGithubIssueV1Alpha {
+        owner: String,
+        repo: String,
+        #[serde(default)]
+        tags: Vec<String>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     enum ReportDestinationV1Alpha {
         RustyPaste { url: String },
+        GithubIssue(ReportDestinationGithubIssueV1Alpha),
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     struct ReportV1Alpha {
+        #[serde(default)]
         additional_data: BTreeMap<String, String>,
         #[serde(with = "serde_yaml::with::singleton_map")]
         destination: ReportDestinationV1Alpha,
@@ -228,6 +263,13 @@ mod parser {
         let destination = match parsed.destination {
             ReportDestinationV1Alpha::RustyPaste { url } => {
                 ReportUploadLocation::RustyPaste { url }
+            }
+            ReportDestinationV1Alpha::GithubIssue(github_issue) => {
+                ReportUploadLocation::GithubIssue {
+                    owner: github_issue.owner,
+                    repo: github_issue.repo,
+                    tags: github_issue.tags,
+                }
             }
         };
         Ok(super::ReportUploadSpec {
@@ -252,18 +294,14 @@ spec:
     let path = Path::new("/foo/bar/file.yaml");
     let configs = parse_config(path, text).unwrap();
     assert_eq!(1, configs.len());
-    if let ParsedConfig::DoctorCheck(model) = &configs[0] {
-        assert_eq!(
-            DoctorExecCheckSpec {
-                description: "Check your shell for basic functionality".to_string(),
-                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-                target: PathBuf::from("/foo/bar/scripts/does-path-env-exist.sh"),
-            },
-            model.spec
-        );
-    } else {
-        unreachable!();
-    }
+    assert_eq!(
+        configs[0].get_doctor_check_spec().unwrap(),
+        DoctorExecCheckSpec {
+            description: "Check your shell for basic functionality".to_string(),
+            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+            target: PathBuf::from("/foo/bar/scripts/does-path-env-exist.sh"),
+        }
+    );
 }
 
 #[test]
@@ -280,24 +318,19 @@ spec:
     let path = Path::new("/foo/bar/file.yaml");
     let configs = parse_config(path, text).unwrap();
     assert_eq!(1, configs.len());
-    if let ParsedConfig::KnownError(model) = &configs[0] {
-        assert_eq!(
-            KnownErrorSpec {
+    assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownErrorSpec {
                 description: "Check if the word error is in the logs".to_string(),
                 help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
                 pattern: "error".to_string(),
                 regex: Regex::new("error").unwrap()
-            },
-            model.spec
-        );
-    } else {
-        unreachable!()
-    }
+            });
 }
 
 #[test]
 fn test_parse_pity_report() {
-    let text = "apiVersion: pity.github.com/v1alpha
+    let text = "
+---
+apiVersion: pity.github.com/v1alpha
 kind: PityReport
 metadata:
   name: report
@@ -306,22 +339,44 @@ spec:
     env: env
   destination:
       rustyPaste:
-        url: https://foo.bar";
+        url: https://foo.bar
+---
+apiVersion: pity.github.com/v1alpha
+kind: PityReport
+metadata:
+  name: github
+spec:
+  additionalData:
+    env: env
+  destination:
+      githubIssue:
+        owner: pity
+        repo: party
+ ";
 
     let path = Path::new("/foo/bar/file.yaml");
     let configs = parse_config(path, text).unwrap();
-    assert_eq!(1, configs.len());
-    if let ParsedConfig::ReportUpload(model) = &configs[0] {
-        assert_eq!(
-            ReportUploadSpec {
-                destination: ReportUploadLocation::RustyPaste {
-                    url: "https://foo.bar".to_string()
-                },
-                additional_data: [("env".to_string(), "env".to_string())].into()
+    assert_eq!(2, configs.len());
+
+    assert_eq!(
+        configs[0].get_report_upload_spec().unwrap(),
+        ReportUploadSpec {
+            destination: ReportUploadLocation::RustyPaste {
+                url: "https://foo.bar".to_string()
             },
-            model.spec
-        );
-    } else {
-        unreachable!()
-    }
+            additional_data: [("env".to_string(), "env".to_string())].into()
+        }
+    );
+
+    assert_eq!(
+        configs[1].get_report_upload_spec().unwrap(),
+        ReportUploadSpec {
+            destination: ReportUploadLocation::GithubIssue {
+                owner: "pity".to_string(),
+                repo: "party".to_string(),
+                tags: Vec::new(),
+            },
+            additional_data: [("env".to_string(), "env".to_string())].into()
+        }
+    );
 }
