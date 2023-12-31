@@ -2,8 +2,8 @@ mod capture;
 mod config_load;
 mod logging;
 mod models;
-mod report;
 mod redact;
+mod report;
 
 pub trait UserListing {
     fn name(&self) -> &str;

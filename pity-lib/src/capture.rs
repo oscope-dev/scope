@@ -1,10 +1,10 @@
+use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
 use std::fmt::Write;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
-use crate::redact::Redactor;
 
 #[derive(Debug, Default)]
 struct RwLockOutput {
@@ -32,7 +32,6 @@ pub enum OutputDestination {
     Logging,
     Null,
 }
-
 
 impl OutputCapture {
     pub async fn capture_output(
