@@ -1,3 +1,4 @@
+---
 apiVersion: pity.github.com/v1alpha
 kind: PityReport
 metadata:
@@ -12,3 +13,13 @@ spec:
   destination:
     rustyPaste:
       url: http://localhost:8000
+---
+apiVersion: pity.github.com/v1alpha
+kind: PityReport
+metadata:
+  name: github
+spec:
+  destination:
+    githubIssue:
+      owner: ethankhall
+      repo: dummy-repo
