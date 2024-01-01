@@ -11,6 +11,9 @@ pub struct DoctorRunArgs {
     /// When set, only the checks listed will run
     #[arg(short, long)]
     only: Option<Vec<String>>,
+    /// When set, if a fix is specified it will also run.
+    #[arg(long, short, default_value = "false")]
+    fix: bool
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<()> {
@@ -45,9 +48,21 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         if exec_result.success {
             info!(target: "user", "Check {} was successful", check_name.bold());
         } else {
-            warn!(target: "user", "Check {} failed. {}: {}", check_name.bold(), "Suggestion".bold(), check.help_text());
+            handle_check_failure(check).await?;
         }
     }
+
+    Ok(())
+}
+
+async fn handle_check_failure(check: &ModelRoot<DoctorExecCheckSpec>) -> Result<()> {
+    let check_path = match &check.spec.fix_exec {
+        None => {
+            warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
+            return Ok(())
+        },
+        Some(path) => path
+    };
 
     Ok(())
 }

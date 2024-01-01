@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use pity_lib::prelude::{DoctorExecCheckSpec, ModelRoot};
+use pity_lib::prelude::{DoctorExecCheckSpec, ModelRoot, OutputCapture};
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use thiserror::Error;
@@ -42,7 +42,8 @@ pub trait CheckRuntime {
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
     async fn exec(&self) -> Result<RuntimeResult, RuntimeError> {
-        let path = &self.spec.target;
+        OutputCapture::capture_output()
+        let path = &self.spec.check_exec;
         if !path.exists() {
             return Err(RuntimeError::MissingShExec {
                 name: path.display().to_string(),

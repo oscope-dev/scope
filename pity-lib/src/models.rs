@@ -74,7 +74,8 @@ impl UserListing for ModelRoot<KnownErrorSpec> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DoctorExecCheckSpec {
-    pub target: PathBuf,
+    pub check_exec: String,
+    pub fix_exec: Option<String>,
     pub description: String,
     pub help_text: String,
 }
@@ -183,20 +184,22 @@ mod parser {
     use regex::Regex;
     use serde::{Deserialize, Serialize};
     use serde_yaml::Value;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, VecDeque};
     use std::path::Path;
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
-    enum DoctorCheckTypeV1Alpha {
-        Exec { target: String },
+    struct DoctorCheckTypeV1Alpha {
+        target: String,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     struct DoctorCheckV1Alpha {
-        #[serde(flatten)]
-        run_type: DoctorCheckTypeV1Alpha,
+        #[serde(with = "serde_yaml::with::singleton_map")]
+        check: DoctorCheckTypeV1Alpha,
+        #[serde(with = "serde_yaml::with::singleton_map", default)]
+        fix: Option<DoctorCheckTypeV1Alpha>,
         description: String,
         help: String,
     }
@@ -206,12 +209,16 @@ mod parser {
         value: &Value,
     ) -> Result<super::DoctorExecCheckSpec> {
         let parsed: DoctorCheckV1Alpha = serde_yaml::from_value(value.clone())?;
-        let target = match parsed.run_type {
-            DoctorCheckTypeV1Alpha::Exec { target } => base_path.join(target),
-        };
+
+        let check_path = extract_command_path(base_path, &parsed.check.target);
+        let fix_exec = parsed
+            .fix
+            .map(|path| extract_command_path(base_path, &path.target));
+
         Ok(super::DoctorExecCheckSpec {
             help_text: parsed.help,
-            target,
+            check_exec: check_path,
+            fix_exec,
             description: parsed.description,
         })
     }
@@ -277,29 +284,80 @@ mod parser {
             destination,
         })
     }
+
+    fn extract_command_path(parent_dir: &Path, command: &str) -> String {
+        let mut parts: VecDeque<_> = command.split(" ").collect();
+        let command = parts.pop_front().unwrap();
+
+        if Path::new(command).is_absolute() {
+            command.to_string()
+        } else {
+            let full_command = parent_dir.join(command).display().to_string();
+            parts.push_front(&full_command);
+            let parts: Vec<_> = parts.iter().cloned().collect();
+            parts.join(" ")
+        }
+    }
+
+    #[test]
+    fn test_extract_command_path() {
+        let base_path = Path::new("/foo/bar");
+        assert_eq!(
+            "/foo/bar/scripts/foo.sh",
+            extract_command_path(base_path, "scripts/foo.sh")
+        );
+        assert_eq!(
+            "/scripts/foo.sh",
+            extract_command_path(base_path, "/scripts/foo.sh")
+        );
+    }
 }
 
 #[test]
 fn test_parse_pity_doctor_check_exec() {
-    let text = "apiVersion: pity.github.com/v1alpha
+    let text = "---
+apiVersion: pity.github.com/v1alpha
 kind: PityDoctorCheck
 metadata:
   name: path-exists
 spec:
-  exec:
+  check:
     target: scripts/does-path-env-exist.sh
+  fix:
+    target: /bin/true
   description: Check your shell for basic functionality
-  help: You're shell does not have a path env. Reload your shell.";
+  help: You're shell does not have a path env. Reload your shell.
+---
+apiVersion: pity.github.com/v1alpha
+kind: PityDoctorCheck
+metadata:
+  name: path-exists
+spec:
+  check:
+    target: /scripts/does-path-env-exist.sh
+  description: Check your shell for basic functionality
+  help: You're shell does not have a path env. Reload your shell.
+";
 
     let path = Path::new("/foo/bar/file.yaml");
     let configs = parse_config(path, text).unwrap();
-    assert_eq!(1, configs.len());
+    assert_eq!(2, configs.len());
     assert_eq!(
         configs[0].get_doctor_check_spec().unwrap(),
         DoctorExecCheckSpec {
             description: "Check your shell for basic functionality".to_string(),
             help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-            target: PathBuf::from("/foo/bar/scripts/does-path-env-exist.sh"),
+            check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
+            fix_exec: Some("/bin/true".to_string())
+        }
+    );
+    assert_eq!(
+        configs[1].get_doctor_check_spec().unwrap(),
+        DoctorExecCheckSpec {
+            description: "Check your shell for basic functionality".to_string(),
+            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+            check_exec: "/scripts/does-path-env-exist.sh".to_string(),
+            fix_exec: None,
         }
     );
 }
