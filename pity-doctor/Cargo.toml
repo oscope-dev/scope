@@ -5,16 +5,19 @@ edition = "2021"
 
 
 [dependencies]
-clap = { version = "4.4.11", features = ["derive", "env"]}
-human-panic = "1.0.3"
-anyhow = "1.0.57"
-thiserror = "1.0.30"
-directories = "5.0.1"
-tracing = "0.1.34"
+clap = { version = "4.4", features = ["derive", "env"]}
+human-panic = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+directories = "5.0"
+tracing = "0.1"
 tokio = { version = "1", features = ["full"] }
-async-trait = "0.1.53"
+async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9.27"
-tempfile = "3.3.0"
-colored = "2.0.0"
+serde_yaml = "0.9"
+tempfile = "3"
+colored = "2.1.0"
 pity-lib = { path = "../pity-lib" }
+
+[dev-dependencies]
+tempfile = "*"

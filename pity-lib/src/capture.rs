@@ -1,7 +1,10 @@
 use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
 use std::fmt::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
@@ -19,6 +22,7 @@ impl RwLockOutput {
 }
 
 pub struct OutputCapture {
+    pub working_dir: PathBuf,
     stdout: Vec<(DateTime<Utc>, String)>,
     stderr: Vec<(DateTime<Utc>, String)>,
     pub exit_code: Option<i32>,
@@ -33,11 +37,30 @@ pub enum OutputDestination {
     Null,
 }
 
+#[derive(Error, Debug)]
+pub enum CaptureError {
+    #[error("Unable to process file. {error:?}")]
+    IoError {
+        #[from]
+        error: std::io::Error,
+    },
+    #[error("File {name} was not executable or it did not exist.")]
+    MissingShExec { name: String },
+    #[error("Unable to parse UTF-8 output. {error:?}")]
+    FromUtf8Error {
+        #[from]
+        error: std::string::FromUtf8Error,
+    },
+}
+
 impl OutputCapture {
     pub async fn capture_output(
+        working_dir: &Path,
         args: &[String],
-        output: &OutputDestination,
-    ) -> anyhow::Result<Self> {
+        output_dest: &OutputDestination,
+    ) -> Result<Self, CaptureError> {
+        check_pre_exec(args)?;
+
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
         let mut child = command
@@ -45,6 +68,7 @@ impl OutputCapture {
             .args(args)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
+            .current_dir(working_dir)
             .spawn()?;
 
         let stdout = child.stdout.take().expect("stdout to be available");
@@ -56,7 +80,7 @@ impl OutputCapture {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Some(line) = reader.next_line().await? {
                     captured.add_line(&line).await;
-                    match output {
+                    match output_dest {
                         OutputDestination::Logging => info!("{}", line),
                         OutputDestination::StandardOut => println!("{}", line),
                         OutputDestination::Null => {}
@@ -73,7 +97,7 @@ impl OutputCapture {
                 let mut reader = BufReader::new(stderr).lines();
                 while let Some(line) = reader.next_line().await? {
                     captured.add_line(&line).await;
-                    match output {
+                    match output_dest {
                         OutputDestination::Logging => error!("{}", line),
                         OutputDestination::StandardOut => eprintln!("{}", line),
                         OutputDestination::Null => {}
@@ -92,6 +116,7 @@ impl OutputCapture {
         let captured_stderr = wait_stderr.unwrap_or_default();
 
         Ok(Self {
+            working_dir: working_dir.to_path_buf(),
             stdout: captured_stdout,
             stderr: captured_stderr,
             exit_code: command_result.ok().and_then(|x| x.code()),
@@ -175,4 +200,30 @@ impl OutputCapture {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+fn check_pre_exec(args: &[String]) -> Result<(), CaptureError> {
+    let path = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
+        None => {
+            return Err(CaptureError::MissingShExec {
+                name: args.join(" "),
+            })
+        }
+        Some(path) => PathBuf::from(path),
+    };
+
+    if !path.exists() {
+        return Err(CaptureError::MissingShExec {
+            name: path.display().to_string(),
+        });
+    }
+    let metadata = std::fs::metadata(&path)?;
+    let permissions = metadata.permissions().mode();
+    if permissions & 0x700 == 0 {
+        return Err(CaptureError::MissingShExec {
+            name: path.display().to_string(),
+        });
+    }
+
+    Ok(())
 }

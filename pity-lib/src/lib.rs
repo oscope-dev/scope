@@ -12,7 +12,7 @@ pub trait UserListing {
 }
 
 pub mod prelude {
-    pub use crate::capture::{OutputCapture, OutputDestination};
+    pub use crate::capture::{CaptureError, OutputCapture, OutputDestination};
     pub use crate::config_load::{ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
     pub use crate::models::{

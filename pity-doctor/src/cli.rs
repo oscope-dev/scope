@@ -19,10 +19,10 @@ enum DoctorCommands {
     Init(DoctorInitArgs),
 }
 
-pub async fn doctor_root(found_config: &FoundConfig, args: &DoctorArgs) -> Result<()> {
+pub async fn doctor_root(found_config: &FoundConfig, args: &DoctorArgs) -> Result<i32> {
     match &args.command {
-        DoctorCommands::List(args) => doctor_list(found_config, args).await,
+        DoctorCommands::List(args) => doctor_list(found_config, args).await.map(|_| 0),
         DoctorCommands::Run(args) => doctor_run(found_config, args).await,
-        DoctorCommands::Init(args) => doctor_init(found_config, args).await,
+        DoctorCommands::Init(args) => doctor_init(found_config, args).await.map(|_| 0),
     }
 }
