@@ -1,8 +1,8 @@
-use std::path::Path;
 use async_trait::async_trait;
 use pity_lib::prelude::{
     CaptureError, DoctorExecCheckSpec, ModelRoot, OutputCapture, OutputDestination,
 };
+use std::path::Path;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -44,7 +44,8 @@ pub trait CheckRuntime {
 impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
     async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
-        let output = OutputCapture::capture_output(working_dir, &args, &OutputDestination::Null).await?;
+        let output =
+            OutputCapture::capture_output(working_dir, &args, &OutputDestination::Null).await?;
 
         Ok(RuntimeResult {
             success: output.exit_code == Some(0),

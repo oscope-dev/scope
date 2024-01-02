@@ -15,7 +15,12 @@ pub struct ReportArgs {
 }
 
 pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Result<i32> {
-    let capture = OutputCapture::capture_output(&found_config.working_dir, &args.command, &OutputDestination::Logging).await?;
+    let capture = OutputCapture::capture_output(
+        &found_config.working_dir,
+        &args.command,
+        &OutputDestination::Logging,
+    )
+    .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);
     let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
 

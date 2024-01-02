@@ -58,7 +58,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     command.extend(opts.args);
     let current_dir = std::env::current_dir()?;
 
-    let capture = OutputCapture::capture_output(&current_dir, &command, &OutputDestination::StandardOut).await?;
+    let capture =
+        OutputCapture::capture_output(&current_dir, &command, &OutputDestination::StandardOut)
+            .await?;
 
     let mut accepted_exit_codes = vec![0];
     accepted_exit_codes.extend(opts.successful_exit);

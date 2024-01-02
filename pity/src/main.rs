@@ -101,7 +101,7 @@ where
     info!(target: "user", "{:^20}{:^60}{:^40}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
     for check in config {
         let mut loc = check.location();
-        let diff_path = pathdiff::diff_paths(&loc, &working_dir);
+        let diff_path = pathdiff::diff_paths(&loc, working_dir);
         if let Some(diff) = diff_path {
             loc = diff.display().to_string();
         } else if loc.len() > 35 {

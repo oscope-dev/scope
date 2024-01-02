@@ -6,7 +6,7 @@ use pity_lib::prelude::{
     DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
 };
 use std::collections::BTreeMap;
-use std::path::{Path};
+use std::path::Path;
 use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Parser)]
@@ -66,7 +66,11 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     }
 }
 
-async fn handle_check_failure(is_fix: bool, working_dir: &Path, check: &ModelRoot<DoctorExecCheckSpec>) -> Result<()> {
+async fn handle_check_failure(
+    is_fix: bool,
+    working_dir: &Path,
+    check: &ModelRoot<DoctorExecCheckSpec>,
+) -> Result<()> {
     let check_path = match &check.spec.fix_exec {
         None => {
             warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
@@ -81,7 +85,8 @@ async fn handle_check_failure(is_fix: bool, working_dir: &Path, check: &ModelRoo
     }
 
     let args = vec![check_path];
-    let capture = OutputCapture::capture_output(&working_dir, &args, &OutputDestination::StandardOut).await?;
+    let capture =
+        OutputCapture::capture_output(working_dir, &args, &OutputDestination::StandardOut).await?;
 
     if capture.exit_code == Some(0) {
         info!(target: "user", "Check {} failed. {} ran successfully", check.name().bold(), "Fix".bold());
