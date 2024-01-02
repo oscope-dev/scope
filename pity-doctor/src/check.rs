@@ -1,7 +1,8 @@
+use std::path::Path;
 use async_trait::async_trait;
-use pity_lib::prelude::{DoctorExecCheckSpec, ModelRoot, OutputCapture};
-use std::os::unix::fs::PermissionsExt;
-use std::process::Command;
+use pity_lib::prelude::{
+    CaptureError, DoctorExecCheckSpec, ModelRoot, OutputCapture, OutputDestination,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -11,8 +12,6 @@ pub enum RuntimeError {
         #[from]
         error: std::io::Error,
     },
-    #[error("File {name} was not executable or it did not exist.")]
-    MissingShExec { name: String },
     #[error("Unable to persist temp file. {error:?}")]
     UnableToWriteFile {
         #[from]
@@ -23,6 +22,8 @@ pub enum RuntimeError {
         #[from]
         error: std::string::FromUtf8Error,
     },
+    #[error(transparent)]
+    CaptureError(#[from] CaptureError),
 }
 
 pub struct RuntimeResult {
@@ -33,7 +34,7 @@ pub struct RuntimeResult {
 
 #[async_trait]
 pub trait CheckRuntime {
-    async fn exec(&self) -> Result<RuntimeResult, RuntimeError>;
+    async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError>;
     fn description(&self) -> String;
     fn help_text(&self) -> String;
     fn name(&self) -> String;
@@ -41,28 +42,14 @@ pub trait CheckRuntime {
 
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
-    async fn exec(&self) -> Result<RuntimeResult, RuntimeError> {
-        OutputCapture::capture_output()
-        let path = &self.spec.check_exec;
-        if !path.exists() {
-            return Err(RuntimeError::MissingShExec {
-                name: path.display().to_string(),
-            });
-        }
-        let metadata = std::fs::metadata(path)?;
-        let permissions = metadata.permissions().mode();
-        if permissions & 0x700 == 0 {
-            return Err(RuntimeError::MissingShExec {
-                name: path.display().to_string(),
-            });
-        }
-
-        let output = Command::new(path).output()?;
+    async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError> {
+        let args = vec![self.spec.check_exec.clone()];
+        let output = OutputCapture::capture_output(working_dir, &args, &OutputDestination::Null).await?;
 
         Ok(RuntimeResult {
-            success: output.status.success(),
-            stdout: String::from_utf8(output.stdout)?,
-            stderr: String::from_utf8(output.stderr)?,
+            success: output.exit_code == Some(0),
+            stdout: output.get_stdout(),
+            stderr: output.get_stderr(),
         })
     }
 

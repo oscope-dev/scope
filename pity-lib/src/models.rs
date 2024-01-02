@@ -5,11 +5,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const FILE_PATH_ANNOTATION: &str = "pity.github.com/file-path";
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct ModelMetadata {
     pub name: String,
     #[serde(default)]
@@ -286,7 +286,7 @@ mod parser {
     }
 
     fn extract_command_path(parent_dir: &Path, command: &str) -> String {
-        let mut parts: VecDeque<_> = command.split(" ").collect();
+        let mut parts: VecDeque<_> = command.split(' ').collect();
         let command = parts.pop_front().unwrap();
 
         if Path::new(command).is_absolute() {

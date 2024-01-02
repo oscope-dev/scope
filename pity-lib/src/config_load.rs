@@ -2,14 +2,14 @@ use crate::models::{
     parse_config, DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportUploadSpec,
     FILE_PATH_ANNOTATION,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use directories::{BaseDirs, UserDirs};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -24,13 +24,29 @@ pub struct ConfigOptions {
     /// When set, default config files will not be loaded and only specified config will be loaded.
     #[arg(long, env = "PITY_DISABLE_DEFAULT_CONFIG", default_value = "false")]
     disable_default_config: bool,
+
+    /// Override the working directory
+    #[arg(long, short = 'C')]
+    working_dir: Option<String>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct FoundConfig {
+    pub working_dir: PathBuf,
     pub exec_check: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>>,
     pub known_error: BTreeMap<String, ModelRoot<KnownErrorSpec>>,
     pub report_upload: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+}
+
+impl FoundConfig {
+    pub fn new(working_dir: PathBuf) -> Self {
+        Self {
+            working_dir,
+            exec_check: BTreeMap::new(),
+            known_error: BTreeMap::new(),
+            report_upload: BTreeMap::new(),
+        }
+    }
 }
 
 impl FoundConfig {
@@ -78,8 +94,19 @@ impl FoundConfig {
 
 impl ConfigOptions {
     pub fn load_config(&self) -> Result<FoundConfig> {
-        let mut found_config = FoundConfig::default();
-        for file_path in self.find_config_files()? {
+        let current_dir = std::env::current_dir();
+        let working_dir = match (current_dir, &self.working_dir) {
+            (Ok(cwd), None) => cwd,
+            (_, Some(dir)) => PathBuf::from(&dir),
+            _ => {
+                error!(target: "user", "Unable to get a working dir");
+                return Err(anyhow!("Unable to get a working dir"));
+            }
+        };
+
+        let mut found_config = FoundConfig::new(working_dir);
+
+        for file_path in self.find_config_files(&found_config.working_dir)? {
             let file_contents = fs::read_to_string(&file_path)?;
             let parsed_file_contents = match parse_config(file_path.as_path(), &file_contents) {
                 Ok(configs) => configs,
@@ -98,11 +125,11 @@ impl ConfigOptions {
         Ok(found_config)
     }
 
-    fn find_config_files(&self) -> Result<Vec<PathBuf>> {
+    fn find_config_files(&self, working_dir: &Path) -> Result<Vec<PathBuf>> {
         let mut config_paths = Vec::new();
 
         if !self.disable_default_config {
-            let search_dir = std::env::current_dir()?;
+            let search_dir = working_dir.to_path_buf();
             for search_dir in search_dir.ancestors() {
                 let pity_dir: PathBuf = search_dir.join(".pity");
                 debug!("Checking if {} exists", pity_dir.display().to_string());

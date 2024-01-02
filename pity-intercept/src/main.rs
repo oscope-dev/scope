@@ -56,8 +56,9 @@ async fn main() -> anyhow::Result<()> {
 async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     let mut command = vec![opts.utility];
     command.extend(opts.args);
+    let current_dir = std::env::current_dir()?;
 
-    let capture = OutputCapture::capture_output(&command, &OutputDestination::StandardOut).await?;
+    let capture = OutputCapture::capture_output(&current_dir, &command, &OutputDestination::StandardOut).await?;
 
     let mut accepted_exit_codes = vec![0];
     accepted_exit_codes.extend(opts.successful_exit);
@@ -70,7 +71,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     error!(target: "user", "Command failed, checking for a known error");
     let found_config = opts.config_options.load_config().unwrap_or_else(|e| {
         error!(target: "user", "Unable to load configs from disk: {:?}", e);
-        FoundConfig::default()
+        FoundConfig::new(std::env::current_dir().unwrap())
     });
 
     let command_output = capture.generate_output();

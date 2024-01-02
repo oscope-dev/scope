@@ -38,7 +38,7 @@ impl ReportBuilder {
             let mut dest_report = base_report.clone();
             for (name, command) in &dest.spec.additional_data {
                 let capture =
-                    OutputCapture::capture_output(&[command.to_string()], &OutputDestination::Null)
+                    OutputCapture::capture_output(&self.command_capture.working_dir, &[command.to_string()], &OutputDestination::Null)
                         .await?;
                 dest_report.push('\n');
                 dest_report.push_str(&capture.create_report_text(Some(&format!("== {}", name)))?);
