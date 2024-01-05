@@ -8,6 +8,7 @@ use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
+use which::which_in;
 
 #[derive(Debug, Default)]
 struct RwLockOutput {
@@ -28,7 +29,7 @@ pub struct OutputCapture {
     pub exit_code: Option<i32>,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
-    command: String,
+    pub command: String,
 }
 
 pub enum OutputDestination {
@@ -59,7 +60,7 @@ impl OutputCapture {
         args: &[String],
         output_dest: &OutputDestination,
     ) -> Result<Self, CaptureError> {
-        check_pre_exec(args)?;
+        check_pre_exec(working_dir, args)?;
 
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
@@ -202,14 +203,24 @@ impl OutputCapture {
     }
 }
 
-fn check_pre_exec(args: &[String]) -> Result<(), CaptureError> {
-    let path = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
+fn check_pre_exec(working_dir: &Path, args: &[String]) -> Result<(), CaptureError> {
+    let found_binary = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
         None => {
             return Err(CaptureError::MissingShExec {
                 name: args.join(" "),
             })
         }
-        Some(path) => PathBuf::from(path),
+        Some(path) => which_in(path, std::env::var_os("PATH"), working_dir),
+    };
+
+    let path = match found_binary {
+        Ok(path) => path,
+        Err(e) => {
+            debug!("Unable to find binary {:?}", e);
+            return Err(CaptureError::MissingShExec {
+                name: args.join(" "),
+            });
+        }
     };
 
     if !path.exists() {

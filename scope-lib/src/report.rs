@@ -8,6 +8,7 @@ use std::io::Write;
 use tracing::{debug, info, warn};
 
 pub struct ReportBuilder {
+    message: String,
     command_capture: OutputCapture,
     destinations: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
 }
@@ -18,9 +19,14 @@ impl ReportBuilder {
         destinations: &BTreeMap<String, ModelRoot<ReportUploadSpec>>,
     ) -> Self {
         Self {
+            message: format!("= Unable to run `{}`", capture.command),
             command_capture: capture,
             destinations: destinations.clone(),
         }
+    }
+
+    pub fn with_message(&mut self, message: String) {
+        self.message = message;
     }
 
     pub fn write_local_report(&self) -> Result<()> {
@@ -33,6 +39,7 @@ impl ReportBuilder {
 
     pub async fn distribute_report(&self) -> Result<()> {
         let base_report = self.command_capture.create_report_text(None)?;
+        let base_report = format!("{}\n{}", self.message, base_report);
 
         for (name, dest) in &self.destinations {
             let mut dest_report = base_report.clone();
@@ -84,8 +91,13 @@ impl ReportUploadLocation {
             }
         };
 
+        let title = match report.find('\n') {
+            Some(value) => report[0..value].to_string(),
+            None => "Scope bug report".to_string(),
+        };
+
         let body = json::object! {
-            title: "Scope bug report",
+            title: title,
             body: report,
             labels: tags
         };
