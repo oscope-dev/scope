@@ -168,7 +168,7 @@ fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
             let known_error = parser::parse_v1_known_error(&root.spec)?;
             ParsedConfig::KnownError(root.with_spec(known_error))
         }
-        ("scope.github.com/v1alpha", "scopereport") => {
+        ("scope.github.com/v1alpha", "scopereportlocation") => {
             let report_upload = parser::parse_v1_report(&root.spec)?;
             ParsedConfig::ReportUpload(root.with_spec(report_upload))
         }
@@ -389,7 +389,7 @@ fn test_parse_scope_report() {
     let text = "
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: report
 spec:
@@ -400,7 +400,7 @@ spec:
         url: https://foo.bar
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: github
 spec:

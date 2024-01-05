@@ -1,6 +1,6 @@
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: report
 spec:
@@ -13,6 +13,16 @@ spec:
   destination:
     rustyPaste:
       url: http://localhost:8000
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportLocation
+metadata:
+  name: github
+spec:
+  destination:
+    githubIssue:
+      owner: ethankhall
+      repo: dummy-repo
 ---
 apiVersion: scope.github.com/v1alpha
 kind: ScopeReport
