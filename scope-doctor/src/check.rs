@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use pity_lib::prelude::{
+use scope_lib::prelude::{
     CaptureError, DoctorExecCheckSpec, ModelRoot, OutputCapture, OutputDestination,
 };
 use std::path::Path;

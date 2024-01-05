@@ -2,7 +2,7 @@ use crate::check::CheckRuntime;
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use pity_lib::prelude::{
+use scope_lib::prelude::{
     DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
 };
 use std::collections::BTreeMap;

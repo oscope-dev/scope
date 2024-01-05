@@ -14,15 +14,15 @@ use tracing::{debug, error, warn};
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
 pub struct ConfigOptions {
-    /// Add a paths to search for configuration. By default, `pity` will search up
-    /// for `.pity` directories and attempt to load `.yml` and `.yaml` files for config.
+    /// Add a paths to search for configuration. By default, `scope` will search up
+    /// for `.scope` directories and attempt to load `.yml` and `.yaml` files for config.
     /// If the config directory is somewhere else, specifying this option will _add_
     /// the paths/files to the loaded config.
-    #[clap(long, env = "PITY_CONFIG_DIR")]
+    #[clap(long, env = "scope_CONFIG_DIR")]
     extra_config: Vec<String>,
 
     /// When set, default config files will not be loaded and only specified config will be loaded.
-    #[arg(long, env = "PITY_DISABLE_DEFAULT_CONFIG", default_value = "false")]
+    #[arg(long, env = "scope_DISABLE_DEFAULT_CONFIG", default_value = "false")]
     disable_default_config: bool,
 
     /// Override the working directory
@@ -131,27 +131,27 @@ impl ConfigOptions {
         if !self.disable_default_config {
             let search_dir = working_dir.to_path_buf();
             for search_dir in search_dir.ancestors() {
-                let pity_dir: PathBuf = search_dir.join(".pity");
-                debug!("Checking if {} exists", pity_dir.display().to_string());
-                if pity_dir.exists() {
-                    config_paths.push(pity_dir)
+                let scope_dir: PathBuf = search_dir.join(".scope");
+                debug!("Checking if {} exists", scope_dir.display().to_string());
+                if scope_dir.exists() {
+                    config_paths.push(scope_dir)
                 }
             }
 
             if let Some(user_dirs) = UserDirs::new() {
-                config_paths.push(user_dirs.home_dir().join(".pity"));
+                config_paths.push(user_dirs.home_dir().join(".scope"));
             }
 
             if let Some(base_dirs) = BaseDirs::new() {
-                config_paths.push(base_dirs.config_dir().join(".pity"));
+                config_paths.push(base_dirs.config_dir().join(".scope"));
             }
         }
 
         for extra_config in &self.extra_config {
-            let pity_dir = Path::new(&extra_config);
-            debug!("Checking if {} exists", pity_dir.display().to_string());
-            if pity_dir.exists() {
-                config_paths.push(pity_dir.to_path_buf())
+            let scope_dir = Path::new(&extra_config);
+            debug!("Checking if {} exists", scope_dir.display().to_string());
+            if scope_dir.exists() {
+                config_paths.push(scope_dir.to_path_buf())
             }
         }
 

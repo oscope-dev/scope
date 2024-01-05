@@ -1,3 +1,3 @@
 [workspace]
-members = ["pity", "pity-doctor", "pity-report", "pity-intercept", "pity-lib"]
+members = ["scope", "scope-doctor", "scope-report", "scope-intercept", "scope-lib"]
 resolver = "2"

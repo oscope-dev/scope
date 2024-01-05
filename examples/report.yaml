@@ -1,6 +1,6 @@
 ---
-apiVersion: pity.github.com/v1alpha
-kind: PityReport
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReport
 metadata:
   name: report
 spec:
@@ -14,8 +14,8 @@ spec:
     rustyPaste:
       url: http://localhost:8000
 ---
-apiVersion: pity.github.com/v1alpha
-kind: PityReport
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReport
 metadata:
   name: github
 spec:
