@@ -3,7 +3,6 @@ use human_panic::setup_panic;
 use scope_lib::prelude::{
     ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination, ReportBuilder,
 };
-use scope_lib::UserListing;
 use tracing::{debug, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors

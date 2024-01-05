@@ -1,5 +1,5 @@
 use crate::capture::{OutputCapture, OutputDestination};
-use crate::models::{ModelRoot, ReportUploadLocation, ReportUploadSpec};
+use crate::models::{ModelRoot, ReportUploadLocation, ReportUploadLocationSpec};
 use anyhow::{anyhow, Result};
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use std::collections::BTreeMap;
@@ -10,13 +10,13 @@ use tracing::{debug, info, warn};
 pub struct ReportBuilder {
     message: String,
     command_capture: OutputCapture,
-    destinations: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+    destinations: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
 }
 
 impl ReportBuilder {
     pub fn new(
         capture: OutputCapture,
-        destinations: &BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+        destinations: &BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
     ) -> Self {
         Self {
             message: format!("= Unable to run `{}`", capture.command),

@@ -1501,6 +1501,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "colored",
  "derivative",
  "directories 5.0.1",
  "dotenv",

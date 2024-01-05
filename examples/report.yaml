@@ -25,11 +25,8 @@ spec:
       repo: dummy-repo
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportDefinition
 metadata:
   name: github
 spec:
-  destination:
-    githubIssue:
-      owner: ethankhall
-      repo: dummy-repo
+  template: "asdf"

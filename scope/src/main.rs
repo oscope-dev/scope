@@ -3,8 +3,8 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use human_panic::setup_panic;
 use scope_doctor::prelude::*;
-use scope_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
-use scope_lib::UserListing;
+use scope_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts, ModelRoot};
+use scope_lib::HelpMetadata;
 use scope_report::prelude::{report_root, ReportArgs};
 use std::path::Path;
 use tracing::{error, info};
@@ -94,19 +94,19 @@ fn show_config(found_config: &FoundConfig) -> Result<()> {
     Ok(())
 }
 
-fn print_details<T>(working_dir: &Path, config: Vec<&T>)
+fn print_details<T>(working_dir: &Path, config: Vec<&ModelRoot<T>>)
 where
-    T: UserListing,
+    T: HelpMetadata,
 {
     info!(target: "user", "{:^20}{:^60}{:^40}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
     for check in config {
-        let mut loc = check.location();
+        let mut loc = check.file_path();
         let diff_path = pathdiff::diff_paths(&loc, working_dir);
         if let Some(diff) = diff_path {
             loc = diff.display().to_string();
         } else if loc.len() > 35 {
             loc = format!("...{}", loc.split_off(loc.len() - 35));
         }
-        info!(target: "user", "{:^20} {:^60} {:^40}", check.name().white().bold(), check.description(), loc);
+        info!(target: "user", "{:^20} {:^60} {:^40}", check.name().white().bold(), check.spec.description(), loc);
     }
 }
