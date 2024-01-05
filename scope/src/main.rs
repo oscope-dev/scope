@@ -2,16 +2,16 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use human_panic::setup_panic;
-use pity_doctor::prelude::*;
-use pity_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
-use pity_lib::UserListing;
-use pity_report::prelude::{report_root, ReportArgs};
+use scope_doctor::prelude::*;
+use scope_lib::prelude::{ConfigOptions, FoundConfig, LoggingOpts};
+use scope_lib::UserListing;
+use scope_report::prelude::{report_root, ReportArgs};
 use std::path::Path;
 use tracing::{error, info};
 
-/// Pity the Fool
+/// (Oscilli)scope
 ///
-/// Pity is a tool to enable teams to manage local machine
+/// Scope is a tool to enable teams to manage local machine
 /// checks. An example would be a team that supports other
 /// engineers may want to verify that the engineer asking
 /// for support's machine is setup correctly.

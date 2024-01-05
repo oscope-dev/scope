@@ -7,7 +7,7 @@ use serde_yaml::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-pub const FILE_PATH_ANNOTATION: &str = "pity.github.com/file-path";
+pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct ModelMetadata {
@@ -160,15 +160,15 @@ fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
 
     let containing_dir = file_path.parent().unwrap();
     let parsed = match (api_version, kind) {
-        ("pity.github.com/v1alpha", "pitydoctorcheck") => {
+        ("scope.github.com/v1alpha", "scopedoctorcheck") => {
             let exec_check = parser::parse_v1_doctor_check(containing_dir, &root.spec)?;
             ParsedConfig::DoctorCheck(root.with_spec(exec_check))
         }
-        ("pity.github.com/v1alpha", "pityknownerror") => {
+        ("scope.github.com/v1alpha", "scopeknownerror") => {
             let known_error = parser::parse_v1_known_error(&root.spec)?;
             ParsedConfig::KnownError(root.with_spec(known_error))
         }
-        ("pity.github.com/v1alpha", "pityreport") => {
+        ("scope.github.com/v1alpha", "scopereport") => {
             let report_upload = parser::parse_v1_report(&root.spec)?;
             ParsedConfig::ReportUpload(root.with_spec(report_upload))
         }
@@ -314,10 +314,10 @@ mod parser {
 }
 
 #[test]
-fn test_parse_pity_doctor_check_exec() {
+fn test_parse_scope_doctor_check_exec() {
     let text = "---
-apiVersion: pity.github.com/v1alpha
-kind: PityDoctorCheck
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorCheck
 metadata:
   name: path-exists
 spec:
@@ -328,8 +328,8 @@ spec:
   description: Check your shell for basic functionality
   help: You're shell does not have a path env. Reload your shell.
 ---
-apiVersion: pity.github.com/v1alpha
-kind: PityDoctorCheck
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorCheck
 metadata:
   name: path-exists
 spec:
@@ -363,9 +363,9 @@ spec:
 }
 
 #[test]
-fn test_parse_pity_known_error() {
-    let text = "apiVersion: pity.github.com/v1alpha
-kind: PityKnownError
+fn test_parse_scope_known_error() {
+    let text = "apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
 metadata:
   name: error-exists
 spec:
@@ -385,11 +385,11 @@ spec:
 }
 
 #[test]
-fn test_parse_pity_report() {
+fn test_parse_scope_report() {
     let text = "
 ---
-apiVersion: pity.github.com/v1alpha
-kind: PityReport
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReport
 metadata:
   name: report
 spec:
@@ -399,8 +399,8 @@ spec:
       rustyPaste:
         url: https://foo.bar
 ---
-apiVersion: pity.github.com/v1alpha
-kind: PityReport
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReport
 metadata:
   name: github
 spec:
@@ -408,7 +408,7 @@ spec:
     env: env
   destination:
       githubIssue:
-        owner: pity
+        owner: scope
         repo: party
  ";
 
@@ -430,7 +430,7 @@ spec:
         configs[1].get_report_upload_spec().unwrap(),
         ReportUploadSpec {
             destination: ReportUploadLocation::GithubIssue {
-                owner: "pity".to_string(),
+                owner: "scope".to_string(),
                 repo: "party".to_string(),
                 tags: Vec::new(),
             },

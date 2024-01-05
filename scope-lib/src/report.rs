@@ -85,7 +85,7 @@ impl ReportUploadLocation {
         };
 
         let body = json::object! {
-            title: "Pity bug report",
+            title: "Scope bug report",
             body: report,
             labels: tags
         };
@@ -98,7 +98,7 @@ impl ReportUploadLocation {
             ))
             .header(ACCEPT, "application/vnd.github+json")
             .header(AUTHORIZATION, format!("Bearer {}", gh_auth))
-            .header(USER_AGENT, "pity")
+            .header(USER_AGENT, "scope")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .body(body.dump())
             .send()
@@ -178,7 +178,7 @@ impl ReportUploadLocation {
 pub fn write_to_report_file(prefix: &str, text: &str) -> Result<String> {
     let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
 
-    let file_path = format!("/tmp/pity/pity-{}-{}.txt", prefix, id);
+    let file_path = format!("/tmp/scope/scope-{}-{}.txt", prefix, id);
     let mut file = File::create(&file_path)?;
     file.write_all(text.as_bytes())?;
 

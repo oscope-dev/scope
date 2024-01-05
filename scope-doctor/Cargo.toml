@@ -1,5 +1,5 @@
 [package]
-name = "pity-doctor"
+name = "scope-doctor"
 version = "0.1.0"
 edition = "2021"
 
@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tempfile = "3"
 colored = "2.1.0"
-pity-lib = { path = "../pity-lib" }
+scope-lib = { path = "../scope-lib" }
 
 [dev-dependencies]
 tempfile = "*"

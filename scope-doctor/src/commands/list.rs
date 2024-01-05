@@ -2,7 +2,7 @@ use crate::check::CheckRuntime;
 use anyhow::Result;
 use clap::Args;
 use colored::*;
-use pity_lib::prelude::FoundConfig;
+use scope_lib::prelude::FoundConfig;
 use tracing::info;
 
 #[derive(Debug, Args)]

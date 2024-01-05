@@ -1202,110 +1202,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
-name = "pity"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "colored",
- "dotenv",
- "human-panic",
- "pathdiff",
- "pity-doctor",
- "pity-lib",
- "pity-report",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "pity-doctor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "colored",
- "directories 5.0.1",
- "human-panic",
- "pity-lib",
- "serde 1.0.193",
- "serde_yaml",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "pity-intercept"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "dotenv",
- "human-panic",
- "inquire",
- "pity-lib",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "pity-lib"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "derivative",
- "directories 5.0.1",
- "dotenv",
- "human-panic",
- "json",
- "log",
- "nanoid",
- "regex",
- "reqwest",
- "serde 1.0.193",
- "serde_yaml",
- "thiserror",
- "time",
- "tokio",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "pity-report"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "colored",
- "directories 5.0.1",
- "futures",
- "human-panic",
- "nanoid",
- "pity-lib",
- "ptree",
- "serde 1.0.193",
- "serde_yaml",
- "sysinfo",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "pkg-config"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1533,6 +1429,110 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbc91545643bcf3a0bbb6569265615222618bdf33ce4ffbbd13c4bbd4c093534"
 dependencies = [
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "scope"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "colored",
+ "dotenv",
+ "human-panic",
+ "pathdiff",
+ "scope-doctor",
+ "scope-lib",
+ "scope-report",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "scope-doctor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "colored",
+ "directories 5.0.1",
+ "human-panic",
+ "scope-lib",
+ "serde 1.0.193",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "scope-intercept"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "dotenv",
+ "human-panic",
+ "inquire",
+ "scope-lib",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "scope-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "derivative",
+ "directories 5.0.1",
+ "dotenv",
+ "human-panic",
+ "json",
+ "log",
+ "nanoid",
+ "regex",
+ "reqwest",
+ "serde 1.0.193",
+ "serde_yaml",
+ "thiserror",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "scope-report"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "colored",
+ "directories 5.0.1",
+ "futures",
+ "human-panic",
+ "nanoid",
+ "ptree",
+ "scope-lib",
+ "serde 1.0.193",
+ "serde_yaml",
+ "sysinfo",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

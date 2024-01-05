@@ -1,15 +1,15 @@
 use clap::Parser;
 use human_panic::setup_panic;
-use pity_lib::prelude::{
+use scope_lib::prelude::{
     ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination, ReportBuilder,
 };
-use pity_lib::UserListing;
+use scope_lib::UserListing;
 use tracing::{debug, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
 /// and let the user know.
 ///
-/// `pity-intercept` will execute `/usr/bin/env -S [utility] [args...]` capture the output from
+/// `scope-intercept` will execute `/usr/bin/env -S [utility] [args...]` capture the output from
 /// STDOUT and STDERR. After the program exits, the exit code will be checked, and if it's non-zero
 /// the output will be parsed for known errors.
 #[derive(Parser)]
@@ -26,7 +26,7 @@ struct Cli {
     #[clap(flatten)]
     config_options: ConfigOptions,
 
-    /// Command to execute withing pity-intercept.
+    /// Command to execute withing scope-intercept.
     #[arg(required = true)]
     utility: String,
 

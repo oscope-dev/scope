@@ -1,53 +1,53 @@
-= Pity (the fool)
+= Scope (Oscilliscope)
 :toc:
 :exampleDir: examples
 
-`pity` is a tool that allows developer experience teams to provide tooling for engineers.
-There are two tools engineers will use directly, `pity doctor` and `pity report`.
+`scope` is a tool that allows developer experience teams to provide tooling for engineers.
+There are two tools engineers will use directly, `scope doctor` and `scope report`.
 
-`pity doctor` runs a set of user-defined scripts to help configure, debug, and fix an engineers environment.
+`scope doctor` runs a set of user-defined scripts to help configure, debug, and fix an engineers environment.
 
-`pity report` is used to report local execution error.
+`scope report` is used to report local execution error.
 This is primarily used to generate a bug report, and upload it somewhere so that the responders have all the required into to respond.
 
 == Commands
 
-=== `pity doctor`
+=== `scope doctor`
 
 Environments are hard to maintain and can fall out of sync with exceptions quickly.
-`pity doctor` is a way to codify what a working environment means and tell the user how to fix it.
+`scope doctor` is a way to codify what a working environment means and tell the user how to fix it.
 The aim is to reduce the need for engineers to ask others to fix their environment and distribute what "working" means to everyone.
 
-=== `pity report`
+=== `scope report`
 
 Sometimes you need to report an error to others.
 Often the responding team wants the output that failed, and some other useful debugging information.
 
-By using `pity report some-command.sh`, pity will capture all the output with timestamps and then generate a "report" that can be uploaded to multiple destinations.
+By using `scope report some-command.sh`, scope will capture all the output with timestamps and then generate a "report" that can be uploaded to multiple destinations.
 
-IMPORTANT: `pity` will redact anything it finds as "sensitive".
+IMPORTANT: `scope` will redact anything it finds as "sensitive".
 This allows you to fetch env-vars, and no leak GH API tokens for example.
 
-=== `pity-intercept`
+=== `scope-intercept`
 
-`pity-intercept` is a https://en.wikipedia.org/wiki/Shebang_(Unix)[shebang] replacement for `env`.
-Behind the scene `env -S` is run to execute the script, however `pity-intercept` will watch all the output and then check for KnownErrors.
+`scope-intercept` is a https://en.wikipedia.org/wiki/Shebang_(Unix)[shebang] replacement for `env`.
+Behind the scene `env -S` is run to execute the script, however `scope-intercept` will watch all the output and then check for KnownErrors.
 This allows the engineer to see, in real time, suggestions for fixing errors.
 It also allows the engineer to upload a bug report immediately.
 
-IMPORTANT: `pity` will redact anything it finds as "sensitive".
+IMPORTANT: `scope` will redact anything it finds as "sensitive".
 This allows you to fetch env-vars, and no leak GH API tokens for example.
 
 == Config
 
-All `pity` config files look like Kubernetes yaml, requiring:
+All `scope` config files look like Kubernetes yaml, requiring:
 
 - `apiVersion`
 - `kind`
 - `metadata`
 - `spec`
 
-Config files live inside a `.pity` directory, and `pity` will search for this directory walking up the file tree.
+Config files live inside a `.scope` directory, and `scope` will search for this directory walking up the file tree.
 A user can also add a specific file or folder with arguments or environment variables.
 
 [cols="1,2"]
@@ -69,19 +69,19 @@ a! `labels`
 a! A map of `string:string` that can be used by user.
 
 a! `annotations`
-a! A map of `string:string` that can be used by user. Pity will set some specific annotations.
+a! A map of `string:string` that can be used by user. Scope will set some specific annotations.
 
 !===
 
 a| `kind`
 a| The type of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
 
-Current supported options are: `PityDoctorCheck`, `PityReport`, `PityKnownError`.
+Current supported options are: `ScopeDoctorCheck`, `ScopeReport`, `ScopeKnownError`.
 
 a| `apiVersion`
 a| The version of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
 
-The only supported value at the moment is `pity.github.com/v1alpha`.
+The only supported value at the moment is `scope.github.com/v1alpha`.
 
 a| `spec`
 | A data structure that changes based on `apiVersion` and `kind`.
@@ -89,16 +89,16 @@ a| `spec`
 |===
 
 
-=== `PityDoctorCheck`
+=== `ScopeDoctorCheck`
 
-Used to diagnose errors with an engineers environment. Used when running `pity doctor`.
+Used to diagnose errors with an engineers environment. Used when running `scope doctor`.
 
 **Example**
 
 [source,yaml]
 ....
-apiVersion: pity.github.com/v1alpha
-kind: PityDoctorCheck
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorCheck
 metadata:
   name: path-exists
 spec:
@@ -112,9 +112,9 @@ From the example, when the check runs it will execute `scripts/does-path-env-exi
 
 If the process exits non-0, the help text will be shown to the user.
 
-=== `PityKnownError`
+=== `ScopeKnownError`
 
-When using `pity-intercept` or `pity report`, providing a KnownError file will allow pity to tell the user about known errors.
+When using `scope-intercept` or `scope report`, providing a KnownError file will allow scope to tell the user about known errors.
 This is useful for example if the owning team knows that the output will contain a message and the user should check for something before continuing.
 A common example is a dependency is missing, the node modules might need to be cleaned.
 
@@ -122,8 +122,8 @@ A common example is a dependency is missing, the node modules might need to be c
 
 [source,yaml]
 ....
-apiVersion: pity.github.com/v1alpha
-kind: PityKnownError
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
 metadata:
   name: error-exists
 spec:
@@ -138,7 +138,7 @@ spec:
 | Description
 
 a| `.spec.description`
-| A short description of the error, for `pity config`
+| A short description of the error, for `scope config`
 
 a| `.spec.pattern`
 | A regex pattern to search all output for (standard error and standard out)
@@ -147,13 +147,13 @@ a| `.spec.help`
 | The text that will be shown to a user when the pattern matches
 |===
 
-=== `PityReport`
+=== `ScopeReport`
 
-When using `pity-intercept` or `pity report`, a user is able to upload the error for sharing.
-`PityReport` defines where to upload, and any additional commands that should be and output included in the report.
+When using `scope-intercept` or `scope report`, a user is able to upload the error for sharing.
+`ScopeReport` defines where to upload, and any additional commands that should be and output included in the report.
 
 In order to use GitHub Issue as the destination, you MUST have the env var `GH_TOKEN` set to a valid https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens[Personal Access Token].
-If you do not, pity cannot publish the report.
+If you do not, scope cannot publish the report.
 
 If your users won't always be logged into GitHub, we recommend using RustyPaste as an alternative.
 
@@ -161,8 +161,8 @@ If your users won't always be logged into GitHub, we recommend using RustyPaste 
 
 [source,yaml]
 ....
-apiVersion: pity.github.com/v1alpha
-kind: PityReport
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReport
 metadata:
   name: report
 spec:
@@ -183,7 +183,7 @@ spec:
 | Description
 
 a| `.spec.additionalData`
-| A map of `name` to `command`. Pity will run the command and capture the output as part of the report.
+| A map of `name` to `command`. Scope will run the command and capture the output as part of the report.
 
 a| `.spec.destination`
 a| Currently, supports GitHub Issues and https://github.com/orhun/rustypaste[`RustyPaste`] as a source.
@@ -193,7 +193,7 @@ a| `.spec.destination.githubIssue.owner`
 a| (required) GitHub owner part of the slug. (ie. `ethankhall`)
 
 a| `.spec.destination.githubIssue.owner`
-a| (required) GitHub repo name (ie. `pity`)
+a| (required) GitHub repo name (ie. `scope`)
 
 a| `.spec.destination.githubIssue.tags`
 a| List of tags to add to the issue.

@@ -1,5 +1,5 @@
-apiVersion: pity.github.com/v1alpha
-kind: PityDoctorCheck
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorCheck
 metadata:
   name: path-exists
 spec:

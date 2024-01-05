@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Args;
-use pity_lib::prelude::{FoundConfig, OutputCapture, OutputDestination, ReportBuilder};
+use scope_lib::prelude::{FoundConfig, OutputCapture, OutputDestination, ReportBuilder};
 use tracing::warn;
 
 #[derive(Debug, Args)]

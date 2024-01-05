@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Args;
-use pity_lib::prelude::FoundConfig;
+use scope_lib::prelude::FoundConfig;
 
 #[derive(Debug, Args)]
 pub struct DoctorInitArgs {
