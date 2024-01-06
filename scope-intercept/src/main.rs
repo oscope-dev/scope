@@ -96,7 +96,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
-    let mut report_builder = ReportBuilder::new(capture, &found_config)?;
+    let mut report_builder = ReportBuilder::new(&capture, &found_config).await?;
     if let Ok(true) = ans {
         report_builder.ask_user_for_message()?;
         if let Err(e) = report_builder.distribute_report().await {

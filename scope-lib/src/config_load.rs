@@ -50,6 +50,17 @@ impl FoundConfig {
             report_definition: None,
         }
     }
+
+    pub fn get_report_definition(&self) -> ReportDefinitionSpec {
+        self.report_definition
+            .as_ref()
+            .map(|x| x.spec.clone())
+            .clone()
+            .unwrap_or_else(|| ReportDefinitionSpec {
+                template: "Error report for {{ command }}.".to_string(),
+                additional_data: Default::default(),
+            })
+    }
 }
 
 impl FoundConfig {

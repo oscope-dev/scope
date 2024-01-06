@@ -22,7 +22,7 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
     )
     .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);
-    let mut report_builder = ReportBuilder::new(capture, found_config)?;
+    let mut report_builder = ReportBuilder::new(&capture, found_config).await?;
 
     if found_config.report_upload.is_empty() {
         report_builder.write_local_report()?;
