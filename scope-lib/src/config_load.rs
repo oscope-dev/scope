@@ -6,12 +6,12 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use directories::{BaseDirs, UserDirs};
+use itertools::Itertools;
 use std::collections::BTreeMap;
-use std::ffi::{OsStr};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
-use itertools::Itertools;
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -24,7 +24,12 @@ pub struct ConfigOptions {
     extra_config: Vec<String>,
 
     /// When set, default config files will not be loaded and only specified config will be loaded.
-    #[arg(long, env = "SCOPE_DISABLE_DEFAULT_CONFIG", default_value = "false", global(true),)]
+    #[arg(
+        long,
+        env = "SCOPE_DISABLE_DEFAULT_CONFIG",
+        default_value = "false",
+        global(true)
+    )]
     disable_default_config: bool,
 
     /// Override the working directory
@@ -40,13 +45,16 @@ pub struct FoundConfig {
     pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
     pub report_definition: Option<ModelRoot<ReportDefinitionSpec>>,
     pub config_path: Vec<PathBuf>,
-    pub bin_path: String
+    pub bin_path: String,
 }
 
 impl FoundConfig {
     pub fn new(working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
         let bin_path = std::env::var("PATH").unwrap_or_default();
-        let scope_path = config_path.iter().map(|x| x.join("bin").display().to_string()).join(":");
+        let scope_path = config_path
+            .iter()
+            .map(|x| x.join("bin").display().to_string())
+            .join(":");
         Self {
             working_dir,
             exec_check: BTreeMap::new(),
@@ -54,7 +62,7 @@ impl FoundConfig {
             report_upload: BTreeMap::new(),
             report_definition: None,
             config_path,
-            bin_path: vec![bin_path, scope_path].join(":")
+            bin_path: [bin_path, scope_path].join(":"),
         }
     }
 
@@ -137,7 +145,7 @@ impl ConfigOptions {
     fn find_config_files(&self, config_dirs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
         let mut config_files = Vec::new();
         for path in config_dirs {
-            config_files.extend(expand_path(&path)?);
+            config_files.extend(expand_path(path)?);
         }
 
         Ok(config_files)

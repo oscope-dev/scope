@@ -10,8 +10,8 @@ pub trait HelpMetadata {
 }
 
 pub mod prelude {
-    pub use crate::capture::{CaptureOpts, CaptureError, OutputCapture, OutputDestination};
-    pub use crate::config_load::{ConfigOptions, FoundConfig, build_config_path};
+    pub use crate::capture::{CaptureError, CaptureOpts, OutputCapture, OutputDestination};
+    pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
     pub use crate::models::{
         parse_config, DoctorExecCheckSpec, ModelMetadata, ModelRoot, ParsedConfig,

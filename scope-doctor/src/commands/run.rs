@@ -2,7 +2,9 @@ use crate::check::CheckRuntime;
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use scope_lib::prelude::{CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination};
+use scope_lib::prelude::{
+    CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
+};
 use std::collections::BTreeMap;
 use tracing::{debug, error, info, warn};
 
@@ -45,13 +47,13 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             Some(check) => check,
         };
 
-        let exec_result = check.exec(&found_config).await?;
+        let exec_result = check.exec(found_config).await?;
         info!(check = %check_name, output= "stdout", successful=exec_result.success, "{}", exec_result.stdout);
         info!(check = %check_name, output= "stderr", successful=exec_result.success, "{}", exec_result.stderr);
         if exec_result.success {
             info!(target: "user", "Check {} was successful", check_name.bold());
         } else {
-            handle_check_failure(args.fix, &found_config, check).await?;
+            handle_check_failure(args.fix, found_config, check).await?;
             should_pass = false;
         }
     }
@@ -82,13 +84,13 @@ async fn handle_check_failure(
     }
 
     let args = vec![check_path];
-    let capture =
-        OutputCapture::capture_output(CaptureOpts {
-            working_dir: &found_config.working_dir,
-            args: &args,
-            output_dest: OutputDestination::StandardOut,
-            path: &found_config.bin_path
-        }).await?;
+    let capture = OutputCapture::capture_output(CaptureOpts {
+        working_dir: &found_config.working_dir,
+        args: &args,
+        output_dest: OutputDestination::StandardOut,
+        path: &found_config.bin_path,
+    })
+    .await?;
 
     if capture.exit_code == Some(0) {
         info!(target: "user", "Check {} failed. {} ran successfully", check.name().bold(), "Fix".bold());

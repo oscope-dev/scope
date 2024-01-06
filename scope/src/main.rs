@@ -1,18 +1,21 @@
-use std::collections::BTreeMap;
-use std::ffi::OsString;
 use anyhow::Result;
+use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use human_panic::setup_panic;
-use scope_doctor::prelude::*;
-use scope_lib::prelude::{CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture, OutputDestination};
-use scope_lib::HelpMetadata;
-use scope_report::prelude::{report_root, ReportArgs};
-use std::path::Path;
 use lazy_static::lazy_static;
 use regex::Regex;
+use scope_doctor::prelude::*;
+use scope_lib::prelude::{
+    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture,
+    OutputDestination,
+};
+use scope_lib::HelpMetadata;
+use scope_report::prelude::{report_root, ReportArgs};
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+use std::path::Path;
 use tracing::{error, info};
-use clap::CommandFactory;
 
 /// (Oscilli)scope
 ///
@@ -42,7 +45,8 @@ enum Command {
     /// List the found config files, and resources detected
     List,
     #[command(external_subcommand)]
-    ExternalSubCommand(Vec<String>)
+    #[allow(clippy::enum_variant_names)]
+    ExternalSubCommand(Vec<String>),
 }
 
 #[tokio::main]
@@ -79,12 +83,12 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
         Command::Doctor(args) => doctor_root(found_config, args).await,
         Command::Report(args) => report_root(found_config, args).await,
         Command::List => show_config(found_config).map(|_| 0),
-        Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await
+        Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await,
     }
 }
 
-async fn exec_sub_command(found_config: &FoundConfig, args: &Vec<String>) -> Result<i32> {
-    let mut args = args.clone();
+async fn exec_sub_command(found_config: &FoundConfig, args: &[String]) -> Result<i32> {
+    let mut args = args.to_owned();
     let command = match args.first() {
         None => return Err(anyhow::anyhow!("Sub command not provided")),
         Some(cmd) => {
@@ -92,16 +96,17 @@ async fn exec_sub_command(found_config: &FoundConfig, args: &Vec<String>) -> Res
         }
     };
     let _ = std::mem::replace(&mut args[0], command);
-    let capture =
-        OutputCapture::capture_output(CaptureOpts {
-            working_dir: &found_config.working_dir,
-            args: &args,
-            output_dest: OutputDestination::StandardOut,
-            path: &found_config.bin_path
-        })
-            .await?;
+    let capture = OutputCapture::capture_output(CaptureOpts {
+        working_dir: &found_config.working_dir,
+        args: &args,
+        output_dest: OutputDestination::StandardOut,
+        path: &found_config.bin_path,
+    })
+    .await?;
 
-    capture.exit_code.ok_or_else(|| anyhow::anyhow!("Unable to exec {}", args.join(" ")))
+    capture
+        .exit_code
+        .ok_or_else(|| anyhow::anyhow!("Unable to exec {}", args.join(" ")))
 }
 
 lazy_static! {
@@ -141,15 +146,25 @@ fn show_config(found_config: &FoundConfig) -> Result<()> {
 }
 
 fn print_commands(found_config: &FoundConfig) {
-    if let Ok(commands) = which::which_re_in(SCOPE_SUBCOMMAND_REGEX.clone(), Some(OsString::from(&found_config.bin_path))) {
+    if let Ok(commands) = which::which_re_in(
+        SCOPE_SUBCOMMAND_REGEX.clone(),
+        Some(OsString::from(&found_config.bin_path)),
+    ) {
         let mut command_map = BTreeMap::new();
         for command in commands {
             let command_name = command.file_name().unwrap().to_str().unwrap().to_string();
             let command_name = command_name.replace("scope-", "");
-            command_map.entry(command_name.clone()).or_insert_with(|| format!("External sub-command, run `scope {}` for help", command_name));
+            command_map.entry(command_name.clone()).or_insert_with(|| {
+                format!(
+                    "External sub-command, run `scope {}` for help",
+                    command_name
+                )
+            });
         }
         for command in Cli::command().get_subcommands() {
-            command_map.entry(command.get_name().to_string()).or_insert_with(|| command.get_about().unwrap_or_default().to_string());
+            command_map
+                .entry(command.get_name().to_string())
+                .or_insert_with(|| command.get_about().unwrap_or_default().to_string());
         }
 
         let mut command_names: Vec<_> = command_map.keys().collect();

@@ -1,6 +1,6 @@
-use std::ffi::OsString;
 use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
+use std::ffi::OsString;
 use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -60,20 +60,17 @@ pub struct CaptureOpts<'a> {
     pub working_dir: &'a Path,
     pub path: &'a str,
     pub args: &'a [String],
-    pub output_dest: OutputDestination
+    pub output_dest: OutputDestination,
 }
 
-impl <'a> CaptureOpts<'a> {
-
+impl<'a> CaptureOpts<'a> {
     fn command(&self) -> String {
         self.args.join(" ")
     }
 }
 
 impl OutputCapture {
-    pub async fn capture_output(
-        opts: CaptureOpts<'_>
-    ) -> Result<Self, CaptureError> {
+    pub async fn capture_output(opts: CaptureOpts<'_>) -> Result<Self, CaptureError> {
         check_pre_exec(&opts)?;
 
         let start_time = Utc::now();
@@ -81,10 +78,10 @@ impl OutputCapture {
         let mut child = command
             .arg("-S")
             .args(opts.args.to_vec())
-            .env("PATH", &opts.path)
+            .env("PATH", opts.path)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
-            .current_dir(&opts.working_dir)
+            .current_dir(opts.working_dir)
             .spawn()?;
 
         let stdout = child.stdout.take().expect("stdout to be available");
@@ -222,11 +219,7 @@ impl OutputCapture {
 fn check_pre_exec(opts: &CaptureOpts) -> Result<(), CaptureError> {
     let command = opts.command();
     let found_binary = match command.split(' ').collect::<Vec<_>>().first() {
-        None => {
-            return Err(CaptureError::MissingShExec {
-                name: command,
-            })
-        }
+        None => return Err(CaptureError::MissingShExec { name: command }),
         Some(path) => which_in(path, Some(OsString::from(opts.path)), opts.working_dir),
     };
 
@@ -234,9 +227,7 @@ fn check_pre_exec(opts: &CaptureOpts) -> Result<(), CaptureError> {
         Ok(path) => path,
         Err(e) => {
             debug!("Unable to find binary {:?}", e);
-            return Err(CaptureError::MissingShExec {
-                name: command,
-            });
+            return Err(CaptureError::MissingShExec { name: command });
         }
     };
 
