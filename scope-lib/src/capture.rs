@@ -161,10 +161,9 @@ impl OutputCapture {
         Redactor::new().redact_text(&text).to_string()
     }
 
-    pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
+    pub fn create_report_text(&self) -> anyhow::Result<String> {
         let mut f = String::new();
-        let title = title.unwrap_or("## Command Results");
-        writeln!(&mut f, "{}\n", title)?;
+        writeln!(&mut f, "### Command Results\n")?;
         writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
         writeln!(
             &mut f,
@@ -177,7 +176,7 @@ impl OutputCapture {
             self.exit_code.unwrap_or(-1)
         )?;
         writeln!(&mut f)?;
-        writeln!(&mut f, "### Output")?;
+        writeln!(&mut f, "#### Output")?;
         writeln!(&mut f)?;
         writeln!(&mut f, "```text")?;
         writeln!(&mut f, "{}", self.generate_output().trim())?;

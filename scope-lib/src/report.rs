@@ -12,65 +12,68 @@ use tracing::{debug, info, warn};
 pub struct ReportBuilder<'a> {
     message: String,
     command_results: String,
-    command: String,
     config: &'a FoundConfig,
 }
 
 impl<'a> ReportBuilder<'a> {
     pub async fn new(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
+        let message = Self::make_default_message(&capture.command, config)?;
+
         let mut this = Self {
-            message: format!("= Unable to run `{}`", &capture.command),
+            message,
             command_results: String::new(),
-            command: capture.command.clone(),
             config,
         };
+
+        this.add_capture(capture)?;
 
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
             let capture =
                 OutputCapture::capture_output(&config.working_dir, &args, &OutputDestination::Null)
                     .await?;
-            this.add_capture(capture)?;
+            this.add_capture(&capture)?;
         }
 
         Ok(this)
     }
 
-    fn add_capture(&mut self, capture: OutputCapture) -> Result<()> {
+    fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
         self.command_results.push('\n');
         self.command_results
-            .push_str(&capture.create_report_text(None)?);
+            .push_str(&capture.create_report_text()?);
 
         Ok(())
     }
 
-    pub fn with_message(&mut self, message: String) {
-        self.message = message;
-    }
-
     pub fn write_local_report(&self) -> Result<()> {
-        let base_report_loc = write_to_report_file("base", &self.command_results)?;
+        let report = self.make_report_test();
+
+        let base_report_loc = write_to_report_file("base", &report)?;
         info!(target: "always", "The basic report was created at {}", base_report_loc);
 
         Ok(())
     }
 
-    pub fn ask_user_for_message(&mut self) -> Result<()> {
+    fn make_default_message(command: &str, config: &FoundConfig) -> Result<String> {
         let mut env = Environment::new();
-        let report_def = self.config.get_report_definition();
+        let report_def = config.get_report_definition();
         env.add_template("tmpl", &report_def.template)?;
         let template = env.get_template("tmpl")?;
-        let template = template.render(context! { command => self.command })?;
+        let template = template.render(context! { command => command })?;
 
-        self.message = template;
-        Ok(())
+        Ok(template)
+    }
+
+    fn make_report_test(&self) -> String {
+        format!(
+            "{}\n\n## Captured Data\n\n{}",
+            self.message, self.command_results
+        )
     }
 
     pub async fn distribute_report(&self) -> Result<()> {
-        let report = format!(
-            "{}\n\n== Captured Data\n\n{}",
-            self.message, self.command_results
-        );
+        let report = self.make_report_test();
 
         for dest in self.config.report_upload.values() {
             if let Err(e) = &dest.spec.destination.upload(&report).await {
@@ -209,7 +212,7 @@ impl ReportUploadLocation {
 pub fn write_to_report_file(prefix: &str, text: &str) -> Result<String> {
     let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
 
-    let file_path = format!("/tmp/scope/scope-{}-{}.txt", prefix, id);
+    let file_path = format!("/tmp/scope/scope-{}-{}.md", prefix, id);
     let mut file = File::create(&file_path)?;
     file.write_all(text.as_bytes())?;
 

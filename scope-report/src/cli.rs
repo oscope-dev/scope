@@ -22,14 +22,12 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
     )
     .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);
-    let mut report_builder = ReportBuilder::new(&capture, found_config).await?;
+    let report_builder = ReportBuilder::new(&capture, found_config).await?;
 
     if found_config.report_upload.is_empty() {
         report_builder.write_local_report()?;
         return Ok(exit_code);
     }
-
-    report_builder.ask_user_for_message()?;
 
     if let Err(e) = report_builder.distribute_report().await {
         warn!(target: "user", "Unable to upload report: {}", e);

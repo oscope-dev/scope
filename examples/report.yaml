@@ -29,4 +29,7 @@ kind: ScopeReportDefinition
 metadata:
   name: github
 spec:
-  template: "asdf"
+  template: |
+    # There was an error!
+    
+    When running `{{ command }}` scope ran into an error

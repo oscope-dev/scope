@@ -57,7 +57,7 @@ impl FoundConfig {
             .map(|x| x.spec.clone())
             .clone()
             .unwrap_or_else(|| ReportDefinitionSpec {
-                template: "Error report for {{ command }}.".to_string(),
+                template: "== Error report for {{ command }}.".to_string(),
                 additional_data: Default::default(),
             })
     }
