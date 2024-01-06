@@ -1,4 +1,4 @@
-use crate::capture::OutputCapture;
+use crate::capture::{CaptureOpts, OutputCapture};
 use crate::config_load::FoundConfig;
 use crate::models::ReportUploadLocation;
 use crate::prelude::OutputDestination;
@@ -30,7 +30,12 @@ impl<'a> ReportBuilder<'a> {
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
             let capture =
-                OutputCapture::capture_output(&config.working_dir, &args, &OutputDestination::Null)
+                OutputCapture::capture_output(CaptureOpts {
+                    working_dir: &config.working_dir,
+                    args: &args,
+                    output_dest: OutputDestination::Null,
+                    path: &config.bin_path
+                })
                     .await?;
             this.add_capture(&capture)?;
         }

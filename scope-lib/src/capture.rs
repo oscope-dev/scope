@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
 use std::fmt::Write;
@@ -32,6 +33,7 @@ pub struct OutputCapture {
     pub command: String,
 }
 
+#[derive(Clone, Debug)]
 pub enum OutputDestination {
     StandardOut,
     Logging,
@@ -54,22 +56,35 @@ pub enum CaptureError {
     },
 }
 
+pub struct CaptureOpts<'a> {
+    pub working_dir: &'a Path,
+    pub path: &'a str,
+    pub args: &'a [String],
+    pub output_dest: OutputDestination
+}
+
+impl <'a> CaptureOpts<'a> {
+
+    fn command(&self) -> String {
+        self.args.join(" ")
+    }
+}
+
 impl OutputCapture {
     pub async fn capture_output(
-        working_dir: &Path,
-        args: &[String],
-        output_dest: &OutputDestination,
+        opts: CaptureOpts<'_>
     ) -> Result<Self, CaptureError> {
-        check_pre_exec(working_dir, args)?;
+        check_pre_exec(&opts)?;
 
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
         let mut child = command
             .arg("-S")
-            .args(args)
+            .args(opts.args.to_vec())
+            .env("PATH", &opts.path)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
-            .current_dir(working_dir)
+            .current_dir(&opts.working_dir)
             .spawn()?;
 
         let stdout = child.stdout.take().expect("stdout to be available");
@@ -77,6 +92,7 @@ impl OutputCapture {
 
         let stdout = {
             let captured = RwLockOutput::default();
+            let output_dest = opts.output_dest.clone();
             async move {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Some(line) = reader.next_line().await? {
@@ -94,6 +110,7 @@ impl OutputCapture {
 
         let stderr = {
             let captured = RwLockOutput::default();
+            let output_dest = opts.output_dest.clone();
             async move {
                 let mut reader = BufReader::new(stderr).lines();
                 while let Some(line) = reader.next_line().await? {
@@ -117,13 +134,13 @@ impl OutputCapture {
         let captured_stderr = wait_stderr.unwrap_or_default();
 
         Ok(Self {
-            working_dir: working_dir.to_path_buf(),
+            working_dir: opts.working_dir.to_path_buf(),
             stdout: captured_stdout,
             stderr: captured_stderr,
             exit_code: command_result.ok().and_then(|x| x.code()),
             start_time,
             end_time,
-            command: args.join(" "),
+            command: opts.command(),
         })
     }
 
@@ -202,14 +219,15 @@ impl OutputCapture {
     }
 }
 
-fn check_pre_exec(working_dir: &Path, args: &[String]) -> Result<(), CaptureError> {
-    let found_binary = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
+fn check_pre_exec(opts: &CaptureOpts) -> Result<(), CaptureError> {
+    let command = opts.command();
+    let found_binary = match command.split(' ').collect::<Vec<_>>().first() {
         None => {
             return Err(CaptureError::MissingShExec {
-                name: args.join(" "),
+                name: command,
             })
         }
-        Some(path) => which_in(path, std::env::var_os("PATH"), working_dir),
+        Some(path) => which_in(path, Some(OsString::from(opts.path)), opts.working_dir),
     };
 
     let path = match found_binary {
@@ -217,7 +235,7 @@ fn check_pre_exec(working_dir: &Path, args: &[String]) -> Result<(), CaptureErro
         Err(e) => {
             debug!("Unable to find binary {:?}", e);
             return Err(CaptureError::MissingShExec {
-                name: args.join(" "),
+                name: command,
             });
         }
     };

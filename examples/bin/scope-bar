@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "in bar"
+exit 0
