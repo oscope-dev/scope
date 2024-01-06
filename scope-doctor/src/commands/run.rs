@@ -24,10 +24,10 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     let mut check_order: Vec<String> = Default::default();
     for check in found_config.exec_check.values() {
         let name = check.name();
-        if let Some(old) = check_map.insert(name.clone(), check.clone()) {
+        if let Some(old) = check_map.insert(name.to_string(), check.clone()) {
             warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
         } else {
-            check_order.push(name);
+            check_order.push(name.to_string());
         }
     }
 

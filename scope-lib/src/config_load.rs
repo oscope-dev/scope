@@ -1,9 +1,10 @@
 use crate::models::{
-    parse_config, DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportUploadSpec,
-    FILE_PATH_ANNOTATION,
+    parse_config, DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig,
+    ReportDefinitionSpec, ReportUploadLocationSpec,
 };
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
+use colored::*;
 use directories::{BaseDirs, UserDirs};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -35,7 +36,8 @@ pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub exec_check: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>>,
     pub known_error: BTreeMap<String, ModelRoot<KnownErrorSpec>>,
-    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
+    pub report_definition: Option<ModelRoot<ReportDefinitionSpec>>,
 }
 
 impl FoundConfig {
@@ -45,7 +47,19 @@ impl FoundConfig {
             exec_check: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
+            report_definition: None,
         }
+    }
+
+    pub fn get_report_definition(&self) -> ReportDefinitionSpec {
+        self.report_definition
+            .as_ref()
+            .map(|x| x.spec.clone())
+            .clone()
+            .unwrap_or_else(|| ReportDefinitionSpec {
+                template: "== Error report for {{ command }}.".to_string(),
+                additional_data: Default::default(),
+            })
     }
 }
 
@@ -53,42 +67,31 @@ impl FoundConfig {
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
             ParsedConfig::DoctorCheck(exec) => {
-                let name = exec.metadata.name.clone();
-                if let Some(old) = self.exec_check.insert(name, exec) {
-                    let path = old
-                        .metadata
-                        .annotations
-                        .get(FILE_PATH_ANNOTATION)
-                        .cloned()
-                        .unwrap_or_else(|| "unknown".to_string());
-                    warn!(target: "user", "A DoctorCheck with duplicate name found, dropping check {} in {}", old.metadata.name, path);
-                }
+                insert_if_absent(&mut self.exec_check, exec);
             }
             ParsedConfig::KnownError(known_error) => {
-                let name = known_error.metadata.name.clone();
-                if let Some(old) = self.known_error.insert(name, known_error) {
-                    let path = old
-                        .metadata
-                        .annotations
-                        .get(FILE_PATH_ANNOTATION)
-                        .cloned()
-                        .unwrap_or_else(|| "unknown".to_string());
-                    warn!(target: "user", "A KnownError with duplicate name found, dropping KnownError {} in {}", old.metadata.name, path);
-                }
+                insert_if_absent(&mut self.known_error, known_error);
             }
             ParsedConfig::ReportUpload(report_upload) => {
-                let name = report_upload.metadata.name.clone();
-                if let Some(old) = self.report_upload.insert(name, report_upload) {
-                    let path = old
-                        .metadata
-                        .annotations
-                        .get(FILE_PATH_ANNOTATION)
-                        .cloned()
-                        .unwrap_or_else(|| "unknown".to_string());
-                    warn!(target: "user", "A ReportUpload with duplicate name found, dropping ReportUpload {} in {}", old.metadata.name, path);
+                insert_if_absent(&mut self.report_upload, report_upload);
+            }
+            ParsedConfig::ReportDefinition(report_definition) => {
+                if self.report_definition.is_none() {
+                    self.report_definition.replace(report_definition);
+                } else {
+                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.file_path());
                 }
             }
         }
+    }
+}
+
+fn insert_if_absent<T>(map: &mut BTreeMap<String, ModelRoot<T>>, entry: ModelRoot<T>) {
+    let name = entry.name();
+    if map.contains_key(name) {
+        warn!(target: "user", "A {} with duplicate name found, dropping {} in {}", entry.kind().to_string().bold(), entry.name().bold(), entry.file_path());
+    } else {
+        map.insert(name.to_string(), entry);
     }
 }
 

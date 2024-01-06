@@ -1,4 +1,4 @@
-use crate::UserListing;
+use crate::HelpMetadata;
 use anyhow::{anyhow, Result};
 use derivative::Derivative;
 use regex::Regex;
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
+use strum::EnumString;
 
 pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
 
@@ -18,6 +19,15 @@ pub struct ModelMetadata {
     pub labels: BTreeMap<String, String>,
 }
 
+impl ModelMetadata {
+    fn file_path(&self) -> String {
+        self.annotations
+            .get(FILE_PATH_ANNOTATION)
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelRoot<V> {
@@ -25,6 +35,26 @@ pub struct ModelRoot<V> {
     pub kind: String,
     pub metadata: ModelMetadata,
     pub spec: V,
+}
+
+#[derive(Debug, PartialEq, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum KnownKinds {
+    ScopeReportDefinition,
+    ScopeReportLocation,
+    ScopeKnownError,
+    ScopeDoctorCheck,
+    #[strum(default)]
+    UnknownKind(String),
+}
+
+#[derive(Debug, PartialEq, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum KnownApiVersion {
+    #[strum(serialize = "scope.github.com/v1alpha")]
+    ScopeV1Alpha,
+    #[strum(default)]
+    UnknownApiVersion(String),
 }
 
 impl<V> ModelRoot<V> {
@@ -36,39 +66,29 @@ impl<V> ModelRoot<V> {
             spec,
         }
     }
-}
 
-impl UserListing for ModelRoot<DoctorExecCheckSpec> {
-    fn name(&self) -> &str {
+    pub fn file_path(&self) -> String {
+        self.metadata.file_path()
+    }
+
+    pub fn name(&self) -> &str {
         &self.metadata.name
     }
-    fn description(&self) -> &str {
-        &self.spec.description
-    }
 
-    fn location(&self) -> String {
-        self.metadata
-            .annotations
-            .get(FILE_PATH_ANNOTATION)
-            .cloned()
-            .unwrap_or_default()
+    pub fn kind(&self) -> &str {
+        &self.kind
     }
 }
 
-impl UserListing for ModelRoot<KnownErrorSpec> {
-    fn name(&self) -> &str {
-        &self.metadata.name
-    }
+impl HelpMetadata for DoctorExecCheckSpec {
     fn description(&self) -> &str {
-        &self.spec.description
+        &self.description
     }
+}
 
-    fn location(&self) -> String {
-        self.metadata
-            .annotations
-            .get(FILE_PATH_ANNOTATION)
-            .cloned()
-            .unwrap_or_default()
+impl HelpMetadata for KnownErrorSpec {
+    fn description(&self) -> &str {
+        &self.description
     }
 }
 
@@ -103,23 +123,36 @@ pub enum ReportUploadLocation {
     },
 }
 #[derive(Debug, PartialEq, Clone)]
-pub struct ReportUploadSpec {
-    pub additional_data: BTreeMap<String, String>,
+pub struct ReportUploadLocationSpec {
     pub destination: ReportUploadLocation,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ReportDefinitionSpec {
+    pub additional_data: BTreeMap<String, String>,
+    pub template: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ParsedConfig {
     DoctorCheck(ModelRoot<DoctorExecCheckSpec>),
     KnownError(ModelRoot<KnownErrorSpec>),
-    ReportUpload(ModelRoot<ReportUploadSpec>),
+    ReportUpload(ModelRoot<ReportUploadLocationSpec>),
+    ReportDefinition(ModelRoot<ReportDefinitionSpec>),
 }
 
 #[cfg(test)]
 impl ParsedConfig {
-    fn get_report_upload_spec(&self) -> Option<ReportUploadSpec> {
+    fn get_report_upload_spec(&self) -> Option<ReportUploadLocationSpec> {
         match self {
             ParsedConfig::ReportUpload(root) => Some(root.spec.clone()),
+            _ => None,
+        }
+    }
+
+    fn get_report_def_spec(&self) -> Option<ReportDefinitionSpec> {
+        match self {
+            ParsedConfig::ReportDefinition(root) => Some(root.spec.clone()),
             _ => None,
         }
     }
@@ -158,28 +191,36 @@ fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
         file_path.display().to_string(),
     );
 
+    let known_kinds =
+        KnownKinds::try_from(kind).unwrap_or_else(|_| KnownKinds::UnknownKind(kind.to_string()));
+    let api_versions = KnownApiVersion::try_from(api_version)
+        .unwrap_or_else(|_| KnownApiVersion::UnknownApiVersion(api_version.to_string()));
     let containing_dir = file_path.parent().unwrap();
-    let parsed = match (api_version, kind) {
-        ("scope.github.com/v1alpha", "scopedoctorcheck") => {
+    let parsed = match (api_versions, known_kinds) {
+        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeDoctorCheck) => {
             let exec_check = parser::parse_v1_doctor_check(containing_dir, &root.spec)?;
             ParsedConfig::DoctorCheck(root.with_spec(exec_check))
         }
-        ("scope.github.com/v1alpha", "scopeknownerror") => {
+        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeKnownError) => {
             let known_error = parser::parse_v1_known_error(&root.spec)?;
             ParsedConfig::KnownError(root.with_spec(known_error))
         }
-        ("scope.github.com/v1alpha", "scopereport") => {
-            let report_upload = parser::parse_v1_report(&root.spec)?;
+        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportLocation) => {
+            let report_upload = parser::parse_v1_report_location(&root.spec)?;
             ParsedConfig::ReportUpload(root.with_spec(report_upload))
         }
-        (version, kind) => return Err(anyhow!("Unable to parse {}/{}", version, kind)),
+        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportDefinition) => {
+            let report_upload = parser::parse_v1_report_definition(&root.spec)?;
+            ParsedConfig::ReportDefinition(root.with_spec(report_upload))
+        }
+        _ => return Err(anyhow!("Unable to parse {}/{}", api_version, kind)),
     };
 
     Ok(parsed)
 }
 
 mod parser {
-    use crate::models::ReportUploadLocation;
+    use crate::models::{ReportDefinitionSpec, ReportUploadLocation};
     use anyhow::Result;
     use regex::Regex;
     use serde::{Deserialize, Serialize};
@@ -259,14 +300,14 @@ mod parser {
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
-    struct ReportV1Alpha {
-        #[serde(default)]
-        additional_data: BTreeMap<String, String>,
+    struct ReportLocationV1Alpha {
         #[serde(with = "serde_yaml::with::singleton_map")]
         destination: ReportDestinationV1Alpha,
     }
-    pub(super) fn parse_v1_report(value: &Value) -> Result<super::ReportUploadSpec> {
-        let parsed: ReportV1Alpha = serde_yaml::from_value(value.clone())?;
+    pub(super) fn parse_v1_report_location(
+        value: &Value,
+    ) -> Result<super::ReportUploadLocationSpec> {
+        let parsed: ReportLocationV1Alpha = serde_yaml::from_value(value.clone())?;
         let destination = match parsed.destination {
             ReportDestinationV1Alpha::RustyPaste { url } => {
                 ReportUploadLocation::RustyPaste { url }
@@ -279,10 +320,7 @@ mod parser {
                 }
             }
         };
-        Ok(super::ReportUploadSpec {
-            additional_data: parsed.additional_data,
-            destination,
-        })
+        Ok(super::ReportUploadLocationSpec { destination })
     }
 
     fn extract_command_path(parent_dir: &Path, command: &str) -> String {
@@ -310,6 +348,22 @@ mod parser {
             "/scripts/foo.sh",
             extract_command_path(base_path, "/scripts/foo.sh")
         );
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    struct ReportDefinitionV1Alpha {
+        #[serde(default)]
+        additional_data: BTreeMap<String, String>,
+        template: String,
+    }
+    pub(super) fn parse_v1_report_definition(value: &Value) -> Result<ReportDefinitionSpec> {
+        let parsed: ReportDefinitionV1Alpha = serde_yaml::from_value(value.clone())?;
+
+        Ok(ReportDefinitionSpec {
+            template: parsed.template.trim().to_string(),
+            additional_data: parsed.additional_data,
+        })
     }
 }
 
@@ -385,27 +439,23 @@ spec:
 }
 
 #[test]
-fn test_parse_scope_report() {
+fn test_parse_scope_report_loc() {
     let text = "
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: report
 spec:
-  additionalData:
-    env: env
   destination:
       rustyPaste:
         url: https://foo.bar
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: github
 spec:
-  additionalData:
-    env: env
   destination:
       githubIssue:
         owner: scope
@@ -418,22 +468,48 @@ spec:
 
     assert_eq!(
         configs[0].get_report_upload_spec().unwrap(),
-        ReportUploadSpec {
+        ReportUploadLocationSpec {
             destination: ReportUploadLocation::RustyPaste {
                 url: "https://foo.bar".to_string()
             },
-            additional_data: [("env".to_string(), "env".to_string())].into()
         }
     );
 
     assert_eq!(
         configs[1].get_report_upload_spec().unwrap(),
-        ReportUploadSpec {
+        ReportUploadLocationSpec {
             destination: ReportUploadLocation::GithubIssue {
                 owner: "scope".to_string(),
                 repo: "party".to_string(),
                 tags: Vec::new(),
-            },
+            }
+        }
+    );
+}
+
+#[test]
+fn test_parse_scope_report_def() {
+    let text = "
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportDefinition
+metadata:
+  name: report
+spec:
+  additionalData:
+    env: env
+  template: |
+    hello bob
+ ";
+
+    let path = Path::new("/foo/bar/file.yaml");
+    let configs = parse_config(path, text).unwrap();
+    assert_eq!(1, configs.len());
+
+    assert_eq!(
+        configs[0].get_report_def_spec().unwrap(),
+        ReportDefinitionSpec {
+            template: "hello bob".to_string(),
             additional_data: [("env".to_string(), "env".to_string())].into()
         }
     );

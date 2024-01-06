@@ -1,6 +1,6 @@
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: report
 spec:
@@ -15,7 +15,7 @@ spec:
       url: http://localhost:8000
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: github
 spec:
@@ -23,3 +23,13 @@ spec:
     githubIssue:
       owner: ethankhall
       repo: dummy-repo
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportDefinition
+metadata:
+  name: github
+spec:
+  template: |
+    # There was an error!
+    
+    When running `{{ command }}` scope ran into an error

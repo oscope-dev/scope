@@ -37,7 +37,6 @@ pub trait CheckRuntime {
     async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError>;
     fn description(&self) -> String;
     fn help_text(&self) -> String;
-    fn name(&self) -> String;
 }
 
 #[async_trait]
@@ -59,8 +58,5 @@ impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
     }
     fn help_text(&self) -> String {
         self.spec.help_text.to_owned()
-    }
-    fn name(&self) -> String {
-        self.metadata.name.to_owned()
     }
 }

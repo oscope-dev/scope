@@ -1,54 +1,83 @@
-use crate::capture::{OutputCapture, OutputDestination};
-use crate::models::{ModelRoot, ReportUploadLocation, ReportUploadSpec};
+use crate::capture::OutputCapture;
+use crate::config_load::FoundConfig;
+use crate::models::ReportUploadLocation;
+use crate::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
+use minijinja::{context, Environment};
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
 use tracing::{debug, info, warn};
 
-pub struct ReportBuilder {
-    command_capture: OutputCapture,
-    destinations: BTreeMap<String, ModelRoot<ReportUploadSpec>>,
+pub struct ReportBuilder<'a> {
+    message: String,
+    command_results: String,
+    config: &'a FoundConfig,
 }
 
-impl ReportBuilder {
-    pub fn new(
-        capture: OutputCapture,
-        destinations: &BTreeMap<String, ModelRoot<ReportUploadSpec>>,
-    ) -> Self {
-        Self {
-            command_capture: capture,
-            destinations: destinations.clone(),
+impl<'a> ReportBuilder<'a> {
+    pub async fn new(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
+        let message = Self::make_default_message(&capture.command, config)?;
+
+        let mut this = Self {
+            message,
+            command_results: String::new(),
+            config,
+        };
+
+        this.add_capture(capture)?;
+
+        for command in config.get_report_definition().additional_data.values() {
+            let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
+            let capture =
+                OutputCapture::capture_output(&config.working_dir, &args, &OutputDestination::Null)
+                    .await?;
+            this.add_capture(&capture)?;
         }
+
+        Ok(this)
+    }
+
+    fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
+        self.command_results.push('\n');
+        self.command_results
+            .push_str(&capture.create_report_text()?);
+
+        Ok(())
     }
 
     pub fn write_local_report(&self) -> Result<()> {
-        let base_report = self.command_capture.create_report_text(None)?;
-        let base_report_loc = write_to_report_file("base", &base_report)?;
+        let report = self.make_report_test();
+
+        let base_report_loc = write_to_report_file("base", &report)?;
         info!(target: "always", "The basic report was created at {}", base_report_loc);
 
         Ok(())
     }
 
+    fn make_default_message(command: &str, config: &FoundConfig) -> Result<String> {
+        let mut env = Environment::new();
+        let report_def = config.get_report_definition();
+        env.add_template("tmpl", &report_def.template)?;
+        let template = env.get_template("tmpl")?;
+        let template = template.render(context! { command => command })?;
+
+        Ok(template)
+    }
+
+    fn make_report_test(&self) -> String {
+        format!(
+            "{}\n\n## Captured Data\n\n{}",
+            self.message, self.command_results
+        )
+    }
+
     pub async fn distribute_report(&self) -> Result<()> {
-        let base_report = self.command_capture.create_report_text(None)?;
+        let report = self.make_report_test();
 
-        for (name, dest) in &self.destinations {
-            let mut dest_report = base_report.clone();
-            for (name, command) in &dest.spec.additional_data {
-                let capture = OutputCapture::capture_output(
-                    &self.command_capture.working_dir,
-                    &[command.to_string()],
-                    &OutputDestination::Null,
-                )
-                .await?;
-                dest_report.push('\n');
-                dest_report.push_str(&capture.create_report_text(Some(&format!("== {}", name)))?);
-            }
-
-            if let Err(e) = &dest.spec.destination.upload(&dest_report).await {
-                warn!(target: "user", "Unable to upload to {}: {}", name, e);
+        for dest in self.config.report_upload.values() {
+            if let Err(e) = &dest.spec.destination.upload(&report).await {
+                warn!(target: "user", "Unable to upload to {}: {}", dest.name(), e);
             }
         }
 
@@ -84,8 +113,13 @@ impl ReportUploadLocation {
             }
         };
 
+        let title = match report.find('\n') {
+            Some(value) => report[0..value].to_string(),
+            None => "Scope bug report".to_string(),
+        };
+
         let body = json::object! {
-            title: "Scope bug report",
+            title: title,
             body: report,
             labels: tags
         };
@@ -178,7 +212,7 @@ impl ReportUploadLocation {
 pub fn write_to_report_file(prefix: &str, text: &str) -> Result<String> {
     let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
 
-    let file_path = format!("/tmp/scope/scope-{}-{}.txt", prefix, id);
+    let file_path = format!("/tmp/scope/scope-{}-{}.md", prefix, id);
     let mut file = File::create(&file_path)?;
     file.write_all(text.as_bytes())?;
 

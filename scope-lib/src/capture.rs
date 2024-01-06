@@ -8,6 +8,7 @@ use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
+use which::which_in;
 
 #[derive(Debug, Default)]
 struct RwLockOutput {
@@ -28,7 +29,7 @@ pub struct OutputCapture {
     pub exit_code: Option<i32>,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
-    command: String,
+    pub command: String,
 }
 
 pub enum OutputDestination {
@@ -59,7 +60,7 @@ impl OutputCapture {
         args: &[String],
         output_dest: &OutputDestination,
     ) -> Result<Self, CaptureError> {
-        check_pre_exec(args)?;
+        check_pre_exec(working_dir, args)?;
 
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
@@ -160,10 +161,9 @@ impl OutputCapture {
         Redactor::new().redact_text(&text).to_string()
     }
 
-    pub fn create_report_text(&self, title: Option<&str>) -> anyhow::Result<String> {
+    pub fn create_report_text(&self) -> anyhow::Result<String> {
         let mut f = String::new();
-        let title = title.unwrap_or("## Command Results");
-        writeln!(&mut f, "{}\n", title)?;
+        writeln!(&mut f, "### Command Results\n")?;
         writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
         writeln!(
             &mut f,
@@ -176,7 +176,7 @@ impl OutputCapture {
             self.exit_code.unwrap_or(-1)
         )?;
         writeln!(&mut f)?;
-        writeln!(&mut f, "### Output")?;
+        writeln!(&mut f, "#### Output")?;
         writeln!(&mut f)?;
         writeln!(&mut f, "```text")?;
         writeln!(&mut f, "{}", self.generate_output().trim())?;
@@ -202,14 +202,24 @@ impl OutputCapture {
     }
 }
 
-fn check_pre_exec(args: &[String]) -> Result<(), CaptureError> {
-    let path = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
+fn check_pre_exec(working_dir: &Path, args: &[String]) -> Result<(), CaptureError> {
+    let found_binary = match args.join(" ").split(' ').collect::<Vec<_>>().first() {
         None => {
             return Err(CaptureError::MissingShExec {
                 name: args.join(" "),
             })
         }
-        Some(path) => PathBuf::from(path),
+        Some(path) => which_in(path, std::env::var_os("PATH"), working_dir),
+    };
+
+    let path = match found_binary {
+        Ok(path) => path,
+        Err(e) => {
+            debug!("Unable to find binary {:?}", e);
+            return Err(CaptureError::MissingShExec {
+                name: args.join(" "),
+            });
+        }
     };
 
     if !path.exists() {

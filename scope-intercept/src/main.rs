@@ -3,7 +3,6 @@ use human_panic::setup_panic;
 use scope_lib::prelude::{
     ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination, ReportBuilder,
 };
-use scope_lib::UserListing;
 use tracing::{debug, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
@@ -97,7 +96,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
-    let report_builder = ReportBuilder::new(capture, &found_config.report_upload);
+    let report_builder = ReportBuilder::new(&capture, &found_config).await?;
     if let Ok(true) = ans {
         if let Err(e) = report_builder.distribute_report().await {
             warn!(target: "user", "Unable to upload report: {}", e);

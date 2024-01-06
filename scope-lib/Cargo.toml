@@ -25,3 +25,8 @@ derivative = "2"
 reqwest = { version = "0.11.23", features = ["multipart"] }
 time = { version = "0.3.31", features = ["macros", "formatting", "local-offset"] }
 json = "0.12"
+which = "5.0.0"
+colored = "2.1"
+minijinja = "1.0.10"
+inquire = {  version = "0.6", features = ["editor"]}
+strum = { version = "0.25", features = ["derive"] }

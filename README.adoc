@@ -76,7 +76,7 @@ a! A map of `string:string` that can be used by user. Scope will set some specif
 a| `kind`
 a| The type of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
 
-Current supported options are: `ScopeDoctorCheck`, `ScopeReport`, `ScopeKnownError`.
+Current supported options are: `ScopeDoctorCheck`, `ScopeReportLocation`, `ScopeKnownError`.
 
 a| `apiVersion`
 a| The version of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
@@ -147,10 +147,10 @@ a| `.spec.help`
 | The text that will be shown to a user when the pattern matches
 |===
 
-=== `ScopeReport`
+=== `ScopeReportLocation`
 
 When using `scope-intercept` or `scope report`, a user is able to upload the error for sharing.
-`ScopeReport` defines where to upload, and any additional commands that should be and output included in the report.
+`ScopeReportLocation` defines where to upload, and any additional commands that should be and output included in the report.
 
 In order to use GitHub Issue as the destination, you MUST have the env var `GH_TOKEN` set to a valid https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens[Personal Access Token].
 If you do not, scope cannot publish the report.
@@ -162,7 +162,7 @@ If your users won't always be logged into GitHub, we recommend using RustyPaste 
 [source,yaml]
 ....
 apiVersion: scope.github.com/v1alpha
-kind: ScopeReport
+kind: ScopeReportLocation
 metadata:
   name: report
 spec:

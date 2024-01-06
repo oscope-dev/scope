@@ -5,10 +5,8 @@ mod models;
 mod redact;
 mod report;
 
-pub trait UserListing {
-    fn name(&self) -> &str;
+pub trait HelpMetadata {
     fn description(&self) -> &str;
-    fn location(&self) -> String;
 }
 
 pub mod prelude {
