@@ -96,26 +96,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
-    let default_message = format!("There was an error when running `{}`", command.join(" "));
-
-    let describe =
-        inquire::Editor::new("Please describe the issue, this will be placed into the report.")
-            .with_file_extension(".md")
-            .with_predefined_text(&default_message)
-            .prompt_skippable();
-
-    let message = match describe {
-        Ok(Some(body)) => body,
-        Ok(None) => default_message,
-        Err(e) => {
-            info!("Error when creating editor {:?}", e);
-            default_message
-        }
-    };
-
-    let mut report_builder = ReportBuilder::new(capture, &found_config.report_upload);
-    report_builder.with_message(message);
+    let mut report_builder = ReportBuilder::new(capture, &found_config)?;
     if let Ok(true) = ans {
+        report_builder.ask_user_for_message()?;
         if let Err(e) = report_builder.distribute_report().await {
             warn!(target: "user", "Unable to upload report: {}", e);
         }
