@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Args;
-use scope_lib::prelude::{FoundConfig, OutputCapture, OutputDestination, ReportBuilder};
+use scope_lib::prelude::{
+    CaptureOpts, FoundConfig, OutputCapture, OutputDestination, ReportBuilder,
+};
 use tracing::warn;
 
 #[derive(Debug, Args)]
@@ -15,11 +17,12 @@ pub struct ReportArgs {
 }
 
 pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Result<i32> {
-    let capture = OutputCapture::capture_output(
-        &found_config.working_dir,
-        &args.command,
-        &OutputDestination::Logging,
-    )
+    let capture = OutputCapture::capture_output(CaptureOpts {
+        working_dir: &found_config.working_dir,
+        args: &args.command,
+        output_dest: OutputDestination::Logging,
+        path: &found_config.bin_path,
+    })
     .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);
     let report_builder = ReportBuilder::new(&capture, found_config).await?;

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use scope_lib::prelude::{
-    CaptureError, DoctorExecCheckSpec, ModelRoot, OutputCapture, OutputDestination,
+    CaptureError, CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture,
+    OutputDestination,
 };
-use std::path::Path;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -34,17 +34,22 @@ pub struct RuntimeResult {
 
 #[async_trait]
 pub trait CheckRuntime {
-    async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError>;
+    async fn exec(&self, found_config: &FoundConfig) -> Result<RuntimeResult, RuntimeError>;
     fn description(&self) -> String;
     fn help_text(&self) -> String;
 }
 
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
-    async fn exec(&self, working_dir: &Path) -> Result<RuntimeResult, RuntimeError> {
+    async fn exec(&self, found_config: &FoundConfig) -> Result<RuntimeResult, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
-        let output =
-            OutputCapture::capture_output(working_dir, &args, &OutputDestination::Null).await?;
+        let output = OutputCapture::capture_output(CaptureOpts {
+            working_dir: &found_config.working_dir,
+            args: &args,
+            output_dest: OutputDestination::Null,
+            path: &found_config.bin_path,
+        })
+        .await?;
 
         Ok(RuntimeResult {
             success: output.exit_code == Some(0),

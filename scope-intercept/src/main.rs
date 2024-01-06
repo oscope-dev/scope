@@ -1,8 +1,10 @@
 use clap::Parser;
 use human_panic::setup_panic;
 use scope_lib::prelude::{
-    ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination, ReportBuilder,
+    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
+    ReportBuilder,
 };
+use std::env;
 use tracing::{debug, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
@@ -56,10 +58,15 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     let mut command = vec![opts.utility];
     command.extend(opts.args);
     let current_dir = std::env::current_dir()?;
+    let path = env::var("PATH").unwrap_or_default();
 
-    let capture =
-        OutputCapture::capture_output(&current_dir, &command, &OutputDestination::StandardOut)
-            .await?;
+    let capture = OutputCapture::capture_output(CaptureOpts {
+        working_dir: &current_dir,
+        args: &command,
+        output_dest: OutputDestination::StandardOut,
+        path: &path,
+    })
+    .await?;
 
     let mut accepted_exit_codes = vec![0];
     accepted_exit_codes.extend(opts.successful_exit);
@@ -72,7 +79,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     error!(target: "user", "Command failed, checking for a known error");
     let found_config = opts.config_options.load_config().unwrap_or_else(|e| {
         error!(target: "user", "Unable to load configs from disk: {:?}", e);
-        FoundConfig::new(std::env::current_dir().unwrap())
+        FoundConfig::new(env::current_dir().unwrap(), Vec::new())
     });
 
     let command_output = capture.generate_output();

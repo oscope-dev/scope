@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use directories::{BaseDirs, UserDirs};
+use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -19,15 +20,20 @@ pub struct ConfigOptions {
     /// for `.scope` directories and attempt to load `.yml` and `.yaml` files for config.
     /// If the config directory is somewhere else, specifying this option will _add_
     /// the paths/files to the loaded config.
-    #[clap(long, env = "scope_CONFIG_DIR")]
+    #[clap(long, env = "SCOPE_CONFIG_DIR", global(true))]
     extra_config: Vec<String>,
 
     /// When set, default config files will not be loaded and only specified config will be loaded.
-    #[arg(long, env = "scope_DISABLE_DEFAULT_CONFIG", default_value = "false")]
+    #[arg(
+        long,
+        env = "SCOPE_DISABLE_DEFAULT_CONFIG",
+        default_value = "false",
+        global(true)
+    )]
     disable_default_config: bool,
 
     /// Override the working directory
-    #[arg(long, short = 'C')]
+    #[arg(long, short = 'C', global(true))]
     working_dir: Option<String>,
 }
 
@@ -38,16 +44,25 @@ pub struct FoundConfig {
     pub known_error: BTreeMap<String, ModelRoot<KnownErrorSpec>>,
     pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
     pub report_definition: Option<ModelRoot<ReportDefinitionSpec>>,
+    pub config_path: Vec<PathBuf>,
+    pub bin_path: String,
 }
 
 impl FoundConfig {
-    pub fn new(working_dir: PathBuf) -> Self {
+    pub fn new(working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
+        let bin_path = std::env::var("PATH").unwrap_or_default();
+        let scope_path = config_path
+            .iter()
+            .map(|x| x.join("bin").display().to_string())
+            .join(":");
         Self {
             working_dir,
             exec_check: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
             report_definition: None,
+            config_path,
+            bin_path: [bin_path, scope_path].join(":"),
         }
     }
 
@@ -61,9 +76,7 @@ impl FoundConfig {
                 additional_data: Default::default(),
             })
     }
-}
 
-impl FoundConfig {
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
             ParsedConfig::DoctorCheck(exec) => {
@@ -107,9 +120,10 @@ impl ConfigOptions {
             }
         };
 
-        let mut found_config = FoundConfig::new(working_dir);
+        let config_path = self.find_scope_paths(&working_dir);
+        let mut found_config = FoundConfig::new(working_dir, config_path);
 
-        for file_path in self.find_config_files(&found_config.working_dir)? {
+        for file_path in self.find_config_files(&found_config.config_path)? {
             let file_contents = fs::read_to_string(&file_path)?;
             let parsed_file_contents = match parse_config(file_path.as_path(), &file_contents) {
                 Ok(configs) => configs,
@@ -128,25 +142,24 @@ impl ConfigOptions {
         Ok(found_config)
     }
 
-    fn find_config_files(&self, working_dir: &Path) -> Result<Vec<PathBuf>> {
+    fn find_config_files(&self, config_dirs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+        let mut config_files = Vec::new();
+        for path in config_dirs {
+            config_files.extend(expand_path(path)?);
+        }
+
+        Ok(config_files)
+    }
+
+    fn find_scope_paths(&self, working_dir: &Path) -> Vec<PathBuf> {
         let mut config_paths = Vec::new();
 
         if !self.disable_default_config {
-            let search_dir = working_dir.to_path_buf();
-            for search_dir in search_dir.ancestors() {
-                let scope_dir: PathBuf = search_dir.join(".scope");
+            for scope_dir in build_config_path(working_dir) {
                 debug!("Checking if {} exists", scope_dir.display().to_string());
                 if scope_dir.exists() {
                     config_paths.push(scope_dir)
                 }
-            }
-
-            if let Some(user_dirs) = UserDirs::new() {
-                config_paths.push(user_dirs.home_dir().join(".scope"));
-            }
-
-            if let Some(base_dirs) = BaseDirs::new() {
-                config_paths.push(base_dirs.config_dir().join(".scope"));
             }
         }
 
@@ -158,12 +171,7 @@ impl ConfigOptions {
             }
         }
 
-        let mut config_files = Vec::new();
-        for path in config_paths {
-            config_files.extend(expand_path(&path)?);
-        }
-
-        Ok(config_files)
+        config_paths
     }
 }
 
@@ -196,4 +204,25 @@ fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {
 
     warn!("Unknown file type {}", path.display().to_string());
     Ok(Vec::new())
+}
+
+pub fn build_config_path(working_dir: &Path) -> Vec<PathBuf> {
+    let mut scope_path = Vec::new();
+
+    let working_dir = fs::canonicalize(working_dir).expect("working dir to be a path");
+    let search_dir = working_dir.to_path_buf();
+    for search_dir in search_dir.ancestors() {
+        let scope_dir: PathBuf = search_dir.join(".scope");
+        scope_path.push(scope_dir)
+    }
+
+    if let Some(user_dirs) = UserDirs::new() {
+        scope_path.push(user_dirs.home_dir().join(".scope"));
+    }
+
+    if let Some(base_dirs) = BaseDirs::new() {
+        scope_path.push(base_dirs.config_dir().join(".scope"));
+    }
+
+    scope_path
 }

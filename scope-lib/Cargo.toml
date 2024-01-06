@@ -30,3 +30,4 @@ colored = "2.1"
 minijinja = "1.0.10"
 inquire = {  version = "0.6", features = ["editor"]}
 strum = { version = "0.25", features = ["derive"] }
+itertools = { version = "0.12.0", features = [] }
