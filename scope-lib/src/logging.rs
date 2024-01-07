@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::path::PathBuf;
 use clap::{ArgGroup, Parser};
 use time::macros::format_description;
 use time::UtcOffset;
@@ -54,14 +56,11 @@ impl LoggingOpts {
         }
     }
 
-    pub fn configure_logging(&self, prefix: &str) -> tracing_appender::non_blocking::WorkerGuard {
-        let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
-        let now = chrono::Local::now();
-        let current_time = now.format("%Y%m%d");
-        let file_name = format!("scope-{}-{}-{}.log", prefix, current_time, id);
-        let full_path = format!("/tmp/scope/{}", file_name);
-        let file_appender = tracing_appender::rolling::never("/tmp/scope", file_name);
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    pub fn configure_logging(&self, run_id: &str, prefix: &str) -> tracing_appender::non_blocking::WorkerGuard {
+        let file_name = format!("scope-{}-{}.log", prefix, run_id);
+        let full_file_name = format!("/tmp/scope/{}", file_name);
+        let file_path = PathBuf::from(&full_file_name);
+        let (non_blocking, guard) = tracing_appender::non_blocking(File::create(file_path).unwrap());
 
         let file_output = tracing_subscriber::fmt::layer()
             .event_format(Format::default().json().flatten_event(true))
@@ -88,7 +87,7 @@ impl LoggingOpts {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        info!(target: "user", "More detailed logs at {}", full_path);
+        info!(target: "user", "More detailed logs at {}", full_file_name);
 
         guard
     }

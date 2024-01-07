@@ -1,4 +1,4 @@
-use crate::HelpMetadata;
+use crate::{FILE_PATH_ANNOTATION, HelpMetadata};
 use anyhow::anyhow;
 use derivative::Derivative;
 use regex::Regex;
@@ -7,8 +7,6 @@ use serde_yaml::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use strum::EnumString;
-
-pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct ModelMetadata {

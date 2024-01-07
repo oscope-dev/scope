@@ -74,12 +74,15 @@ impl<'a> CaptureOpts<'a> {
 impl OutputCapture {
     pub async fn capture_output(opts: CaptureOpts<'_>) -> Result<Self, CaptureError> {
         check_pre_exec(&opts)?;
+        let args = opts.args.to_vec();
+
+        debug!("Executing PATH={} {:?}", &opts.path, &args);
 
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
         let mut child = command
             .arg("-S")
-            .args(opts.args.to_vec())
+            .args(args)
             .env("PATH", opts.path)
             .envs(&opts.env_vars)
             .stderr(Stdio::piped())

@@ -1,6 +1,6 @@
 use crate::models::{
     DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportDefinitionSpec,
-    ReportUploadLocationSpec, FILE_PATH_ANNOTATION,
+    ReportUploadLocationSpec,
 };
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
@@ -9,8 +9,6 @@ use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
-use sha2::digest::Update;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -18,6 +16,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
+use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -41,6 +40,67 @@ pub struct ConfigOptions {
     /// Override the working directory
     #[arg(long, short = 'C', global(true))]
     working_dir: Option<String>,
+
+    /// When outputting logs, or other files, the run-id is the unique value that will define where these go.
+    /// In the case that the run-id is re-used, the old values will be overwritten.
+    #[arg(long, global(true), env = RUN_ID_ENV_VAR)]
+    run_id: Option<String>
+}
+
+
+impl ConfigOptions {
+
+    pub fn generate_run_id() -> String {
+        let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
+        let now = chrono::Local::now();
+        let current_time = now.format("%Y%m%d");
+        format!("{}-{}", current_time, id)
+    }
+    pub fn get_run_id(&self) -> String {
+        self.run_id.clone().unwrap_or_else(Self::generate_run_id)
+    }
+
+    pub async fn load_config(&self) -> Result<FoundConfig> {
+        let current_dir = std::env::current_dir();
+        let working_dir = match (current_dir, &self.working_dir) {
+            (Ok(cwd), None) => cwd,
+            (_, Some(dir)) => PathBuf::from(&dir),
+            _ => {
+                error!(target: "user", "Unable to get a working dir");
+                return Err(anyhow!("Unable to get a working dir"));
+            }
+        };
+
+        let config_path = self.find_scope_paths(&working_dir);
+        let found_config = FoundConfig::new(&self, working_dir, config_path).await;
+
+        debug!("Loaded config {:?}", found_config);
+
+        Ok(found_config)
+    }
+
+    fn find_scope_paths(&self, working_dir: &Path) -> Vec<PathBuf> {
+        let mut config_paths = Vec::new();
+
+        if !self.disable_default_config {
+            for scope_dir in build_config_path(working_dir) {
+                debug!("Checking if {} exists", scope_dir.display().to_string());
+                if scope_dir.exists() {
+                    config_paths.push(scope_dir)
+                }
+            }
+        }
+
+        for extra_config in &self.extra_config {
+            let scope_dir = Path::new(&extra_config);
+            debug!("Checking if {} exists", scope_dir.display().to_string());
+            if scope_dir.exists() {
+                config_paths.push(scope_dir.to_path_buf())
+            }
+        }
+
+        config_paths
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +113,7 @@ pub struct FoundConfig {
     pub report_definition: Option<ModelRoot<ReportDefinitionSpec>>,
     pub config_path: Vec<PathBuf>,
     pub bin_path: String,
+    pub run_id: String,
 }
 
 impl FoundConfig {
@@ -67,11 +128,12 @@ impl FoundConfig {
             report_upload: BTreeMap::new(),
             report_definition: None,
             config_path: Vec::new(),
+            run_id: ConfigOptions::generate_run_id(),
             bin_path,
         }
     }
-    pub async fn new(working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
-        let bin_path = std::env::var("PATH").unwrap_or_default();
+    pub async fn new(config_options: &ConfigOptions, working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
+        let default_path = std::env::var("PATH").unwrap_or_default();
         let scope_path = config_path
             .iter()
             .map(|x| x.join("bin").display().to_string())
@@ -87,7 +149,8 @@ impl FoundConfig {
             report_upload: BTreeMap::new(),
             report_definition: None,
             config_path,
-            bin_path: [bin_path, scope_path].join(":"),
+            bin_path: [scope_path, default_path].join(":"),
+            run_id: config_options.get_run_id(),
         };
 
         for raw_config in raw_config {
@@ -101,21 +164,11 @@ impl FoundConfig {
 
     pub fn write_raw_config_to_disk(&self) -> Result<PathBuf> {
         let json = serde_json::to_string(&self.raw_config)?;
-        let mut hasher = Sha256::new();
         let json_bytes = json.as_bytes();
-        Update::update(&mut hasher, json_bytes);
-
-        let result = hasher.finalize();
-        let file_hash = base16ct::lower::encode_string(result.as_slice());
-
         let file_path =
-            PathBuf::from_iter(vec!["tmp", "scope", &format!("config-{}.json", file_hash)]);
+            PathBuf::from_iter(vec!["/tmp", "scope", &format!("config-{}.json", self.run_id)]);
 
-        if file_path.exists()
-            && file_path.metadata().map(|x| x.len()).ok() == Some(json_bytes.len() as u64)
-        {
-            return Ok(file_path);
-        }
+        debug!("Merged config destination is to {}", file_path.display());
 
         let mut file = File::create(&file_path)?;
         file.write_all(json_bytes)?;
@@ -162,50 +215,6 @@ fn insert_if_absent<T>(map: &mut BTreeMap<String, ModelRoot<T>>, entry: ModelRoo
         warn!(target: "user", "A {} with duplicate name found, dropping {} in {}", entry.kind().to_string().bold(), entry.name().bold(), entry.file_path());
     } else {
         map.insert(name.to_string(), entry);
-    }
-}
-
-impl ConfigOptions {
-    pub async fn load_config(&self) -> Result<FoundConfig> {
-        let current_dir = std::env::current_dir();
-        let working_dir = match (current_dir, &self.working_dir) {
-            (Ok(cwd), None) => cwd,
-            (_, Some(dir)) => PathBuf::from(&dir),
-            _ => {
-                error!(target: "user", "Unable to get a working dir");
-                return Err(anyhow!("Unable to get a working dir"));
-            }
-        };
-
-        let config_path = self.find_scope_paths(&working_dir);
-        let found_config = FoundConfig::new(working_dir, config_path).await;
-
-        debug!("Loaded config {:?}", found_config);
-
-        Ok(found_config)
-    }
-
-    fn find_scope_paths(&self, working_dir: &Path) -> Vec<PathBuf> {
-        let mut config_paths = Vec::new();
-
-        if !self.disable_default_config {
-            for scope_dir in build_config_path(working_dir) {
-                debug!("Checking if {} exists", scope_dir.display().to_string());
-                if scope_dir.exists() {
-                    config_paths.push(scope_dir)
-                }
-            }
-        }
-
-        for extra_config in &self.extra_config {
-            let scope_dir = Path::new(&extra_config);
-            debug!("Checking if {} exists", scope_dir.display().to_string());
-            if scope_dir.exists() {
-                config_paths.push(scope_dir.to_path_buf())
-            }
-        }
-
-        config_paths
     }
 }
 

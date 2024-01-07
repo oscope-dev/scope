@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let _guard = opts
         .logging
         .with_new_default(tracing::level_filters::LevelFilter::WARN)
-        .configure_logging("intercept");
+        .configure_logging(&opts.config_options.get_run_id(), "intercept");
 
     let exit_code = run_command(opts).await.unwrap_or_else(|e| {
         error!(target: "user", "Fatal error {:?}", e);

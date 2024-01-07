@@ -5,6 +5,10 @@ mod models;
 mod redact;
 mod report;
 
+pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
+pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
+pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
+
 pub trait HelpMetadata {
     fn description(&self) -> &str;
 }

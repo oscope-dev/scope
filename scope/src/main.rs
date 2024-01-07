@@ -10,12 +10,12 @@ use scope_lib::prelude::{
     CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture,
     OutputDestination,
 };
-use scope_lib::HelpMetadata;
+use scope_lib::{CONFIG_FILE_PATH_ENV, HelpMetadata, RUN_ID_ENV_VAR};
 use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::Path;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 /// (Oscilli)scope
 ///
@@ -55,7 +55,7 @@ async fn main() {
     dotenv::dotenv().ok();
     let opts = Cli::parse();
 
-    let _guard = opts.logging.configure_logging("root");
+    let _guard = opts.logging.configure_logging(&opts.config.get_run_id(), "root");
     let error_code = run_subcommand(opts).await;
 
     std::process::exit(error_code);
@@ -96,12 +96,19 @@ async fn exec_sub_command(found_config: &FoundConfig, args: &[String]) -> Result
         }
     };
     let _ = std::mem::replace(&mut args[0], command);
+
+    debug!("Executing {:?}", args);
+
+    let config_file_path = found_config.write_raw_config_to_disk()?;
     let capture = OutputCapture::capture_output(CaptureOpts {
         working_dir: &found_config.working_dir,
         args: &args,
         output_dest: OutputDestination::StandardOut,
         path: &found_config.bin_path,
-        env_vars: Default::default(),
+        env_vars: BTreeMap::from([
+            (CONFIG_FILE_PATH_ENV.to_string(), config_file_path.display().to_string()),
+            (RUN_ID_ENV_VAR.to_string(), found_config.run_id.clone())
+        ])
     })
     .await?;
 

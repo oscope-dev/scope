@@ -21,7 +21,7 @@ spec:
 apiVersion: scope.github.com/v1alpha
 kind: ScopeReportDefinition
 metadata:
-  name: github
+  name: template
 spec:
   additionalData:
     username: id -u
