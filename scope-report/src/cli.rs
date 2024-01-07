@@ -22,6 +22,7 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
         args: &args.command,
         output_dest: OutputDestination::Logging,
         path: &found_config.bin_path,
+        env_vars: Default::default(),
     })
     .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);

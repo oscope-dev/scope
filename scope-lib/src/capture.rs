@@ -1,5 +1,6 @@
 use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -58,6 +59,7 @@ pub enum CaptureError {
 
 pub struct CaptureOpts<'a> {
     pub working_dir: &'a Path,
+    pub env_vars: BTreeMap<String, String>,
     pub path: &'a str,
     pub args: &'a [String],
     pub output_dest: OutputDestination,
@@ -79,6 +81,7 @@ impl OutputCapture {
             .arg("-S")
             .args(opts.args.to_vec())
             .env("PATH", opts.path)
+            .envs(&opts.env_vars)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .current_dir(opts.working_dir)

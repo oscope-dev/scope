@@ -48,6 +48,7 @@ impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
             args: &args,
             output_dest: OutputDestination::Null,
             path: &found_config.bin_path,
+            env_vars: Default::default(),
         })
         .await?;
 

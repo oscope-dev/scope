@@ -65,6 +65,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         args: &command,
         output_dest: OutputDestination::StandardOut,
         path: &path,
+        env_vars: Default::default(),
     })
     .await?;
 
@@ -77,9 +78,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     }
 
     error!(target: "user", "Command failed, checking for a known error");
-    let found_config = opts.config_options.load_config().unwrap_or_else(|e| {
+    let found_config = opts.config_options.load_config().await.unwrap_or_else(|e| {
         error!(target: "user", "Unable to load configs from disk: {:?}", e);
-        FoundConfig::new(env::current_dir().unwrap(), Vec::new())
+        FoundConfig::empty(env::current_dir().unwrap())
     });
 
     let command_output = capture.generate_output();

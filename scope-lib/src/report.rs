@@ -34,6 +34,7 @@ impl<'a> ReportBuilder<'a> {
                 args: &args,
                 output_dest: OutputDestination::Null,
                 path: &config.bin_path,
+                env_vars: Default::default(),
             })
             .await?;
             this.add_capture(&capture)?;

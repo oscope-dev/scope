@@ -89,6 +89,7 @@ async fn handle_check_failure(
         args: &args,
         output_dest: OutputDestination::StandardOut,
         path: &found_config.bin_path,
+        env_vars: Default::default(),
     })
     .await?;
 

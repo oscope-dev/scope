@@ -62,7 +62,7 @@ async fn main() {
 }
 
 async fn run_subcommand(opts: Cli) -> i32 {
-    let loaded_config = match opts.config.load_config() {
+    let loaded_config = match opts.config.load_config().await {
         Err(e) => {
             error!(target: "user", "Failed to load configuration: {}", e);
             return 2;
@@ -101,6 +101,7 @@ async fn exec_sub_command(found_config: &FoundConfig, args: &[String]) -> Result
         args: &args,
         output_dest: OutputDestination::StandardOut,
         path: &found_config.bin_path,
+        env_vars: Default::default(),
     })
     .await?;
 

@@ -1,15 +1,21 @@
 use crate::models::{
-    parse_config, DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig,
-    ReportDefinitionSpec, ReportUploadLocationSpec,
+    DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportDefinitionSpec,
+    ReportUploadLocationSpec, FILE_PATH_ANNOTATION,
 };
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
+use serde::Deserialize;
+use serde_yaml::{Deserializer, Value};
+use sha2::digest::Update;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
 
@@ -40,6 +46,7 @@ pub struct ConfigOptions {
 #[derive(Debug, Clone)]
 pub struct FoundConfig {
     pub working_dir: PathBuf,
+    pub raw_config: Vec<ModelRoot<Value>>,
     pub exec_check: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>>,
     pub known_error: BTreeMap<String, ModelRoot<KnownErrorSpec>>,
     pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
@@ -49,21 +56,71 @@ pub struct FoundConfig {
 }
 
 impl FoundConfig {
-    pub fn new(working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
+    pub fn empty(working_dir: PathBuf) -> Self {
+        let bin_path = std::env::var("PATH").unwrap_or_default();
+
+        Self {
+            working_dir,
+            raw_config: Vec::new(),
+            exec_check: BTreeMap::new(),
+            known_error: BTreeMap::new(),
+            report_upload: BTreeMap::new(),
+            report_definition: None,
+            config_path: Vec::new(),
+            bin_path,
+        }
+    }
+    pub async fn new(working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
         let bin_path = std::env::var("PATH").unwrap_or_default();
         let scope_path = config_path
             .iter()
             .map(|x| x.join("bin").display().to_string())
             .join(":");
-        Self {
+
+        let raw_config = load_all_config(&config_path).await;
+
+        let mut this = Self {
             working_dir,
+            raw_config: raw_config.clone(),
             exec_check: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
             report_definition: None,
             config_path,
             bin_path: [bin_path, scope_path].join(":"),
+        };
+
+        for raw_config in raw_config {
+            if let Ok(value) = raw_config.try_into() {
+                this.add_model(value);
+            }
         }
+
+        this
+    }
+
+    pub fn write_raw_config_to_disk(&self) -> Result<PathBuf> {
+        let json = serde_json::to_string(&self.raw_config)?;
+        let mut hasher = Sha256::new();
+        let json_bytes = json.as_bytes();
+        Update::update(&mut hasher, json_bytes);
+
+        let result = hasher.finalize();
+        let file_hash = base16ct::lower::encode_string(result.as_slice());
+
+        let file_path =
+            PathBuf::from_iter(vec!["tmp", "scope", &format!("config-{}.json", file_hash)]);
+
+        if file_path.exists()
+            && file_path.metadata().map(|x| x.len()).ok() == Some(json_bytes.len() as u64)
+        {
+            return Ok(file_path);
+        }
+
+        let mut file = File::create(&file_path)?;
+        file.write_all(json_bytes)?;
+
+        Ok(file_path)
     }
 
     pub fn get_report_definition(&self) -> ReportDefinitionSpec {
@@ -109,7 +166,7 @@ fn insert_if_absent<T>(map: &mut BTreeMap<String, ModelRoot<T>>, entry: ModelRoo
 }
 
 impl ConfigOptions {
-    pub fn load_config(&self) -> Result<FoundConfig> {
+    pub async fn load_config(&self) -> Result<FoundConfig> {
         let current_dir = std::env::current_dir();
         let working_dir = match (current_dir, &self.working_dir) {
             (Ok(cwd), None) => cwd,
@@ -121,34 +178,11 @@ impl ConfigOptions {
         };
 
         let config_path = self.find_scope_paths(&working_dir);
-        let mut found_config = FoundConfig::new(working_dir, config_path);
-
-        for file_path in self.find_config_files(&found_config.config_path)? {
-            let file_contents = fs::read_to_string(&file_path)?;
-            let parsed_file_contents = match parse_config(file_path.as_path(), &file_contents) {
-                Ok(configs) => configs,
-                Err(e) => {
-                    warn!(target: "user", "Unable to parse {} because {:?}", file_path.display().to_string(), e);
-                    continue;
-                }
-            };
-            for config in parsed_file_contents {
-                found_config.add_model(config);
-            }
-        }
+        let found_config = FoundConfig::new(working_dir, config_path).await;
 
         debug!("Loaded config {:?}", found_config);
 
         Ok(found_config)
-    }
-
-    fn find_config_files(&self, config_dirs: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
-        let mut config_files = Vec::new();
-        for path in config_dirs {
-            config_files.extend(expand_path(path)?);
-        }
-
-        Ok(config_files)
     }
 
     fn find_scope_paths(&self, working_dir: &Path) -> Vec<PathBuf> {
@@ -173,6 +207,64 @@ impl ConfigOptions {
 
         config_paths
     }
+}
+
+async fn load_all_config(paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
+    let mut loaded_values = Vec::new();
+
+    for file_path in expand_to_files(paths) {
+        let file_contents = match fs::read_to_string(&file_path) {
+            Err(e) => {
+                warn!(target: "user", "Unable to read file {} because {}", file_path.display().to_string(), e);
+                continue;
+            }
+            Ok(content) => content,
+        };
+        for doc in Deserializer::from_str(&file_contents) {
+            if let Some(parsed_model) = parse_model(doc, &file_path) {
+                loaded_values.push(parsed_model)
+            }
+        }
+    }
+
+    loaded_values
+}
+
+pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRoot<Value>> {
+    let value = match Value::deserialize(doc) {
+        Ok(value) => value,
+        Err(e) => {
+            warn!(target: "user", "Unable to load document from {} because {}", file_path.display(), e);
+            return None;
+        }
+    };
+
+    match serde_yaml::from_value::<ModelRoot<Value>>(value) {
+        Ok(mut value) => {
+            value.metadata.annotations.insert(
+                FILE_PATH_ANNOTATION.to_string(),
+                file_path.display().to_string(),
+            );
+            Some(value)
+        }
+        Err(e) => {
+            warn!(target: "user", "Unable to parse model from {} because {}", file_path.display(), e);
+            None
+        }
+    }
+}
+
+fn expand_to_files(paths: &Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut config_files = Vec::new();
+    for path in paths {
+        let expanded_paths = expand_path(path).unwrap_or_else(|e| {
+            warn!(target: "user", "Unable to access filesystem because {}", e);
+            Vec::new()
+        });
+        config_files.extend(expanded_paths);
+    }
+
+    config_files
 }
 
 fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {

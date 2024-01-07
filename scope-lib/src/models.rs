@@ -1,11 +1,11 @@
 use crate::HelpMetadata;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use derivative::Derivative;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::PathBuf;
 use strum::EnumString;
 
 pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
@@ -172,51 +172,49 @@ impl ParsedConfig {
     }
 }
 
-pub fn parse_config(file_path: &Path, config: &str) -> Result<Vec<ParsedConfig>> {
-    let mut parsed_configs = Vec::new();
-    for doc in serde_yaml::Deserializer::from_str(config) {
-        let value = Value::deserialize(doc)?;
-        parsed_configs.push(parse_value(file_path, value)?)
+impl TryFrom<ModelRoot<Value>> for ParsedConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModelRoot<Value>) -> std::result::Result<Self, Self::Error> {
+        ParsedConfig::try_from(&value)
     }
-    Ok(parsed_configs)
 }
 
-fn parse_value(file_path: &Path, value: Value) -> Result<ParsedConfig> {
-    let mut root: ModelRoot<Value> = serde_yaml::from_value(value)?;
-    let api_version: &str = &root.api_version.trim().to_ascii_lowercase();
-    let kind: &str = &root.kind.trim().to_ascii_lowercase();
+impl TryFrom<&ModelRoot<Value>> for ParsedConfig {
+    type Error = anyhow::Error;
 
-    root.metadata.annotations.insert(
-        FILE_PATH_ANNOTATION.to_string(),
-        file_path.display().to_string(),
-    );
+    fn try_from(root: &ModelRoot<Value>) -> std::result::Result<Self, Self::Error> {
+        let api_version: &str = &root.api_version.trim().to_ascii_lowercase();
+        let kind: &str = &root.kind.trim().to_ascii_lowercase();
 
-    let known_kinds =
-        KnownKinds::try_from(kind).unwrap_or_else(|_| KnownKinds::UnknownKind(kind.to_string()));
-    let api_versions = KnownApiVersion::try_from(api_version)
-        .unwrap_or_else(|_| KnownApiVersion::UnknownApiVersion(api_version.to_string()));
-    let containing_dir = file_path.parent().unwrap();
-    let parsed = match (api_versions, known_kinds) {
-        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeDoctorCheck) => {
-            let exec_check = parser::parse_v1_doctor_check(containing_dir, &root.spec)?;
-            ParsedConfig::DoctorCheck(root.with_spec(exec_check))
-        }
-        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeKnownError) => {
-            let known_error = parser::parse_v1_known_error(&root.spec)?;
-            ParsedConfig::KnownError(root.with_spec(known_error))
-        }
-        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportLocation) => {
-            let report_upload = parser::parse_v1_report_location(&root.spec)?;
-            ParsedConfig::ReportUpload(root.with_spec(report_upload))
-        }
-        (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportDefinition) => {
-            let report_upload = parser::parse_v1_report_definition(&root.spec)?;
-            ParsedConfig::ReportDefinition(root.with_spec(report_upload))
-        }
-        _ => return Err(anyhow!("Unable to parse {}/{}", api_version, kind)),
-    };
+        let known_kinds = KnownKinds::try_from(kind)
+            .unwrap_or_else(|_| KnownKinds::UnknownKind(kind.to_string()));
+        let api_versions = KnownApiVersion::try_from(api_version)
+            .unwrap_or_else(|_| KnownApiVersion::UnknownApiVersion(api_version.to_string()));
+        let file_path = PathBuf::from(root.file_path());
+        let containing_dir = file_path.parent().unwrap();
+        let parsed = match (api_versions, known_kinds) {
+            (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeDoctorCheck) => {
+                let exec_check = parser::parse_v1_doctor_check(containing_dir, &root.spec)?;
+                ParsedConfig::DoctorCheck(root.with_spec(exec_check))
+            }
+            (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeKnownError) => {
+                let known_error = parser::parse_v1_known_error(&root.spec)?;
+                ParsedConfig::KnownError(root.with_spec(known_error))
+            }
+            (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportLocation) => {
+                let report_upload = parser::parse_v1_report_location(&root.spec)?;
+                ParsedConfig::ReportUpload(root.with_spec(report_upload))
+            }
+            (KnownApiVersion::ScopeV1Alpha, KnownKinds::ScopeReportDefinition) => {
+                let report_upload = parser::parse_v1_report_definition(&root.spec)?;
+                ParsedConfig::ReportDefinition(root.with_spec(report_upload))
+            }
+            _ => return Err(anyhow!("Unable to parse {}/{}", api_version, kind)),
+        };
 
-    Ok(parsed)
+        Ok(parsed)
+    }
 }
 
 mod parser {
@@ -367,9 +365,29 @@ mod parser {
     }
 }
 
-#[test]
-fn test_parse_scope_doctor_check_exec() {
-    let text = "---
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::config_load::parse_model;
+    use crate::models::ParsedConfig;
+    use anyhow::Result;
+    use serde_yaml::Deserializer;
+    use std::path::Path;
+
+    fn parse_models_from_string(file_path: &Path, input: &str) -> Result<Vec<ParsedConfig>> {
+        let mut models = Vec::new();
+        for doc in Deserializer::from_str(input) {
+            if let Some(parsed_model) = parse_model(doc, file_path) {
+                models.push(parsed_model.try_into()?)
+            }
+        }
+
+        Ok(models)
+    }
+
+    #[test]
+    fn test_parse_scope_doctor_check_exec() {
+        let text = "---
 apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorCheck
 metadata:
@@ -393,32 +411,32 @@ spec:
   help: You're shell does not have a path env. Reload your shell.
 ";
 
-    let path = Path::new("/foo/bar/file.yaml");
-    let configs = parse_config(path, text).unwrap();
-    assert_eq!(2, configs.len());
-    assert_eq!(
-        configs[0].get_doctor_check_spec().unwrap(),
-        DoctorExecCheckSpec {
-            description: "Check your shell for basic functionality".to_string(),
-            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-            check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
-            fix_exec: Some("/bin/true".to_string())
-        }
-    );
-    assert_eq!(
-        configs[1].get_doctor_check_spec().unwrap(),
-        DoctorExecCheckSpec {
-            description: "Check your shell for basic functionality".to_string(),
-            help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-            check_exec: "/scripts/does-path-env-exist.sh".to_string(),
-            fix_exec: None,
-        }
-    );
-}
+        let path = Path::new("/foo/bar/file.yaml");
+        let configs = parse_models_from_string(path, text).unwrap();
+        assert_eq!(2, configs.len());
+        assert_eq!(
+            configs[0].get_doctor_check_spec().unwrap(),
+            DoctorExecCheckSpec {
+                description: "Check your shell for basic functionality".to_string(),
+                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+                check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
+                fix_exec: Some("/bin/true".to_string())
+            }
+        );
+        assert_eq!(
+            configs[1].get_doctor_check_spec().unwrap(),
+            DoctorExecCheckSpec {
+                description: "Check your shell for basic functionality".to_string(),
+                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+                check_exec: "/scripts/does-path-env-exist.sh".to_string(),
+                fix_exec: None,
+            }
+        );
+    }
 
-#[test]
-fn test_parse_scope_known_error() {
-    let text = "apiVersion: scope.github.com/v1alpha
+    #[test]
+    fn test_parse_scope_known_error() {
+        let text = "apiVersion: scope.github.com/v1alpha
 kind: ScopeKnownError
 metadata:
   name: error-exists
@@ -427,20 +445,20 @@ spec:
   pattern: error
   help: The command had an error, try reading the logs around there to find out what happened.";
 
-    let path = Path::new("/foo/bar/file.yaml");
-    let configs = parse_config(path, text).unwrap();
-    assert_eq!(1, configs.len());
-    assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownErrorSpec {
-                description: "Check if the word error is in the logs".to_string(),
-                help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
-                pattern: "error".to_string(),
-                regex: Regex::new("error").unwrap()
-            });
-}
+        let path = Path::new("/foo/bar/file.yaml");
+        let configs = parse_models_from_string(path, text).unwrap();
+        assert_eq!(1, configs.len());
+        assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownErrorSpec {
+            description: "Check if the word error is in the logs".to_string(),
+            help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
+            pattern: "error".to_string(),
+            regex: Regex::new("error").unwrap()
+        });
+    }
 
-#[test]
-fn test_parse_scope_report_loc() {
-    let text = "
+    #[test]
+    fn test_parse_scope_report_loc() {
+        let text = "
 ---
 apiVersion: scope.github.com/v1alpha
 kind: ScopeReportLocation
@@ -462,34 +480,34 @@ spec:
         repo: party
  ";
 
-    let path = Path::new("/foo/bar/file.yaml");
-    let configs = parse_config(path, text).unwrap();
-    assert_eq!(2, configs.len());
+        let path = Path::new("/foo/bar/file.yaml");
+        let configs = parse_models_from_string(path, text).unwrap();
+        assert_eq!(2, configs.len());
 
-    assert_eq!(
-        configs[0].get_report_upload_spec().unwrap(),
-        ReportUploadLocationSpec {
-            destination: ReportUploadLocation::RustyPaste {
-                url: "https://foo.bar".to_string()
-            },
-        }
-    );
-
-    assert_eq!(
-        configs[1].get_report_upload_spec().unwrap(),
-        ReportUploadLocationSpec {
-            destination: ReportUploadLocation::GithubIssue {
-                owner: "scope".to_string(),
-                repo: "party".to_string(),
-                tags: Vec::new(),
+        assert_eq!(
+            configs[0].get_report_upload_spec().unwrap(),
+            ReportUploadLocationSpec {
+                destination: ReportUploadLocation::RustyPaste {
+                    url: "https://foo.bar".to_string()
+                },
             }
-        }
-    );
-}
+        );
 
-#[test]
-fn test_parse_scope_report_def() {
-    let text = "
+        assert_eq!(
+            configs[1].get_report_upload_spec().unwrap(),
+            ReportUploadLocationSpec {
+                destination: ReportUploadLocation::GithubIssue {
+                    owner: "scope".to_string(),
+                    repo: "party".to_string(),
+                    tags: Vec::new(),
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_report_def() {
+        let text = "
 ---
 apiVersion: scope.github.com/v1alpha
 kind: ScopeReportDefinition
@@ -502,15 +520,16 @@ spec:
     hello bob
  ";
 
-    let path = Path::new("/foo/bar/file.yaml");
-    let configs = parse_config(path, text).unwrap();
-    assert_eq!(1, configs.len());
+        let path = Path::new("/foo/bar/file.yaml");
+        let configs = parse_models_from_string(path, text).unwrap();
+        assert_eq!(1, configs.len());
 
-    assert_eq!(
-        configs[0].get_report_def_spec().unwrap(),
-        ReportDefinitionSpec {
-            template: "hello bob".to_string(),
-            additional_data: [("env".to_string(), "env".to_string())].into()
-        }
-    );
+        assert_eq!(
+            configs[0].get_report_def_spec().unwrap(),
+            ReportDefinitionSpec {
+                template: "hello bob".to_string(),
+                additional_data: [("env".to_string(), "env".to_string())].into()
+            }
+        );
+    }
 }
