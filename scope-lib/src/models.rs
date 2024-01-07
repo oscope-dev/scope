@@ -1,4 +1,4 @@
-use crate::{FILE_PATH_ANNOTATION, HelpMetadata};
+use crate::{HelpMetadata, FILE_PATH_ANNOTATION};
 use anyhow::anyhow;
 use derivative::Derivative;
 use regex::Regex;

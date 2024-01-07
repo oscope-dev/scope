@@ -1,6 +1,6 @@
+use clap::{ArgGroup, Parser};
 use std::fs::File;
 use std::path::PathBuf;
-use clap::{ArgGroup, Parser};
 use time::macros::format_description;
 use time::UtcOffset;
 use tracing::info;
@@ -56,11 +56,16 @@ impl LoggingOpts {
         }
     }
 
-    pub fn configure_logging(&self, run_id: &str, prefix: &str) -> tracing_appender::non_blocking::WorkerGuard {
+    pub fn configure_logging(
+        &self,
+        run_id: &str,
+        prefix: &str,
+    ) -> tracing_appender::non_blocking::WorkerGuard {
         let file_name = format!("scope-{}-{}.log", prefix, run_id);
         let full_file_name = format!("/tmp/scope/{}", file_name);
         let file_path = PathBuf::from(&full_file_name);
-        let (non_blocking, guard) = tracing_appender::non_blocking(File::create(file_path).unwrap());
+        let (non_blocking, guard) =
+            tracing_appender::non_blocking(File::create(file_path).unwrap());
 
         let file_output = tracing_subscriber::fmt::layer()
             .event_format(Format::default().json().flatten_event(true))

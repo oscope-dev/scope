@@ -2,6 +2,7 @@ use crate::models::{
     DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportDefinitionSpec,
     ReportUploadLocationSpec,
 };
+use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
@@ -16,7 +17,6 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
-use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -44,12 +44,10 @@ pub struct ConfigOptions {
     /// When outputting logs, or other files, the run-id is the unique value that will define where these go.
     /// In the case that the run-id is re-used, the old values will be overwritten.
     #[arg(long, global(true), env = RUN_ID_ENV_VAR)]
-    run_id: Option<String>
+    run_id: Option<String>,
 }
 
-
 impl ConfigOptions {
-
     pub fn generate_run_id() -> String {
         let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
         let now = chrono::Local::now();
@@ -72,7 +70,7 @@ impl ConfigOptions {
         };
 
         let config_path = self.find_scope_paths(&working_dir);
-        let found_config = FoundConfig::new(&self, working_dir, config_path).await;
+        let found_config = FoundConfig::new(self, working_dir, config_path).await;
 
         debug!("Loaded config {:?}", found_config);
 
@@ -132,7 +130,11 @@ impl FoundConfig {
             bin_path,
         }
     }
-    pub async fn new(config_options: &ConfigOptions, working_dir: PathBuf, config_path: Vec<PathBuf>) -> Self {
+    pub async fn new(
+        config_options: &ConfigOptions,
+        working_dir: PathBuf,
+        config_path: Vec<PathBuf>,
+    ) -> Self {
         let default_path = std::env::var("PATH").unwrap_or_default();
         let scope_path = config_path
             .iter()
@@ -165,8 +167,11 @@ impl FoundConfig {
     pub fn write_raw_config_to_disk(&self) -> Result<PathBuf> {
         let json = serde_json::to_string(&self.raw_config)?;
         let json_bytes = json.as_bytes();
-        let file_path =
-            PathBuf::from_iter(vec!["/tmp", "scope", &format!("config-{}.json", self.run_id)]);
+        let file_path = PathBuf::from_iter(vec![
+            "/tmp",
+            "scope",
+            &format!("config-{}.json", self.run_id),
+        ]);
 
         debug!("Merged config destination is to {}", file_path.display());
 
