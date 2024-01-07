@@ -48,8 +48,8 @@ jobs:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
           set -euxo pipefail
-          SNAPSHOT_VERSION="$(env TZ=UTC date +"0.%Y%m%d.0-$(git rev-parse --short HEAD)")"
-          RELEASE_VERSION="$(env TZ=UTC date +"1.%Y%m%d.$(git rev-list --count origin/main --since "$(TZ=UTC date +'%FT00:00:00-00:00')")")"
+          SNAPSHOT_VERSION="$(env TZ=UTC date +"%Y.%m.0-$(git rev-parse --short HEAD)")"
+          RELEASE_VERSION="$(env TZ=UTC date +"%Y.%m.$(git rev-list --count origin/main --since "$(TZ=UTC date +'%+4Y-%m-01T00:00:00-00:00')")")"
           
           echo "snapshot-version=$SNAPSHOT_VERSION" >> $GITHUB_OUTPUT
           echo "release-version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
