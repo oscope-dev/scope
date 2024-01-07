@@ -1,4 +1,10 @@
 #!/bin/bash
 
 echo "in bar"
-exit 0
+
+if [[ "$(jq  '. | length' "${SCOPE_CONFIG_JSON}")" == "2" ]]; then
+  exit 0
+else
+  echo "config file had more than 2 entries"
+  exit 1
+fi

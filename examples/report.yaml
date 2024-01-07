@@ -4,12 +4,6 @@ kind: ScopeReportLocation
 metadata:
   name: report
 spec:
-  additionalData:
-    env: env
-    username: id -u
-    ruby: which ruby
-    node: which node
-    nodeVersion: node -v
   destination:
     rustyPaste:
       url: http://localhost:8000
@@ -27,8 +21,13 @@ spec:
 apiVersion: scope.github.com/v1alpha
 kind: ScopeReportDefinition
 metadata:
-  name: github
+  name: template
 spec:
+  additionalData:
+    username: id -u
+    ruby: which ruby
+    node: which node
+    nodeVersion: node -v
   template: |
     # There was an error!
     

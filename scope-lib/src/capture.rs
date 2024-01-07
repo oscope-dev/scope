@@ -1,5 +1,6 @@
 use crate::redact::Redactor;
 use chrono::{DateTime, Duration, Utc};
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -58,6 +59,7 @@ pub enum CaptureError {
 
 pub struct CaptureOpts<'a> {
     pub working_dir: &'a Path,
+    pub env_vars: BTreeMap<String, String>,
     pub path: &'a str,
     pub args: &'a [String],
     pub output_dest: OutputDestination,
@@ -72,13 +74,17 @@ impl<'a> CaptureOpts<'a> {
 impl OutputCapture {
     pub async fn capture_output(opts: CaptureOpts<'_>) -> Result<Self, CaptureError> {
         check_pre_exec(&opts)?;
+        let args = opts.args.to_vec();
+
+        debug!("Executing PATH={} {:?}", &opts.path, &args);
 
         let start_time = Utc::now();
         let mut command = tokio::process::Command::new("/usr/bin/env");
         let mut child = command
             .arg("-S")
-            .args(opts.args.to_vec())
+            .args(args)
             .env("PATH", opts.path)
+            .envs(&opts.env_vars)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .current_dir(opts.working_dir)
