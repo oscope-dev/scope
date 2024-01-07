@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.4.11", features = ["derive", "env"]}
-human-panic = "1.0.3"
-anyhow = "1.0.57"
-thiserror = "1.0.30"
-tracing = "0.1.34"
+clap = { version = "4.4", features = ["derive", "env"]}
+human-panic = "1.2"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
 tokio = { version = "1", features = ["full"] }
-async-trait = "0.1.53"
-dotenv = "0.15.0"
+dotenv = "0.15"
 inquire = {  version = "0.6", features = ["editor"]}
 
 scope-lib = { path = "../scope-lib" }

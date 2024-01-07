@@ -5,17 +5,13 @@ use scope_lib::prelude::{
 };
 use thiserror::Error;
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Unable to prcess file. {error:?}")]
+    #[error("Unable to process file. {error:?}")]
     IoError {
         #[from]
         error: std::io::Error,
-    },
-    #[error("Unable to persist temp file. {error:?}")]
-    UnableToWriteFile {
-        #[from]
-        error: tempfile::PersistError,
     },
     #[error("Unable to parse UTF-8 output. {error:?}")]
     FromUtf8Error {

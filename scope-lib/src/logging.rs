@@ -63,9 +63,12 @@ impl LoggingOpts {
     ) -> tracing_appender::non_blocking::WorkerGuard {
         let file_name = format!("scope-{}-{}.log", prefix, run_id);
         let full_file_name = format!("/tmp/scope/{}", file_name);
+        std::fs::create_dir_all("/tmp/scope").expect("to be able to create tmp dir");
+
         let file_path = PathBuf::from(&full_file_name);
-        let (non_blocking, guard) =
-            tracing_appender::non_blocking(File::create(file_path).unwrap());
+        let (non_blocking, guard) = tracing_appender::non_blocking(
+            File::create(file_path).expect("to be able to create log file"),
+        );
 
         let file_output = tracing_subscriber::fmt::layer()
             .event_format(Format::default().json().flatten_event(true))
