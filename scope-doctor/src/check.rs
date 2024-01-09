@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+use std::ops::Deref;
 use async_trait::async_trait;
 use colored::Colorize;
 use scope_lib::prelude::{
@@ -6,6 +8,8 @@ use scope_lib::prelude::{
 };
 use thiserror::Error;
 use tracing::{info, warn};
+use crate::commands::DoctorRunArgs;
+use scope_lib::prelude::ScopeModel;
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -26,6 +30,22 @@ pub enum RuntimeError {
     CaptureError(#[from] CaptureError),
 }
 
+pub enum DoctorTypes {
+    Exec(ModelRoot<DoctorExec>),
+    Setup(ModelRoot<DoctorSetup>),
+}
+
+impl Deref for DoctorTypes {
+    type Target = dyn CheckRuntime;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            DoctorTypes::Exec(e) => e,
+            DoctorTypes::Setup(s) => s
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum CacheResults {
     NoWorkNeeded,
@@ -39,23 +59,45 @@ pub enum CorrectionResults {
 }
 
 #[async_trait]
-pub trait CheckRuntime {
+pub trait CheckRuntime: ScopeModel {
+    fn order(&self) -> i32;
+
+    fn should_run_check(&self, runtime_args: &DoctorRunArgs) -> bool {
+        let check_names: BTreeSet<_> = match &runtime_args.only {
+            None => return true,
+            Some(check_names) => check_names.iter().map(|x| x.to_lowercase()).collect()
+        };
+
+        let names = BTreeSet::from([self.name().to_lowercase(), self.full_name().to_lowercase()]);
+        !check_names.is_disjoint(&names)
+    }
+
     async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError>;
+
     async fn run_correction(
         &self,
         found_config: &FoundConfig,
     ) -> Result<CorrectionResults, RuntimeError>;
+
+    fn has_correction(&self) -> bool;
+
     fn help_text(&self) -> String;
 }
 
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorExec> {
+
+    fn order(&self) -> i32 {
+        self.spec.order
+    }
+
+    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
     async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
         let output = OutputCapture::capture_output(CaptureOpts {
             working_dir: &found_config.working_dir,
             args: &args,
-            output_dest: OutputDestination::Null,
+            output_dest: OutputDestination::Logging,
             path: &found_config.bin_path,
             env_vars: Default::default(),
         })
@@ -66,24 +108,10 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
             false => CacheResults::FixRequired,
         };
 
-        info!(
-            check = self.name(),
-            output = "stdout",
-            successful = cache_results == CacheResults::NoWorkNeeded,
-            "{}",
-            output.get_stdout()
-        );
-        info!(
-            check = self.name(),
-            output = "stderr",
-            successful = cache_results == CacheResults::NoWorkNeeded,
-            "{}",
-            output.get_stderr()
-        );
-
         Ok(cache_results)
     }
 
+    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
     async fn run_correction(
         &self,
         found_config: &FoundConfig,
@@ -112,6 +140,10 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         }
     }
 
+    fn has_correction(&self) -> bool {
+        self.spec.fix_exec.is_some()
+    }
+
     fn help_text(&self) -> String {
         self.spec.help_text.to_owned()
     }
@@ -119,15 +151,44 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
 
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorSetup> {
+    fn order(&self) -> i32 {
+        self.spec.order
+    }
+
+    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
     async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
         Ok(CacheResults::FixRequired)
     }
 
+    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
     async fn run_correction(
         &self,
         found_config: &FoundConfig,
     ) -> Result<CorrectionResults, RuntimeError> {
-        Ok(CorrectionResults::Failure)
+        let commands = match &self.spec.exec {
+            DoctorSetupExec::Exec(exec) => exec
+        };
+
+        for command in commands {
+            let args = vec![command.clone()];
+            let capture = OutputCapture::capture_output(CaptureOpts {
+                working_dir: &found_config.working_dir,
+                args: &args,
+                output_dest: OutputDestination::StandardOut,
+                path: &found_config.bin_path,
+                env_vars: Default::default(),
+            })
+                .await?;
+
+            if capture.exit_code != Some(0) {
+                return Ok(CorrectionResults::Failure)
+            }
+        }
+        Ok(CorrectionResults::Success)
+    }
+
+    fn has_correction(&self) -> bool {
+        true
     }
 
     fn help_text(&self) -> String {

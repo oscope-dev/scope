@@ -55,6 +55,7 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetup>
     };
 
     Ok(DoctorSetup {
+        order: parsed.order,
         cache,
         exec,
         description: parsed.description,
@@ -119,6 +120,7 @@ spec:
         assert_eq!(
             configs[0].get_doctor_setup_spec().unwrap(),
             DoctorSetup {
+                order: 100,
                 description: "Check your shell for basic functionality".to_string(),
                 exec: DoctorSetupExec::Exec(vec!["/foo/bar/bin/setup".to_string()]),
                 cache: DoctorSetupCache::Paths(DoctorSetupCachePath {

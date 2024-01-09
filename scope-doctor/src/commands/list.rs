@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 use colored::*;
-use scope_lib::prelude::{FoundConfig, HelpMetadata};
+use scope_lib::prelude::{FoundConfig, HelpMetadata, ScopeModel};
 use tracing::info;
 
 #[derive(Debug, Args)]

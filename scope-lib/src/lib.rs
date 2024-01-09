@@ -19,7 +19,7 @@ pub mod prelude {
     pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
     pub use crate::models::prelude::{
-        DoctorExec, DoctorSetup, DoctorSetupExec, ModelMetadata, ModelRoot, ParsedConfig,
+        DoctorExec, DoctorSetup, DoctorSetupExec, ModelMetadata, ModelRoot, ParsedConfig, ScopeModel
     };
     pub use crate::report::ReportBuilder;
     pub use crate::HelpMetadata;

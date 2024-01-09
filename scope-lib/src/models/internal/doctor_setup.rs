@@ -19,6 +19,7 @@ pub enum DoctorSetupCache {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DoctorSetup {
+    pub order: i32,
     pub cache: DoctorSetupCache,
     pub exec: DoctorSetupExec,
     pub description: String,

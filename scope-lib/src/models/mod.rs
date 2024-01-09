@@ -12,6 +12,7 @@ mod v1alpha;
 pub mod prelude {
     pub use super::internal::prelude::*;
     pub use super::{ModelMetadata, ModelRoot};
+    pub use super::ScopeModel;
 }
 
 #[derive(Debug, PartialEq, EnumString)]
@@ -41,6 +42,14 @@ impl ModelMetadata {
     }
 }
 
+pub trait ScopeModel {
+    fn name(&self) -> &str;
+    fn kind(&self) -> &str;
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind(), self.name())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelRoot<V> {
@@ -63,12 +72,14 @@ impl<V> ModelRoot<V> {
     pub fn file_path(&self) -> String {
         self.metadata.file_path()
     }
+}
 
-    pub fn name(&self) -> &str {
+impl <V> ScopeModel for ModelRoot<V> {
+    fn name(&self) -> &str {
         &self.metadata.name
     }
 
-    pub fn kind(&self) -> &str {
+    fn kind(&self) -> &str {
         &self.kind
     }
 }
