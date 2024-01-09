@@ -1,6 +1,6 @@
 use crate::capture::{CaptureOpts, OutputCapture};
 use crate::config_load::FoundConfig;
-use crate::models::ReportUploadLocation;
+use crate::models::prelude::ReportUploadLocation;
 use crate::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};

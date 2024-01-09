@@ -1,4 +1,4 @@
-use crate::models::{
+use crate::models::prelude::{
     DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportDefinitionSpec,
     ReportUploadLocationSpec,
 };
@@ -196,6 +196,9 @@ impl FoundConfig {
         match parsed_config {
             ParsedConfig::DoctorCheck(exec) => {
                 insert_if_absent(&mut self.exec_check, exec);
+            }
+            ParsedConfig::DoctorSetup(exec) => {
+                // insert_if_absent(&mut self.exec_check, exec);
             }
             ParsedConfig::KnownError(known_error) => {
                 insert_if_absent(&mut self.known_error, known_error);
