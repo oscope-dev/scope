@@ -1,10 +1,10 @@
 use crate::models::v1alpha::extract_command_path;
 use crate::prelude::DoctorExecCheckSpec;
 use anyhow::Result;
-use regex::Regex;
+
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::collections::{BTreeMap, VecDeque};
+
 use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]

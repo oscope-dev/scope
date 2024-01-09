@@ -197,7 +197,7 @@ impl FoundConfig {
             ParsedConfig::DoctorCheck(exec) => {
                 insert_if_absent(&mut self.exec_check, exec);
             }
-            ParsedConfig::DoctorSetup(exec) => {
+            ParsedConfig::DoctorSetup(_exec) => {
                 // insert_if_absent(&mut self.exec_check, exec);
             }
             ParsedConfig::KnownError(known_error) => {

@@ -1,12 +1,9 @@
 use crate::models::internal::ParsedConfig;
-use crate::{HelpMetadata, FILE_PATH_ANNOTATION};
+use crate::FILE_PATH_ANNOTATION;
 use anyhow::anyhow;
-use derivative::Derivative;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
 use strum::EnumString;
 
 mod internal;
@@ -87,14 +84,20 @@ impl TryFrom<&ModelRoot<Value>> for ParsedConfig {
         match api_versions {
             KnownApiVersion::ScopeV1Alpha => Ok(v1alpha::parse_v1_alpha1(root)?),
             KnownApiVersion::UnknownApiVersion(_) => {
-                return Err(anyhow!("Unable to parse {}", api_version))
+                Err(anyhow!("Unable to parse {}", api_version))
             }
         }
     }
 }
 
 #[cfg(test)]
-pub(crate) fn parse_models_from_string(file_path: &Path, input: &str) -> Result<Vec<ParsedConfig>> {
+pub(crate) fn parse_models_from_string(
+    file_path: &std::path::Path,
+    input: &str,
+) -> anyhow::Result<Vec<ParsedConfig>> {
+    use crate::config_load::parse_model;
+    use serde_yaml::Deserializer;
+
     let mut models = Vec::new();
     for doc in Deserializer::from_str(input) {
         if let Some(parsed_model) = parse_model(doc, file_path) {

@@ -1,10 +1,10 @@
 use crate::models::prelude::*;
 use crate::models::v1alpha::extract_command_path;
 use anyhow::Result;
-use regex::Regex;
+
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::collections::{BTreeMap, VecDeque};
+
 use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -46,7 +46,7 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetupS
         DoctorSetupSpecExecV1Alpha::Exec(commands) => DoctorSetupSpecExec::Exec(
             commands
                 .iter()
-                .map(|p| extract_command_path(containing_dir, &p))
+                .map(|p| extract_command_path(containing_dir, p))
                 .collect(),
         ),
     };

@@ -3,8 +3,6 @@ use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::collections::{BTreeMap, VecDeque};
-use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
