@@ -16,12 +16,18 @@ struct DoctorCheckType {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct DoctorCheckSpec {
+    #[serde(default = "default_order")]
+    order: i32,
     #[serde(with = "serde_yaml::with::singleton_map")]
     check: DoctorCheckType,
     #[serde(with = "serde_yaml::with::singleton_map", default)]
     fix: Option<DoctorCheckType>,
     description: String,
     help: String,
+}
+
+fn default_order() -> i32 {
+    100
 }
 
 pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExec> {
@@ -33,6 +39,7 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExec> {
         .map(|path| extract_command_path(base_path, &path.target));
 
     Ok(DoctorExec {
+        order: parsed.order,
         help_text: parsed.help,
         check_exec: check_path,
         fix_exec,
@@ -78,6 +85,7 @@ spec:
         assert_eq!(
             configs[0].get_doctor_check_spec().unwrap(),
             DoctorExec {
+                order: 100,
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
@@ -87,6 +95,7 @@ spec:
         assert_eq!(
             configs[1].get_doctor_check_spec().unwrap(),
             DoctorExec {
+                order: 100,
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/scripts/does-path-env-exist.sh".to_string(),

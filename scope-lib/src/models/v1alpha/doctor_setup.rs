@@ -29,7 +29,6 @@ pub struct DoctorSetupSpec {
     #[serde(with = "serde_yaml::with::singleton_map")]
     pub setup: DoctorSetupSpecExec,
     pub description: String,
-    pub help: String,
 }
 
 fn default_order() -> i32 {
@@ -40,12 +39,10 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetup>
     let parsed: DoctorSetupSpec = serde_yaml::from_value(value.clone())?;
 
     let cache = match parsed.cache {
-        DoctorSetupSpecCache::Paths(paths) => {
-            DoctorSetupCache::Paths(DoctorSetupCachePath {
-                paths,
-                base_path: containing_dir.parent().unwrap().to_path_buf(),
-            })
-        }
+        DoctorSetupSpecCache::Paths(paths) => DoctorSetupCache::Paths(DoctorSetupCachePath {
+            paths,
+            base_path: containing_dir.parent().unwrap().to_path_buf(),
+        }),
     };
 
     let exec = match parsed.setup {
@@ -60,7 +57,6 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetup>
     Ok(DoctorSetup {
         cache,
         exec,
-        help_text: parsed.help,
         description: parsed.description,
     })
 }
@@ -71,8 +67,10 @@ mod tests {
     use crate::models::prelude::{
         DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec,
     };
+    use crate::models::v1alpha::doctor_setup::{
+        DoctorSetupSpec, DoctorSetupSpecCache, DoctorSetupSpecExec,
+    };
     use std::path::{Path, PathBuf};
-    use crate::models::v1alpha::doctor_setup::{DoctorSetupSpecCache, DoctorSetupSpecExec, DoctorSetupSpec};
 
     #[test]
     fn default_value() {
@@ -81,20 +79,20 @@ mod tests {
             cache: DoctorSetupSpecCache::Paths(vec!["foo".to_string()]),
             setup: DoctorSetupSpecExec::Exec(vec!["bar".to_string()]),
             description: "desc".to_string(),
-            help: "help".to_string(),
         };
 
         let text = serde_yaml::to_string(&spec).unwrap();
         assert_eq!(
-"order: 100
+            "order: 100
 cache:
   paths:
   - foo
 setup:
   exec:
   - bar
-description: desc
-help: help\n", text);
+description: desc\n",
+            text
+        );
     }
 
     #[test]
@@ -106,7 +104,6 @@ kind: ScopeDoctorSetup
 metadata:
   name: setup
 spec:
-  order: 100
   cache:
     paths:
      - flig/bar/**/*
@@ -114,7 +111,6 @@ spec:
     exec:
       - bin/setup
   description: Check your shell for basic functionality
-  help: You're shell does not have a path env. Reload your shell.
 ";
 
         let path = Path::new("/foo/bar/file.yaml");
@@ -124,7 +120,6 @@ spec:
             configs[0].get_doctor_setup_spec().unwrap(),
             DoctorSetup {
                 description: "Check your shell for basic functionality".to_string(),
-                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 exec: DoctorSetupExec::Exec(vec!["/foo/bar/bin/setup".to_string()]),
                 cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
                     paths: vec!["flig/bar/**/*".to_string()],

@@ -2,7 +2,7 @@
 
 echo "in bar"
 
-if [[ "$(jq  '. | length' "${SCOPE_CONFIG_JSON}")" == "2" ]]; then
+if [[ "$(jq  '. | length' "${SCOPE_CONFIG_JSON}")" == "3" ]]; then
   exit 0
 else
   echo "config file had more than 2 entries"

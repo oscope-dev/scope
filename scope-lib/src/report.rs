@@ -97,8 +97,13 @@ impl ReportUploadLocationDestination {
                 ReportUploadLocationDestination::upload_to_rusty_paste(url, report).await
             }
             ReportUploadLocationDestination::GithubIssue { owner, repo, tags } => {
-                ReportUploadLocationDestination::upload_to_github_issue(owner, repo, tags.clone(), report)
-                    .await
+                ReportUploadLocationDestination::upload_to_github_issue(
+                    owner,
+                    repo,
+                    tags.clone(),
+                    report,
+                )
+                .await
             }
         }
     }

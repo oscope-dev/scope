@@ -1,4 +1,4 @@
-use crate::models::prelude::{ReportUploadLocationDestination, ReportUploadLocation};
+use crate::models::prelude::{ReportUploadLocation, ReportUploadLocationDestination};
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -29,12 +29,16 @@ struct ReportLocationSpec {
 pub(super) fn parse(value: &Value) -> Result<ReportUploadLocation> {
     let parsed: ReportLocationSpec = serde_yaml::from_value(value.clone())?;
     let destination = match parsed.destination {
-        ReportDestinationSpec::RustyPaste { url } => ReportUploadLocationDestination::RustyPaste { url },
-        ReportDestinationSpec::GithubIssue(github_issue) => ReportUploadLocationDestination::GithubIssue {
-            owner: github_issue.owner,
-            repo: github_issue.repo,
-            tags: github_issue.tags,
-        },
+        ReportDestinationSpec::RustyPaste { url } => {
+            ReportUploadLocationDestination::RustyPaste { url }
+        }
+        ReportDestinationSpec::GithubIssue(github_issue) => {
+            ReportUploadLocationDestination::GithubIssue {
+                owner: github_issue.owner,
+                repo: github_issue.repo,
+                tags: github_issue.tags,
+            }
+        }
     };
     Ok(ReportUploadLocation { destination })
 }
@@ -42,7 +46,7 @@ pub(super) fn parse(value: &Value) -> Result<ReportUploadLocation> {
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::models::prelude::{ReportUploadLocationDestination, ReportUploadLocation};
+    use crate::models::prelude::{ReportUploadLocation, ReportUploadLocationDestination};
     use std::path::Path;
 
     #[test]

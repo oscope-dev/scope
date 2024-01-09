@@ -1,3 +1,4 @@
+use crate::HelpMetadata;
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -21,5 +22,10 @@ pub struct DoctorSetup {
     pub cache: DoctorSetupCache,
     pub exec: DoctorSetupExec,
     pub description: String,
-    pub help_text: String,
+}
+
+impl HelpMetadata for DoctorSetup {
+    fn description(&self) -> &str {
+        &self.description
+    }
 }

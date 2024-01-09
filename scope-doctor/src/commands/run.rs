@@ -1,9 +1,9 @@
-use crate::check::CheckRuntime;
+use crate::check::{CacheResults, CheckRuntime};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
 use scope_lib::prelude::{
-    CaptureOpts, DoctorExec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
+    DoctorExec, FoundConfig, ModelRoot,
 };
 use std::collections::BTreeMap;
 use tracing::{debug, error, info, warn};
@@ -21,7 +21,7 @@ pub struct DoctorRunArgs {
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
     let mut check_map: BTreeMap<String, ModelRoot<DoctorExec>> = Default::default();
     let mut check_order: Vec<String> = Default::default();
-    for check in found_config.exec_check.values() {
+    for check in found_config.doctor_exec.values() {
         let name = check.name();
         if let Some(old) = check_map.insert(name.to_string(), check.clone()) {
             warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
@@ -47,14 +47,15 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             Some(check) => check,
         };
 
-        let exec_result = check.exec(found_config).await?;
-        info!(check = %check_name, output= "stdout", successful=exec_result.success, "{}", exec_result.stdout);
-        info!(check = %check_name, output= "stderr", successful=exec_result.success, "{}", exec_result.stderr);
-        if exec_result.success {
-            info!(target: "user", "Check {} was successful", check_name.bold());
-        } else {
-            handle_check_failure(args.fix, found_config, check).await?;
-            should_pass = false;
+        let exec_result = check.check_cache(found_config).await?;
+        match exec_result {
+            CacheResults::FixRequired => {
+                handle_check_failure(args.fix, found_config, check).await?;
+                should_pass = false;
+            }
+            CacheResults::NoWorkNeeded => {
+                info!(target: "user", "Check {} was successful", check_name.bold());
+            }
         }
     }
 
@@ -70,12 +71,9 @@ async fn handle_check_failure(
     found_config: &FoundConfig,
     check: &ModelRoot<DoctorExec>,
 ) -> Result<()> {
-    let check_path = match &check.spec.fix_exec {
-        None => {
-            warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
-            return Ok(());
-        }
-        Some(path) => path.to_string(),
+    if check.spec.fix_exec.is_none() {
+        warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
+        return Ok(());
     };
 
     if !is_fix {
@@ -83,21 +81,7 @@ async fn handle_check_failure(
         return Ok(());
     }
 
-    let args = vec![check_path];
-    let capture = OutputCapture::capture_output(CaptureOpts {
-        working_dir: &found_config.working_dir,
-        args: &args,
-        output_dest: OutputDestination::StandardOut,
-        path: &found_config.bin_path,
-        env_vars: Default::default(),
-    })
-    .await?;
+    check.run_correction(found_config).await?;
 
-    if capture.exit_code == Some(0) {
-        info!(target: "user", "Check {} failed. {} ran successfully", check.name().bold(), "Fix".bold());
-        Ok(())
-    } else {
-        warn!(target: "user", "Check {} failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
-        Ok(())
-    }
+    Ok(())
 }

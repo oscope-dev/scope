@@ -27,6 +27,10 @@ fn setup_working_dir() -> TempDir {
         .write_file(&get_example_file("doctor-check.yaml"))
         .unwrap();
     scope_dir
+        .child("doctor-setup.yaml")
+        .write_file(&get_example_file("doctor-setup.yaml"))
+        .unwrap();
+    scope_dir
         .child("bin/scope-bar")
         .write_file(&get_example_file("bin/scope-bar"))
         .unwrap();
@@ -56,11 +60,34 @@ fn test_list_reports_all_config() {
         .stdout(predicate::str::contains(
             "Check if the word error is in the logs",
         ))
+        .stdout(predicate::str::contains("Doctor Setup"))
+        .stdout(predicate::str::contains("setup"))
         .stdout(predicate::str::contains(".scope/known-error.yaml"))
         .stdout(
             predicate::str::is_match(r"bar\s+External sub-command, run `scope bar` for help")
                 .unwrap(),
         );
+    working_dir.close().unwrap();
+}
+
+#[test]
+fn test_doctor_list() {
+    let working_dir = setup_working_dir();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_doctor_list")
+        .arg("doctor")
+        .arg("list")
+        .assert();
+
+    result
+        .success()
+        .stdout(predicate::str::contains("path-exists"))
+        .stdout(predicate::str::contains(
+            "Check your shell for basic functionalityc",
+        ))
+        .stdout(predicate::str::contains("setup"));
     working_dir.close().unwrap();
 }
 

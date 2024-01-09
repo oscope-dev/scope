@@ -128,11 +128,20 @@ lazy_static! {
 
 fn show_config(found_config: &FoundConfig) -> Result<()> {
     let mut extra_line = false;
-    if !found_config.exec_check.is_empty() {
+    if !found_config.doctor_exec.is_empty() {
         info!(target: "user", "Doctor Checks");
         print_details(
             &found_config.working_dir,
-            found_config.exec_check.values().collect(),
+            found_config.doctor_exec.values().collect(),
+        );
+        extra_line = true;
+    }
+
+    if !found_config.doctor_setup.is_empty() {
+        info!(target: "user", "Doctor Setup");
+        print_details(
+            &found_config.working_dir,
+            found_config.doctor_setup.values().collect(),
         );
         extra_line = true;
     }
