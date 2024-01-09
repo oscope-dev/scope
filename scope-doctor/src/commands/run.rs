@@ -4,7 +4,7 @@ use clap::Parser;
 use colored::*;
 use scope_lib::prelude::{FoundConfig, ScopeModel};
 use std::collections::BTreeMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -19,14 +19,15 @@ pub struct DoctorRunArgs {
     pub cache_dir: Option<String>,
     /// When set cache will be disabled, forcing all file based checks to run.
     #[arg(long, short, default_value = "false")]
-    pub no_cache: bool
+    pub no_cache: bool,
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
     let mut check_map: BTreeMap<String, DoctorTypes> = Default::default();
     for check in found_config.doctor_exec.values() {
         if check.should_run_check(args) {
-            if let Some(old) = check_map.insert(check.full_name(), DoctorTypes::Exec(check.clone())) {
+            if let Some(old) = check_map.insert(check.full_name(), DoctorTypes::Exec(check.clone()))
+            {
                 warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
             }
         }
@@ -34,15 +35,16 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
     for check in found_config.doctor_setup.values() {
         if check.should_run_check(args) {
-            if let Some(old) = check_map.insert(check.full_name(), DoctorTypes::Setup(check.clone())) {
+            if let Some(old) =
+                check_map.insert(check.full_name(), DoctorTypes::Setup(check.clone()))
+            {
                 warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
             }
         }
     }
 
-
     let mut checks_to_run: Vec<_> = check_map.values().collect();
-    checks_to_run.sort_by(|l, r| l.order().cmp(&r.order()));
+    checks_to_run.sort_by_key(|l| l.order());
 
     let mut should_pass = true;
 

@@ -6,7 +6,10 @@ use human_panic::setup_panic;
 use lazy_static::lazy_static;
 use regex::Regex;
 use scope_doctor::prelude::*;
-use scope_lib::prelude::{CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture, OutputDestination, ScopeModel};
+use scope_lib::prelude::{
+    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture,
+    OutputDestination, ScopeModel,
+};
 use scope_lib::{HelpMetadata, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;

@@ -1,15 +1,15 @@
-use std::collections::BTreeSet;
-use std::ops::Deref;
+use crate::commands::DoctorRunArgs;
 use async_trait::async_trait;
 use colored::Colorize;
+use scope_lib::prelude::ScopeModel;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorExec, DoctorSetup, DoctorSetupExec, FoundConfig, ModelRoot,
     OutputCapture, OutputDestination,
 };
+use std::collections::BTreeSet;
+use std::ops::Deref;
 use thiserror::Error;
 use tracing::{info, warn};
-use crate::commands::DoctorRunArgs;
-use scope_lib::prelude::ScopeModel;
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -41,7 +41,7 @@ impl Deref for DoctorTypes {
     fn deref(&self) -> &Self::Target {
         match self {
             DoctorTypes::Exec(e) => e,
-            DoctorTypes::Setup(s) => s
+            DoctorTypes::Setup(s) => s,
         }
     }
 }
@@ -65,7 +65,7 @@ pub trait CheckRuntime: ScopeModel {
     fn should_run_check(&self, runtime_args: &DoctorRunArgs) -> bool {
         let check_names: BTreeSet<_> = match &runtime_args.only {
             None => return true,
-            Some(check_names) => check_names.iter().map(|x| x.to_lowercase()).collect()
+            Some(check_names) => check_names.iter().map(|x| x.to_lowercase()).collect(),
         };
 
         let names = BTreeSet::from([self.name().to_lowercase(), self.full_name().to_lowercase()]);
@@ -86,7 +86,6 @@ pub trait CheckRuntime: ScopeModel {
 
 #[async_trait]
 impl CheckRuntime for ModelRoot<DoctorExec> {
-
     fn order(&self) -> i32 {
         self.spec.order
     }
@@ -156,7 +155,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
     }
 
     #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
-    async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
+    async fn check_cache(&self, _found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
         Ok(CacheResults::FixRequired)
     }
 
@@ -165,9 +164,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         &self,
         found_config: &FoundConfig,
     ) -> Result<CorrectionResults, RuntimeError> {
-        let commands = match &self.spec.exec {
-            DoctorSetupExec::Exec(exec) => exec
-        };
+        let DoctorSetupExec::Exec(commands) = &self.spec.exec;
 
         for command in commands {
             let args = vec![command.clone()];
@@ -178,10 +175,10 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
                 path: &found_config.bin_path,
                 env_vars: Default::default(),
             })
-                .await?;
+            .await?;
 
             if capture.exit_code != Some(0) {
-                return Ok(CorrectionResults::Failure)
+                return Ok(CorrectionResults::Failure);
             }
         }
         Ok(CorrectionResults::Success)

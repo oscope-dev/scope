@@ -11,8 +11,8 @@ mod v1alpha;
 
 pub mod prelude {
     pub use super::internal::prelude::*;
-    pub use super::{ModelMetadata, ModelRoot};
     pub use super::ScopeModel;
+    pub use super::{ModelMetadata, ModelRoot};
 }
 
 #[derive(Debug, PartialEq, EnumString)]
@@ -74,7 +74,7 @@ impl<V> ModelRoot<V> {
     }
 }
 
-impl <V> ScopeModel for ModelRoot<V> {
+impl<V> ScopeModel for ModelRoot<V> {
     fn name(&self) -> &str {
         &self.metadata.name
     }

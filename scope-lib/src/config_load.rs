@@ -2,6 +2,7 @@ use crate::models::prelude::{
     DoctorExec, DoctorSetup, KnownError, ModelRoot, ParsedConfig, ReportDefinition,
     ReportUploadLocation,
 };
+use crate::models::ScopeModel;
 use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
@@ -16,7 +17,6 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
-use crate::models::ScopeModel;
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
