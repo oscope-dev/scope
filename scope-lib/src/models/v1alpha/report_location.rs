@@ -1,4 +1,4 @@
-use crate::models::prelude::{ReportUploadLocation, ReportUploadLocationSpec};
+use crate::models::prelude::{ReportUploadLocationDestination, ReportUploadLocation};
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde_yaml::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct ReportDestinationGithubIssueV1Alpha {
+struct ReportDestinationGithubIssueSpec {
     owner: String,
     repo: String,
     #[serde(default)]
@@ -15,34 +15,34 @@ struct ReportDestinationGithubIssueV1Alpha {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-enum ReportDestinationV1Alpha {
+enum ReportDestinationSpec {
     RustyPaste { url: String },
-    GithubIssue(ReportDestinationGithubIssueV1Alpha),
+    GithubIssue(ReportDestinationGithubIssueSpec),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct ReportLocationV1Alpha {
+struct ReportLocationSpec {
     #[serde(with = "serde_yaml::with::singleton_map")]
-    destination: ReportDestinationV1Alpha,
+    destination: ReportDestinationSpec,
 }
-pub(super) fn parse(value: &Value) -> Result<ReportUploadLocationSpec> {
-    let parsed: ReportLocationV1Alpha = serde_yaml::from_value(value.clone())?;
+pub(super) fn parse(value: &Value) -> Result<ReportUploadLocation> {
+    let parsed: ReportLocationSpec = serde_yaml::from_value(value.clone())?;
     let destination = match parsed.destination {
-        ReportDestinationV1Alpha::RustyPaste { url } => ReportUploadLocation::RustyPaste { url },
-        ReportDestinationV1Alpha::GithubIssue(github_issue) => ReportUploadLocation::GithubIssue {
+        ReportDestinationSpec::RustyPaste { url } => ReportUploadLocationDestination::RustyPaste { url },
+        ReportDestinationSpec::GithubIssue(github_issue) => ReportUploadLocationDestination::GithubIssue {
             owner: github_issue.owner,
             repo: github_issue.repo,
             tags: github_issue.tags,
         },
     };
-    Ok(ReportUploadLocationSpec { destination })
+    Ok(ReportUploadLocation { destination })
 }
 
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::models::prelude::{ReportUploadLocation, ReportUploadLocationSpec};
+    use crate::models::prelude::{ReportUploadLocationDestination, ReportUploadLocation};
     use std::path::Path;
 
     #[test]
@@ -75,8 +75,8 @@ spec:
 
         assert_eq!(
             configs[0].get_report_upload_spec().unwrap(),
-            ReportUploadLocationSpec {
-                destination: ReportUploadLocation::RustyPaste {
+            ReportUploadLocation {
+                destination: ReportUploadLocationDestination::RustyPaste {
                     url: "https://foo.bar".to_string()
                 },
             }
@@ -84,8 +84,8 @@ spec:
 
         assert_eq!(
             configs[1].get_report_upload_spec().unwrap(),
-            ReportUploadLocationSpec {
-                destination: ReportUploadLocation::GithubIssue {
+            ReportUploadLocation {
+                destination: ReportUploadLocationDestination::GithubIssue {
                     owner: "scope".to_string(),
                     repo: "party".to_string(),
                     tags: Vec::new(),

@@ -18,6 +18,6 @@ pub mod prelude {
     pub use crate::capture::{CaptureError, CaptureOpts, OutputCapture, OutputDestination};
     pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
-    pub use crate::models::prelude::{DoctorExecCheckSpec, ModelMetadata, ModelRoot, ParsedConfig};
+    pub use crate::models::prelude::{DoctorExec, ModelMetadata, ModelRoot, ParsedConfig};
     pub use crate::report::ReportBuilder;
 }

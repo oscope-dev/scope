@@ -1,5 +1,5 @@
 use crate::models::v1alpha::extract_command_path;
-use crate::prelude::DoctorExecCheckSpec;
+use crate::prelude::DoctorExec;
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -9,30 +9,30 @@ use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct DoctorCheckTypeV1Alpha {
+struct DoctorCheckType {
     target: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct DoctorCheckV1Alpha {
+struct DoctorCheckSpec {
     #[serde(with = "serde_yaml::with::singleton_map")]
-    check: DoctorCheckTypeV1Alpha,
+    check: DoctorCheckType,
     #[serde(with = "serde_yaml::with::singleton_map", default)]
-    fix: Option<DoctorCheckTypeV1Alpha>,
+    fix: Option<DoctorCheckType>,
     description: String,
     help: String,
 }
 
-pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExecCheckSpec> {
-    let parsed: DoctorCheckV1Alpha = serde_yaml::from_value(value.clone())?;
+pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExec> {
+    let parsed: DoctorCheckSpec = serde_yaml::from_value(value.clone())?;
 
     let check_path = extract_command_path(base_path, &parsed.check.target);
     let fix_exec = parsed
         .fix
         .map(|path| extract_command_path(base_path, &path.target));
 
-    Ok(DoctorExecCheckSpec {
+    Ok(DoctorExec {
         help_text: parsed.help,
         check_exec: check_path,
         fix_exec,
@@ -43,7 +43,7 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExecCheckSp
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::prelude::DoctorExecCheckSpec;
+    use crate::prelude::DoctorExec;
     use std::path::Path;
 
     #[test]
@@ -77,7 +77,7 @@ spec:
         assert_eq!(2, configs.len());
         assert_eq!(
             configs[0].get_doctor_check_spec().unwrap(),
-            DoctorExecCheckSpec {
+            DoctorExec {
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
@@ -86,7 +86,7 @@ spec:
         );
         assert_eq!(
             configs[1].get_doctor_check_spec().unwrap(),
-            DoctorExecCheckSpec {
+            DoctorExec {
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/scripts/does-path-env-exist.sh".to_string(),

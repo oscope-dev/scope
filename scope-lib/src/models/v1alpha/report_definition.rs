@@ -1,4 +1,4 @@
-use crate::models::prelude::ReportDefinitionSpec;
+use crate::models::prelude::ReportDefinition;
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -7,15 +7,15 @@ use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct ReportDefinitionV1Alpha {
+struct ReportDefinitionSpec {
     #[serde(default)]
     additional_data: BTreeMap<String, String>,
     template: String,
 }
-pub(super) fn parse(value: &Value) -> Result<ReportDefinitionSpec> {
-    let parsed: ReportDefinitionV1Alpha = serde_yaml::from_value(value.clone())?;
+pub(super) fn parse(value: &Value) -> Result<ReportDefinition> {
+    let parsed: ReportDefinitionSpec = serde_yaml::from_value(value.clone())?;
 
-    Ok(ReportDefinitionSpec {
+    Ok(ReportDefinition {
         template: parsed.template.trim().to_string(),
         additional_data: parsed.additional_data,
     })
@@ -24,7 +24,7 @@ pub(super) fn parse(value: &Value) -> Result<ReportDefinitionSpec> {
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::models::prelude::ReportDefinitionSpec;
+    use crate::models::prelude::ReportDefinition;
     use std::path::Path;
 
     #[test]
@@ -48,7 +48,7 @@ spec:
 
         assert_eq!(
             configs[0].get_report_def_spec().unwrap(),
-            ReportDefinitionSpec {
+            ReportDefinition {
                 template: "hello bob".to_string(),
                 additional_data: [("env".to_string(), "env".to_string())].into()
             }

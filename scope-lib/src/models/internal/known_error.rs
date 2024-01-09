@@ -5,7 +5,7 @@ use regex::Regex;
 #[derive(Derivative)]
 #[derivative(PartialEq)]
 #[derive(Debug, Clone)]
-pub struct KnownErrorSpec {
+pub struct KnownError {
     pub description: String,
     pub pattern: String,
     #[derivative(PartialEq = "ignore")]
@@ -13,7 +13,7 @@ pub struct KnownErrorSpec {
     pub help_text: String,
 }
 
-impl HelpMetadata for KnownErrorSpec {
+impl HelpMetadata for KnownError {
     fn description(&self) -> &str {
         &self.description
     }

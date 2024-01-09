@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::Parser;
 use colored::*;
 use scope_lib::prelude::{
-    CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
+    CaptureOpts, DoctorExec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
 };
 use std::collections::BTreeMap;
 use tracing::{debug, error, info, warn};
@@ -19,7 +19,7 @@ pub struct DoctorRunArgs {
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
-    let mut check_map: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>> = Default::default();
+    let mut check_map: BTreeMap<String, ModelRoot<DoctorExec>> = Default::default();
     let mut check_order: Vec<String> = Default::default();
     for check in found_config.exec_check.values() {
         let name = check.name();
@@ -68,7 +68,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 async fn handle_check_failure(
     is_fix: bool,
     found_config: &FoundConfig,
-    check: &ModelRoot<DoctorExecCheckSpec>,
+    check: &ModelRoot<DoctorExec>,
 ) -> Result<()> {
     let check_path = match &check.spec.fix_exec {
         None => {

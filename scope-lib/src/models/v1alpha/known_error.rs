@@ -1,4 +1,4 @@
-use crate::models::prelude::KnownErrorSpec;
+use crate::models::prelude::KnownError;
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -6,15 +6,15 @@ use serde_yaml::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct KnownErrorV1Alpha {
+struct KnownErrorSpec {
     description: String,
     help: String,
     pattern: String,
 }
-pub(super) fn parse(value: &Value) -> Result<KnownErrorSpec> {
-    let parsed: KnownErrorV1Alpha = serde_yaml::from_value(value.clone())?;
+pub(super) fn parse(value: &Value) -> Result<KnownError> {
+    let parsed: KnownErrorSpec = serde_yaml::from_value(value.clone())?;
     let regex = Regex::new(&parsed.pattern)?;
-    Ok(KnownErrorSpec {
+    Ok(KnownError {
         pattern: parsed.pattern,
         regex,
         help_text: parsed.help,
@@ -25,7 +25,7 @@ pub(super) fn parse(value: &Value) -> Result<KnownErrorSpec> {
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::models::prelude::KnownErrorSpec;
+    use crate::models::prelude::KnownError;
     use regex::Regex;
     use std::path::Path;
 
@@ -43,7 +43,7 @@ spec:
         let path = Path::new("/foo/bar/file.yaml");
         let configs = parse_models_from_string(path, text).unwrap();
         assert_eq!(1, configs.len());
-        assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownErrorSpec {
+        assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownError {
             description: "Check if the word error is in the logs".to_string(),
             help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
             pattern: "error".to_string(),

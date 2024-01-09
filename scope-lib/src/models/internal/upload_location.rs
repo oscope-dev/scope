@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Clone)]
-pub enum ReportUploadLocation {
+pub enum ReportUploadLocationDestination {
     RustyPaste {
         url: String,
     },
@@ -10,6 +10,6 @@ pub enum ReportUploadLocation {
     },
 }
 #[derive(Debug, PartialEq, Clone)]
-pub struct ReportUploadLocationSpec {
-    pub destination: ReportUploadLocation,
+pub struct ReportUploadLocation {
+    pub destination: ReportUploadLocationDestination,
 }

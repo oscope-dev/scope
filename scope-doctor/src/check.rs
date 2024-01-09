@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use scope_lib::prelude::{
-    CaptureError, CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture,
+    CaptureError, CaptureOpts, DoctorExec, FoundConfig, ModelRoot, OutputCapture,
     OutputDestination,
 };
 use thiserror::Error;
@@ -36,7 +36,7 @@ pub trait CheckRuntime {
 }
 
 #[async_trait]
-impl CheckRuntime for ModelRoot<DoctorExecCheckSpec> {
+impl CheckRuntime for ModelRoot<DoctorExec> {
     async fn exec(&self, found_config: &FoundConfig) -> Result<RuntimeResult, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
         let output = OutputCapture::capture_output(CaptureOpts {

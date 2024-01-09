@@ -9,33 +9,39 @@ use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum DoctorSetupSpecExecV1Alpha {
+pub enum DoctorSetupSpecExec {
     Exec(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub enum DoctorSetupSpecCacheV1Alpha {
+pub enum DoctorSetupSpecCache {
     Paths(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct DoctorSetupSpecV1Alpha {
+pub struct DoctorSetupSpec {
+    #[serde(default = "default_order")]
+    pub order: i32,
     #[serde(with = "serde_yaml::with::singleton_map")]
-    pub cache: DoctorSetupSpecCacheV1Alpha,
+    pub cache: DoctorSetupSpecCache,
     #[serde(with = "serde_yaml::with::singleton_map")]
-    pub setup: DoctorSetupSpecExecV1Alpha,
+    pub setup: DoctorSetupSpecExec,
     pub description: String,
-    pub help_text: String,
+    pub help: String,
 }
 
-pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetupSpec> {
-    let parsed: DoctorSetupSpecV1Alpha = serde_yaml::from_value(value.clone())?;
+fn default_order() -> i32 {
+    100
+}
+
+pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetup> {
+    let parsed: DoctorSetupSpec = serde_yaml::from_value(value.clone())?;
 
     let cache = match parsed.cache {
-        DoctorSetupSpecCacheV1Alpha::Paths(paths) => {
-            DoctorSetupSpecCache::Paths(DoctorSetupSpecCachePath {
+        DoctorSetupSpecCache::Paths(paths) => {
+            DoctorSetupCache::Paths(DoctorSetupCachePath {
                 paths,
                 base_path: containing_dir.parent().unwrap().to_path_buf(),
             })
@@ -43,7 +49,7 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetupS
     };
 
     let exec = match parsed.setup {
-        DoctorSetupSpecExecV1Alpha::Exec(commands) => DoctorSetupSpecExec::Exec(
+        DoctorSetupSpecExec::Exec(commands) => DoctorSetupExec::Exec(
             commands
                 .iter()
                 .map(|p| extract_command_path(containing_dir, p))
@@ -51,10 +57,10 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetupS
         ),
     };
 
-    Ok(DoctorSetupSpec {
+    Ok(DoctorSetup {
         cache,
         exec,
-        help_text: parsed.help_text,
+        help_text: parsed.help,
         description: parsed.description,
     })
 }
@@ -63,23 +69,47 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorSetupS
 mod tests {
     use crate::models::parse_models_from_string;
     use crate::models::prelude::{
-        DoctorSetupSpec, DoctorSetupSpecCache, DoctorSetupSpecCachePath, DoctorSetupSpecExec,
+        DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec,
     };
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use crate::models::v1alpha::doctor_setup::{DoctorSetupSpecCache, DoctorSetupSpecExec, DoctorSetupSpec};
+
+    #[test]
+    fn default_value() {
+        let spec = DoctorSetupSpec {
+            order: 100,
+            cache: DoctorSetupSpecCache::Paths(vec!["foo".to_string()]),
+            setup: DoctorSetupSpecExec::Exec(vec!["bar".to_string()]),
+            description: "desc".to_string(),
+            help: "help".to_string(),
+        };
+
+        let text = serde_yaml::to_string(&spec).unwrap();
+        assert_eq!(
+"order: 100
+cache:
+  paths:
+  - foo
+setup:
+  exec:
+  - bar
+description: desc
+help: help\n", text);
+    }
 
     #[test]
     fn test_parse_scope_setup() {
         let text = "
 ---
 apiVersion: scope.github.com/v1alpha
-kind: ScopeSetup
+kind: ScopeDoctorSetup
 metadata:
   name: setup
 spec:
   order: 100
   cache:
     paths:
-     - foo/bar/**/*
+     - flig/bar/**/*
   setup:
     exec:
       - bin/setup
@@ -92,13 +122,13 @@ spec:
         assert_eq!(1, configs.len());
         assert_eq!(
             configs[0].get_doctor_setup_spec().unwrap(),
-            DoctorSetupSpec {
+            DoctorSetup {
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-                exec: DoctorSetupSpecExec::Exec(vec!["/foo/bin/setup".to_string()]),
-                cache: DoctorSetupSpecCache::Paths(DoctorSetupSpecCachePath {
-                    paths: vec![],
-                    base_path: Default::default(),
+                exec: DoctorSetupExec::Exec(vec!["/foo/bar/bin/setup".to_string()]),
+                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                    paths: vec!["flig/bar/**/*".to_string()],
+                    base_path: PathBuf::from("/foo"),
                 }),
             }
         );

@@ -1,14 +1,14 @@
 use crate::HelpMetadata;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct DoctorExecCheckSpec {
+pub struct DoctorExec {
     pub check_exec: String,
     pub fix_exec: Option<String>,
     pub description: String,
     pub help_text: String,
 }
 
-impl HelpMetadata for DoctorExecCheckSpec {
+impl HelpMetadata for DoctorExec {
     fn description(&self) -> &str {
         &self.description
     }

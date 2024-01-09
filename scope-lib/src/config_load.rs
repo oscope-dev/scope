@@ -1,6 +1,6 @@
 use crate::models::prelude::{
-    DoctorExecCheckSpec, KnownErrorSpec, ModelRoot, ParsedConfig, ReportDefinitionSpec,
-    ReportUploadLocationSpec,
+    DoctorExec, KnownError, ModelRoot, ParsedConfig, ReportDefinition,
+    ReportUploadLocation,
 };
 use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 use anyhow::{anyhow, Result};
@@ -105,10 +105,10 @@ impl ConfigOptions {
 pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub raw_config: Vec<ModelRoot<Value>>,
-    pub exec_check: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>>,
-    pub known_error: BTreeMap<String, ModelRoot<KnownErrorSpec>>,
-    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocationSpec>>,
-    pub report_definition: Option<ModelRoot<ReportDefinitionSpec>>,
+    pub exec_check: BTreeMap<String, ModelRoot<DoctorExec>>,
+    pub known_error: BTreeMap<String, ModelRoot<KnownError>>,
+    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocation>>,
+    pub report_definition: Option<ModelRoot<ReportDefinition>>,
     pub config_path: Vec<PathBuf>,
     pub bin_path: String,
     pub run_id: String,
@@ -181,12 +181,12 @@ impl FoundConfig {
         Ok(file_path)
     }
 
-    pub fn get_report_definition(&self) -> ReportDefinitionSpec {
+    pub fn get_report_definition(&self) -> ReportDefinition {
         self.report_definition
             .as_ref()
             .map(|x| x.spec.clone())
             .clone()
-            .unwrap_or_else(|| ReportDefinitionSpec {
+            .unwrap_or_else(|| ReportDefinition {
                 template: "== Error report for {{ command }}.".to_string(),
                 additional_data: Default::default(),
             })
