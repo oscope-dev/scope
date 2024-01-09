@@ -14,7 +14,7 @@ pub struct DoctorRunArgs {
     #[arg(short, long)]
     only: Option<Vec<String>>,
     /// When set, if a fix is specified it will also run.
-    #[arg(long, short, default_value = "false")]
+    #[arg(long, short, default_value = "true")]
     fix: bool,
 }
 
