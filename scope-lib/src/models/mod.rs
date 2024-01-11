@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+
 use strum::EnumString;
 
 mod internal;

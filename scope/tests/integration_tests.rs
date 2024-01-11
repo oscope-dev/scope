@@ -3,23 +3,8 @@ use assert_fs::{prelude::*, TempDir};
 use predicates::prelude::*;
 use std::path::PathBuf;
 
-fn get_example_file(name: &str) -> PathBuf {
-    let file_path = PathBuf::from(format!(
-        "{}/../examples/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    ))
-    .canonicalize()
-    .unwrap();
-    println!("Example file {}", file_path.display());
-    file_path
-}
-
 fn setup_working_dir() -> TempDir {
-    let file_path = PathBuf::from(format!(
-        "{}/../examples",
-        env!("CARGO_MANIFEST_DIR")
-    ));
+    let file_path = PathBuf::from(format!("{}/../examples", env!("CARGO_MANIFEST_DIR")));
 
     let temp = TempDir::new().unwrap();
     temp.copy_from(file_path, &["*", "**/*"]).unwrap();
@@ -105,8 +90,9 @@ fn test_run_check_path_exists() {
         .arg("--only=path-exists")
         .assert();
 
-    result.failure()
-        .stdout(predicate::str::contains("Check path-exists failed. Fix ran successfully"));
+    result.failure().stdout(predicate::str::contains(
+        "Check path-exists failed. Fix ran successfully",
+    ));
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     let result = cmd
@@ -117,9 +103,9 @@ fn test_run_check_path_exists() {
         .arg("--only=path-exists-fix-in-scope-dir")
         .assert();
 
-    result.failure()
-        .stdout(predicate::str::contains("Check path-exists-fix-in-scope-dir failed. Fix ran successfully."));
+    result.failure().stdout(predicate::str::contains(
+        "Check path-exists-fix-in-scope-dir failed. Fix ran successfully.",
+    ));
 
     working_dir.close().unwrap();
 }
-

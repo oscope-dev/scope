@@ -2,7 +2,7 @@ use crate::commands::DoctorRunArgs;
 use crate::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use async_trait::async_trait;
-use colored::Colorize;
+
 use glob::glob;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorExec, DoctorSetup, DoctorSetupExec, FoundConfig, ModelRoot,
@@ -176,7 +176,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         file_cache: &'a dyn FileCache,
     ) -> Result<CacheResults, RuntimeError> {
         let check_full_name = self.full_name();
-        let result = process_glob(&self, |path| {
+        let result = process_glob(self, |path| {
             let check_full_name = check_full_name.clone();
             async move {
                 let file_result = file_cache.check_file(check_full_name, &path).await?;
@@ -216,7 +216,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         }
 
         let check_full_name = self.full_name();
-        if let Err(e) = process_glob(&self, |path| {
+        if let Err(e) = process_glob(self, |path| {
             let check_full_name = check_full_name.clone();
             async move {
                 file_cache
@@ -255,9 +255,7 @@ where
     F: Fn(PathBuf) -> Ret,
     Ret: Future<Output = Result<bool, RuntimeError>>,
 {
-    let cache = match &model.spec.cache {
-        DoctorSetupCache::Paths(p) => p,
-    };
+    let DoctorSetupCache::Paths(cache) = &model.spec.cache;
 
     let base_path_str = cache.base_path.display().to_string();
     for glob_str in &cache.paths {
