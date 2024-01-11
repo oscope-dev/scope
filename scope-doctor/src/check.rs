@@ -12,7 +12,7 @@ use scope_lib::prelude::{DoctorSetupCache, ScopeModel};
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::ops::Deref;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 use tracing::{info, warn};
 
@@ -176,9 +176,13 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         _found_config: &FoundConfig,
         file_cache: &'a dyn FileCache,
     ) -> Result<CacheResults, RuntimeError> {
-        let result = process_glob(&self, |path| async move {
-            let file_result = file_cache.check_file(&path).await?;
-            Ok(file_result == FileCacheStatus::FileMatches)
+        let check_full_name = self.full_name();
+        let result = process_glob(&self, |path| {
+            let check_full_name = check_full_name.clone();
+            async move {
+                let file_result = file_cache.check_file(check_full_name, &path).await?;
+                Ok(file_result == FileCacheStatus::FileMatches)
+            }
         })
         .await?;
 
@@ -212,9 +216,15 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
             }
         }
 
-        if let Err(e) = process_glob(&self, |path| async move {
-            file_cache.update_cache_entry(&path).await?;
-            Ok(true)
+        let check_full_name = self.full_name();
+        if let Err(e) = process_glob(&self, |path| {
+            let check_full_name = check_full_name.clone();
+            async move {
+                file_cache
+                    .update_cache_entry(check_full_name, &path)
+                    .await?;
+                Ok(true)
+            }
         })
         .await
         {

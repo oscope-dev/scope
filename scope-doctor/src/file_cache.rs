@@ -1,13 +1,13 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
-use tracing::{info, warn};
-use anyhow::Result;
 use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum FileCacheStatus {
@@ -17,8 +17,9 @@ pub enum FileCacheStatus {
 
 #[async_trait]
 pub trait FileCache: Sync {
-    async fn check_file(&self, path: &Path) -> Result<FileCacheStatus>;
-    async fn update_cache_entry(&self, path: &Path) -> Result<()>;
+    async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus>;
+    async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()>;
+    async fn persist(&self) -> Result<()>;
 }
 
 pub enum CacheStorage {
@@ -42,11 +43,15 @@ pub struct NoOpCache {}
 
 #[async_trait]
 impl FileCache for NoOpCache {
-    async fn check_file(&self, _path: &Path) -> Result<FileCacheStatus> {
+    async fn check_file(&self, _check_name: String, _path: &Path) -> Result<FileCacheStatus> {
         Ok(FileCacheStatus::FileChanged)
     }
 
-    async fn update_cache_entry(&self, _path: &Path) -> Result<()> {
+    async fn update_cache_entry(&self, _check_name: String, _path: &Path) -> Result<()> {
+        Ok(())
+    }
+
+    async fn persist(&self) -> Result<()> {
         Ok(())
     }
 }
@@ -54,13 +59,13 @@ impl FileCache for NoOpCache {
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct FileCacheData {
     #[serde(default)]
-    checksums: BTreeMap<String, String>,
+    checksums: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Default)]
 pub struct FileBasedCache {
     data: Arc<RwLock<FileCacheData>>,
-    path: String
+    path: String,
 }
 
 impl FileBasedCache {
@@ -75,13 +80,11 @@ impl FileBasedCache {
                         path: cache_path.display().to_string(),
                         ..Default::default()
                     })
-                },
-                Ok(r) => {
-                    Ok(Self {
-                        path: cache_path.display().to_string(),
-                        data: Arc::new(RwLock::new(r))
-                    })
                 }
+                Ok(r) => Ok(Self {
+                    path: cache_path.display().to_string(),
+                    data: Arc::new(RwLock::new(r)),
+                }),
             }
         } else {
             Ok(Self {
@@ -90,7 +93,44 @@ impl FileBasedCache {
             })
         }
     }
-    pub async fn write_storage(&self) -> Result<()>{
+}
+
+#[async_trait]
+impl FileCache for FileBasedCache {
+    async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus> {
+        match make_checksum(path).await {
+            Ok(checksum) => {
+                let data = self.data.read().await;
+                let check_cache = data.checksums.get(&check_name).cloned().unwrap_or_default();
+                if check_cache.get(&path.display().to_string()) == Some(&checksum) {
+                    Ok(FileCacheStatus::FileMatches)
+                } else {
+                    Ok(FileCacheStatus::FileChanged)
+                }
+            }
+            Err(e) => {
+                info!("Unable to make checksum of file. {:?}", e);
+                Ok(FileCacheStatus::FileChanged)
+            }
+        }
+    }
+
+    async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()> {
+        match make_checksum(path).await {
+            Ok(checksum) => {
+                let mut data = self.data.write().await;
+                let check_cache = data.checksums.entry(check_name).or_default();
+                check_cache.insert(path.display().to_string(), checksum);
+            }
+            Err(e) => {
+                info!("Unable to make checksum of file. {:?}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn persist(&self) -> Result<()> {
         let cache_data = self.data.read().await;
         match serde_json::to_string(cache_data.deref()) {
             Ok(text) => {
@@ -98,7 +138,7 @@ impl FileBasedCache {
                     warn!("Error writing cache data {:?}", e);
                     warn!(target: "user", "Failed to write updated cache to disk, next run will show incorrect results")
                 }
-            },
+            }
             Err(e) => {
                 warn!("Error deserializing cache data {:?}", e);
                 warn!(target: "user", "Unable to update cached value, next run will show incorrect results");
@@ -109,43 +149,11 @@ impl FileBasedCache {
     }
 }
 
-#[async_trait]
-impl FileCache for FileBasedCache {
-    async fn check_file(&self, path: &Path) -> Result<FileCacheStatus> {
-        match make_checksum(path).await {
-            Ok(checksum) => {
-                if self.data.read().await.checksums.get(&path.display().to_string()) == Some(&checksum) {
-                    Ok(FileCacheStatus::FileMatches)
-                } else {
-                    Ok(FileCacheStatus::FileChanged)
-                }
-            },
-            Err(e) => {
-                info!("Unable to make checksum of file. {:?}", e);
-                Ok(FileCacheStatus::FileChanged)
-            }
-        }
-    }
-
-    async fn update_cache_entry(&self, path: &Path) -> Result<()> {
-        match make_checksum(path).await {
-            Ok(checksum) => {
-                self.data.write().await.checksums.insert(path.display().to_string(), checksum);
-            },
-            Err(e) => {
-                info!("Unable to make checksum of file. {:?}", e);
-            }
-        }
-
-        Ok(())
-    }
-}
-
 async fn make_checksum(path: &Path) -> Result<String> {
     if !path.exists() {
-        return Ok("<not exist>".to_string())
+        return Ok("<not exist>".to_string());
     } else if path.is_dir() {
-        return Ok("<dir>".to_string())
+        return Ok("<dir>".to_string());
     }
 
     Ok(sha256::try_async_digest(path).await?)

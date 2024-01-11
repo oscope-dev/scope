@@ -49,7 +49,10 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     let cache = if args.no_cache {
         CacheStorage::NoCache(NoOpCache::default())
     } else {
-        let cache_dir = args.cache_dir.clone().unwrap_or_else(|| "/tmp/scope".to_string());
+        let cache_dir = args
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| "/tmp/scope".to_string());
         let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
         CacheStorage::File(FileBasedCache::new(&cache_path)?)
     };
@@ -72,6 +75,11 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 info!(target: "user", "Check {} was successful", model.name().bold());
             }
         }
+    }
+
+    if let Err(e) = cache.persist().await {
+        info!("Unable to store cache {:?}", e);
+        warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
     if should_pass {
