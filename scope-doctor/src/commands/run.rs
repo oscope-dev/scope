@@ -1,4 +1,4 @@
-use crate::check::{CacheResults, CheckRuntime, DoctorTypes};
+use crate::check::{CacheResults, CheckRuntime, CorrectionResults, DoctorTypes};
 use crate::file_cache::{CacheStorage, FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
@@ -95,7 +95,7 @@ async fn handle_check_failure(
     check: &DoctorTypes,
     cache: &dyn FileCache,
 ) -> Result<()> {
-    if check.has_correction() {
+    if !check.has_correction() {
         warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
         return Ok(());
     };
@@ -105,7 +105,15 @@ async fn handle_check_failure(
         return Ok(());
     }
 
-    check.run_correction(found_config, cache).await?;
+    let correction_result = check.run_correction(found_config, cache).await?;
+    match correction_result {
+        CorrectionResults::Success => {
+            info!(target: "user", "Check {} failed. {} ran successfully.", check.name().bold(), "Fix".bold());
+        }
+        CorrectionResults::Failure => {
+            warn!(target: "user", "Check {} failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
+        }
+    }
 
     Ok(())
 }

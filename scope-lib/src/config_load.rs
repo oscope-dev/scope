@@ -3,7 +3,7 @@ use crate::models::prelude::{
     ReportUploadLocation,
 };
 use crate::models::ScopeModel;
-use crate::{FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
+use crate::{FILE_DIR_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
@@ -264,6 +264,11 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
             value.metadata.annotations.insert(
                 FILE_PATH_ANNOTATION.to_string(),
                 file_path.display().to_string(),
+            );
+
+            value.metadata.annotations.insert(
+                FILE_DIR_ANNOTATION.to_string(),
+                file_path.parent().unwrap().display().to_string(),
             );
             Some(value)
         }

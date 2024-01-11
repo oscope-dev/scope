@@ -5,7 +5,7 @@ metadata:
 spec:
   cache:
     paths:
-      - flig/bar/**/*
+      - '**/requirements.txt'
   setup:
     exec:
       - bin/setup

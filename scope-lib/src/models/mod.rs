@@ -1,9 +1,10 @@
 use crate::models::internal::ParsedConfig;
-use crate::FILE_PATH_ANNOTATION;
+use crate::{FILE_DIR_ANNOTATION, FILE_PATH_ANNOTATION};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use strum::EnumString;
 
 mod internal;
@@ -40,6 +41,13 @@ impl ModelMetadata {
             .cloned()
             .unwrap_or_else(|| "unknown".to_string())
     }
+
+    fn containing_dir(&self) -> String {
+        self.annotations
+            .get(FILE_DIR_ANNOTATION)
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string())
+    }
 }
 
 pub trait ScopeModel {
@@ -71,6 +79,9 @@ impl<V> ModelRoot<V> {
 
     pub fn file_path(&self) -> String {
         self.metadata.file_path()
+    }
+    pub fn containing_dir(&self) -> String {
+        self.metadata.containing_dir()
     }
 }
 

@@ -110,11 +110,12 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         _file_cache: &'a dyn FileCache,
     ) -> Result<CacheResults, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
+        let path = format!("{}:{}", self.containing_dir(), found_config.bin_path);
         let output = OutputCapture::capture_output(CaptureOpts {
             working_dir: &found_config.working_dir,
             args: &args,
             output_dest: OutputDestination::Logging,
-            path: &found_config.bin_path,
+            path: &path,
             env_vars: Default::default(),
         })
         .await?;
@@ -148,10 +149,8 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         .await?;
 
         if capture.exit_code == Some(0) {
-            info!(target: "user", "Check {} failed. {} ran successfully", self.name().bold(), "Fix".bold());
             Ok(CorrectionResults::Success)
         } else {
-            warn!(target: "user", "Check {} failed. The fix ran and {}.", self.name().bold(), "Failed".red().bold());
             Ok(CorrectionResults::Failure)
         }
     }

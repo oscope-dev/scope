@@ -114,7 +114,7 @@ spec:
   description: Check your shell for basic functionality
 ";
 
-        let path = Path::new("/foo/bar/file.yaml");
+        let path = Path::new("/foo/bar/.scope/file.yaml");
         let configs = parse_models_from_string(path, text).unwrap();
         assert_eq!(1, configs.len());
         assert_eq!(
@@ -122,10 +122,10 @@ spec:
             DoctorSetup {
                 order: 100,
                 description: "Check your shell for basic functionality".to_string(),
-                exec: DoctorSetupExec::Exec(vec!["/foo/bar/bin/setup".to_string()]),
+                exec: DoctorSetupExec::Exec(vec!["/foo/bar/.scope/bin/setup".to_string()]),
                 cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
                     paths: vec!["flig/bar/**/*".to_string()],
-                    base_path: PathBuf::from("/foo"),
+                    base_path: PathBuf::from("/foo/bar"),
                 }),
             }
         );

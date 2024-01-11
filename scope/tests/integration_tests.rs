@@ -16,28 +16,13 @@ fn get_example_file(name: &str) -> PathBuf {
 }
 
 fn setup_working_dir() -> TempDir {
+    let file_path = PathBuf::from(format!(
+        "{}/../examples",
+        env!("CARGO_MANIFEST_DIR")
+    ));
+
     let temp = TempDir::new().unwrap();
-    let scope_dir = temp.child(".scope");
-    scope_dir
-        .child("known-error.yaml")
-        .write_file(&get_example_file("known-error.yaml"))
-        .unwrap();
-    scope_dir
-        .child("doctor-check.yaml")
-        .write_file(&get_example_file("doctor-check.yaml"))
-        .unwrap();
-    scope_dir
-        .child("doctor-setup.yaml")
-        .write_file(&get_example_file("doctor-setup.yaml"))
-        .unwrap();
-    scope_dir
-        .child("bin/scope-bar")
-        .write_file(&get_example_file("bin/scope-bar"))
-        .unwrap();
-    scope_dir
-        .child("scripts/does-path-env-exist.sh")
-        .write_file(&get_example_file("scripts/does-path-env-exist.sh"))
-        .unwrap();
+    temp.copy_from(file_path, &["*", "**/*"]).unwrap();
 
     temp
 }
@@ -85,7 +70,7 @@ fn test_doctor_list() {
         .success()
         .stdout(predicate::str::contains("path-exists"))
         .stdout(predicate::str::contains(
-            "Check your shell for basic functionalityc",
+            "Check your shell for basic functionality",
         ))
         .stdout(predicate::str::contains("setup"));
     working_dir.close().unwrap();
@@ -106,3 +91,35 @@ fn test_sub_command_works() {
     result.success().stdout(predicate::str::contains("in bar"));
     working_dir.close().unwrap();
 }
+
+#[test]
+fn test_run_check_path_exists() {
+    let working_dir = setup_working_dir();
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_check_path_exists")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=path-exists")
+        .assert();
+
+    result.failure()
+        .stdout(predicate::str::contains("Check path-exists failed. Fix ran successfully"));
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_check_path_exists_2")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=path-exists-fix-in-scope-dir")
+        .assert();
+
+    result.failure()
+        .stdout(predicate::str::contains("Check path-exists-fix-in-scope-dir failed. Fix ran successfully."));
+
+    working_dir.close().unwrap();
+}
+
