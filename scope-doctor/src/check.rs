@@ -1,13 +1,18 @@
 use crate::commands::DoctorRunArgs;
+use crate::file_cache::{FileCache, FileCacheStatus};
+use anyhow::Result;
 use async_trait::async_trait;
 use colored::Colorize;
-use scope_lib::prelude::ScopeModel;
+use glob::glob;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorExec, DoctorSetup, DoctorSetupExec, FoundConfig, ModelRoot,
     OutputCapture, OutputDestination,
 };
+use scope_lib::prelude::{DoctorSetupCache, ScopeModel};
 use std::collections::BTreeSet;
+use std::future::Future;
 use std::ops::Deref;
+use std::path::{PathBuf};
 use thiserror::Error;
 use tracing::{info, warn};
 
@@ -28,6 +33,10 @@ pub enum RuntimeError {
     FixNotDefined,
     #[error(transparent)]
     CaptureError(#[from] CaptureError),
+    #[error(transparent)]
+    AnyError(#[from] anyhow::Error),
+    #[error(transparent)]
+    PatternError(#[from] glob::PatternError),
 }
 
 pub enum DoctorTypes {
@@ -72,11 +81,16 @@ pub trait CheckRuntime: ScopeModel {
         !check_names.is_disjoint(&names)
     }
 
-    async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError>;
-
-    async fn run_correction(
+    async fn check_cache<'a>(
         &self,
         found_config: &FoundConfig,
+        file_cache: &'a dyn FileCache,
+    ) -> Result<CacheResults, RuntimeError>;
+
+    async fn run_correction<'a>(
+        &self,
+        found_config: &FoundConfig,
+        file_cache: &'a dyn FileCache,
     ) -> Result<CorrectionResults, RuntimeError>;
 
     fn has_correction(&self) -> bool;
@@ -90,8 +104,11 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         self.spec.order
     }
 
-    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
-    async fn check_cache(&self, found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
+    async fn check_cache<'a>(
+        &self,
+        found_config: &FoundConfig,
+        _file_cache: &'a dyn FileCache,
+    ) -> Result<CacheResults, RuntimeError> {
         let args = vec![self.spec.check_exec.clone()];
         let output = OutputCapture::capture_output(CaptureOpts {
             working_dir: &found_config.working_dir,
@@ -110,10 +127,10 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         Ok(cache_results)
     }
 
-    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
-    async fn run_correction(
+    async fn run_correction<'a>(
         &self,
         found_config: &FoundConfig,
+        _file_cache: &'a dyn FileCache,
     ) -> Result<CorrectionResults, RuntimeError> {
         let check_path = match &self.spec.fix_exec {
             None => return Err(RuntimeError::FixNotDefined),
@@ -154,15 +171,28 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         self.spec.order
     }
 
-    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
-    async fn check_cache(&self, _found_config: &FoundConfig) -> Result<CacheResults, RuntimeError> {
-        Ok(CacheResults::FixRequired)
+    async fn check_cache<'a>(
+        &self,
+        _found_config: &FoundConfig,
+        file_cache: &'a dyn FileCache,
+    ) -> Result<CacheResults, RuntimeError> {
+        let result = process_glob(&self, |path| async move {
+            let file_result = file_cache.check_file(&path).await?;
+            Ok(file_result == FileCacheStatus::FileMatches)
+        })
+        .await?;
+
+        if result {
+            Ok(CacheResults::NoWorkNeeded)
+        } else {
+            Ok(CacheResults::FixRequired)
+        }
     }
 
-    #[tracing::instrument(skip_all, fields(check_name = %self.full_name()))]
-    async fn run_correction(
+    async fn run_correction<'a>(
         &self,
         found_config: &FoundConfig,
+        file_cache: &'a dyn FileCache,
     ) -> Result<CorrectionResults, RuntimeError> {
         let DoctorSetupExec::Exec(commands) = &self.spec.exec;
 
@@ -181,6 +211,17 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
                 return Ok(CorrectionResults::Failure);
             }
         }
+
+        if let Err(e) = process_glob(&self, |path| async move {
+            file_cache.update_cache_entry(&path).await?;
+            Ok(true)
+        })
+        .await
+        {
+            info!("Error when updating cache {:?}", e);
+            warn!(target: "user", "Unable to update file cache, next run will see changes.");
+        }
+
         Ok(CorrectionResults::Success)
     }
 
@@ -195,4 +236,30 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
             }
         }
     }
+}
+
+async fn process_glob<'b, F, Ret: 'b>(
+    model: &ModelRoot<DoctorSetup>,
+    fun: F,
+) -> Result<bool, RuntimeError>
+where
+    F: Fn(PathBuf) -> Ret,
+    Ret: Future<Output = Result<bool, RuntimeError>>,
+{
+    let cache = match &model.spec.cache {
+        DoctorSetupCache::Paths(p) => p,
+    };
+
+    let base_path_str = cache.base_path.display().to_string();
+    for glob_str in &cache.paths {
+        let glob_path = format!("{}/{}", base_path_str, glob_str);
+        for path in glob(&glob_path)?.filter_map(Result::ok) {
+            let check_result = fun(path).await?;
+            if !check_result {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
 }

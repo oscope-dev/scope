@@ -8,8 +8,8 @@ pub enum DoctorSetupExec {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DoctorSetupCachePath {
-    pub(crate) paths: Vec<String>,
-    pub(crate) base_path: PathBuf,
+    pub paths: Vec<String>,
+    pub base_path: PathBuf,
 }
 
 #[derive(Debug, PartialEq, Clone)]
