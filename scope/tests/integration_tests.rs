@@ -3,37 +3,11 @@ use assert_fs::{prelude::*, TempDir};
 use predicates::prelude::*;
 use std::path::PathBuf;
 
-fn get_example_file(name: &str) -> PathBuf {
-    let file_path = PathBuf::from(format!(
-        "{}/../examples/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    ))
-    .canonicalize()
-    .unwrap();
-    println!("Example file {}", file_path.display());
-    file_path
-}
-
 fn setup_working_dir() -> TempDir {
+    let file_path = PathBuf::from(format!("{}/../examples", env!("CARGO_MANIFEST_DIR")));
+
     let temp = TempDir::new().unwrap();
-    let scope_dir = temp.child(".scope");
-    scope_dir
-        .child("known-error.yaml")
-        .write_file(&get_example_file("known-error.yaml"))
-        .unwrap();
-    scope_dir
-        .child("doctor-check.yaml")
-        .write_file(&get_example_file("doctor-check.yaml"))
-        .unwrap();
-    scope_dir
-        .child("bin/scope-bar")
-        .write_file(&get_example_file("bin/scope-bar"))
-        .unwrap();
-    scope_dir
-        .child("scripts/does-path-env-exist.sh")
-        .write_file(&get_example_file("scripts/does-path-env-exist.sh"))
-        .unwrap();
+    temp.copy_from(file_path, &["*", "**/*"]).unwrap();
 
     temp
 }
@@ -56,11 +30,34 @@ fn test_list_reports_all_config() {
         .stdout(predicate::str::contains(
             "Check if the word error is in the logs",
         ))
+        .stdout(predicate::str::contains("Doctor Setup"))
+        .stdout(predicate::str::contains("setup"))
         .stdout(predicate::str::contains(".scope/known-error.yaml"))
         .stdout(
             predicate::str::is_match(r"bar\s+External sub-command, run `scope bar` for help")
                 .unwrap(),
         );
+    working_dir.close().unwrap();
+}
+
+#[test]
+fn test_doctor_list() {
+    let working_dir = setup_working_dir();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_doctor_list")
+        .arg("doctor")
+        .arg("list")
+        .assert();
+
+    result
+        .success()
+        .stdout(predicate::str::contains("path-exists"))
+        .stdout(predicate::str::contains(
+            "Check your shell for basic functionality",
+        ))
+        .stdout(predicate::str::contains("setup"));
     working_dir.close().unwrap();
 }
 
@@ -78,4 +75,104 @@ fn test_sub_command_works() {
 
     result.success().stdout(predicate::str::contains("in bar"));
     working_dir.close().unwrap();
+}
+
+#[test]
+fn test_run_check_path_exists() {
+    let working_dir = setup_working_dir();
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_check_path_exists")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=path-exists")
+        .assert();
+
+    result.failure().stdout(predicate::str::contains(
+        "Check `path-exists` failed. Fix ran successfully",
+    ));
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_check_path_exists_2")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=path-exists-fix-in-scope-dir")
+        .assert();
+
+    result.failure().stdout(predicate::str::contains(
+        "Check `path-exists-fix-in-scope-dir` failed. Fix ran successfully.",
+    ));
+
+    working_dir.close().unwrap();
+}
+
+#[test]
+fn test_run_setup() {
+    let working_dir = setup_working_dir();
+    working_dir
+        .child("foo/requirements.txt")
+        .write_str("initial cache")
+        .unwrap();
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_1")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result
+        .failure()
+        .stdout(predicate::str::contains(
+            "Check `setup` failed. Fix ran successfully.",
+        ))
+        .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_2")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result
+        .success()
+        .stdout(predicate::str::contains("Check `setup` was successful."));
+
+    working_dir
+        .child("foo/requirements.txt")
+        .write_str("cache buster")
+        .unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_3")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result.failure().stdout(predicate::str::contains(
+        "Check `setup` failed. Fix ran successfully.",
+    ));
 }

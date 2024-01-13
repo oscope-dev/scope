@@ -28,8 +28,7 @@ jobs:
       ## Cargo clippy
       - name: cargo clippy
         run: cargo clippy -- -D warnings
-      - name: run checks
-        run: bin/run-tests.sh
+
   build-darwin:
     uses: ./.github/workflows/build-macos.yml
     needs: [ check ]

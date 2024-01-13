@@ -1,61 +1,85 @@
-use crate::check::CheckRuntime;
+use crate::check::{CacheResults, CheckRuntime, CorrectionResults, DoctorTypes};
+use crate::file_cache::{CacheStorage, FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use scope_lib::prelude::{
-    CaptureOpts, DoctorExecCheckSpec, FoundConfig, ModelRoot, OutputCapture, OutputDestination,
-};
+use scope_lib::prelude::{FoundConfig, ScopeModel};
 use std::collections::BTreeMap;
-use tracing::{debug, error, info, warn};
+use std::ops::Deref;
+use std::path::PathBuf;
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
     /// When set, only the checks listed will run
     #[arg(short, long)]
-    only: Option<Vec<String>>,
+    pub only: Option<Vec<String>>,
     /// When set, if a fix is specified it will also run.
-    #[arg(long, short, default_value = "false")]
+    #[arg(long, short, default_value = "true")]
     fix: bool,
+    /// Location to store cache between runs
+    #[arg(long, env = "SCOPE_DOCTOR_CACHE_DIR")]
+    pub cache_dir: Option<String>,
+    /// When set cache will be disabled, forcing all file based checks to run.
+    #[arg(long, short, default_value = "false")]
+    pub no_cache: bool,
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
-    let mut check_map: BTreeMap<String, ModelRoot<DoctorExecCheckSpec>> = Default::default();
-    let mut check_order: Vec<String> = Default::default();
-    for check in found_config.exec_check.values() {
-        let name = check.name();
-        if let Some(old) = check_map.insert(name.to_string(), check.clone()) {
-            warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
-        } else {
-            check_order.push(name.to_string());
+    let mut check_map: BTreeMap<String, DoctorTypes> = Default::default();
+    for check in found_config.doctor_exec.values() {
+        if check.should_run_check(args) {
+            if let Some(old) = check_map.insert(check.full_name(), DoctorTypes::Exec(check.clone()))
+            {
+                warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
+            }
         }
     }
 
-    let checks_names_to_run = match &args.only {
-        Some(only_run) => only_run.clone(),
-        None => check_order,
+    for check in found_config.doctor_setup.values() {
+        if check.should_run_check(args) {
+            if let Some(old) =
+                check_map.insert(check.full_name(), DoctorTypes::Setup(check.clone()))
+            {
+                warn!(target: "user", "Check `{}` has multiple definitions, only the last will be processed.", old.name().bold());
+            }
+        }
+    }
+
+    let cache = if args.no_cache {
+        CacheStorage::NoCache(NoOpCache::default())
+    } else {
+        let cache_dir = args
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| "/tmp/scope".to_string());
+        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
+        CacheStorage::File(FileBasedCache::new(&cache_path)?)
     };
+
+    let mut checks_to_run: Vec<_> = check_map.values().collect();
+    checks_to_run.sort_by_key(|l| l.order());
 
     let mut should_pass = true;
 
-    for check_name in checks_names_to_run {
-        debug!(target: "user", "Running check {}", check_name);
-        let check = match check_map.get(&check_name) {
-            None => {
-                error!(target: "user", "Check {} was not found, skipping!.", check_name.bold());
-                continue;
-            }
-            Some(check) => check,
-        };
+    for model in checks_to_run {
+        debug!(target: "user", "Running check {}", model.name());
 
-        let exec_result = check.exec(found_config).await?;
-        info!(check = %check_name, output= "stdout", successful=exec_result.success, "{}", exec_result.stdout);
-        info!(check = %check_name, output= "stderr", successful=exec_result.success, "{}", exec_result.stderr);
-        if exec_result.success {
-            info!(target: "user", "Check {} was successful", check_name.bold());
-        } else {
-            handle_check_failure(args.fix, found_config, check).await?;
-            should_pass = false;
+        let exec_result = model.check_cache(found_config, cache.deref()).await?;
+        match exec_result {
+            CacheResults::FixRequired => {
+                handle_check_failure(args.fix, found_config, model, cache.deref()).await?;
+                should_pass = false;
+            }
+            CacheResults::NoWorkNeeded => {
+                info!(target: "user", "Check `{}` was successful.", model.name().bold());
+            }
         }
+    }
+
+    if let Err(e) = cache.persist().await {
+        info!("Unable to store cache {:?}", e);
+        warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
     if should_pass {
@@ -68,36 +92,28 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 async fn handle_check_failure(
     is_fix: bool,
     found_config: &FoundConfig,
-    check: &ModelRoot<DoctorExecCheckSpec>,
+    check: &DoctorTypes,
+    cache: &dyn FileCache,
 ) -> Result<()> {
-    let check_path = match &check.spec.fix_exec {
-        None => {
-            warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
-            return Ok(());
-        }
-        Some(path) => path.to_string(),
+    if !check.has_correction() {
+        warn!(target: "user", "Check `{}` failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
+        return Ok(());
     };
 
     if !is_fix {
-        info!(target: "user", "Check {} failed. {}: Run with --fix to auto-fix", check.name().bold(), "Suggestion".bold());
+        info!(target: "user", "Check `{}` failed. {}: Run with --fix to auto-fix", check.name().bold(), "Suggestion".bold());
         return Ok(());
     }
 
-    let args = vec![check_path];
-    let capture = OutputCapture::capture_output(CaptureOpts {
-        working_dir: &found_config.working_dir,
-        args: &args,
-        output_dest: OutputDestination::StandardOut,
-        path: &found_config.bin_path,
-        env_vars: Default::default(),
-    })
-    .await?;
-
-    if capture.exit_code == Some(0) {
-        info!(target: "user", "Check {} failed. {} ran successfully", check.name().bold(), "Fix".bold());
-        Ok(())
-    } else {
-        warn!(target: "user", "Check {} failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
-        Ok(())
+    let correction_result = check.run_correction(found_config, cache).await?;
+    match correction_result {
+        CorrectionResults::Success => {
+            info!(target: "user", "Check `{}` failed. {} ran successfully.", check.name().bold(), "Fix".bold());
+        }
+        CorrectionResults::Failure => {
+            warn!(target: "user", "Check `{}` failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
+        }
     }
+
+    Ok(())
 }

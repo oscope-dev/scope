@@ -1,6 +1,6 @@
 use crate::capture::{CaptureOpts, OutputCapture};
 use crate::config_load::FoundConfig;
-use crate::models::ReportUploadLocation;
+use crate::models::prelude::{ReportUploadLocationDestination, ScopeModel};
 use crate::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};
@@ -90,15 +90,20 @@ impl<'a> ReportBuilder<'a> {
     }
 }
 
-impl ReportUploadLocation {
+impl ReportUploadLocationDestination {
     async fn upload(&self, report: &str) -> Result<()> {
         match self {
-            ReportUploadLocation::RustyPaste { url } => {
-                ReportUploadLocation::upload_to_rusty_paste(url, report).await
+            ReportUploadLocationDestination::RustyPaste { url } => {
+                ReportUploadLocationDestination::upload_to_rusty_paste(url, report).await
             }
-            ReportUploadLocation::GithubIssue { owner, repo, tags } => {
-                ReportUploadLocation::upload_to_github_issue(owner, repo, tags.clone(), report)
-                    .await
+            ReportUploadLocationDestination::GithubIssue { owner, repo, tags } => {
+                ReportUploadLocationDestination::upload_to_github_issue(
+                    owner,
+                    repo,
+                    tags.clone(),
+                    report,
+                )
+                .await
             }
         }
     }
