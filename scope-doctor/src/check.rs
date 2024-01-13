@@ -104,6 +104,7 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         self.spec.order
     }
 
+    #[tracing::instrument(skip_all, fields(check.name = self.name()))]
     async fn check_cache<'a>(
         &self,
         found_config: &FoundConfig,
@@ -128,6 +129,7 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         Ok(cache_results)
     }
 
+    #[tracing::instrument(skip_all, fields(check.name = self.name()))]
     async fn run_correction<'a>(
         &self,
         found_config: &FoundConfig,
@@ -170,6 +172,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         self.spec.order
     }
 
+    #[tracing::instrument(skip_all, fields(check.name = self.name()))]
     async fn check_cache<'a>(
         &self,
         _found_config: &FoundConfig,
@@ -192,6 +195,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(check.name = self.name()))]
     async fn run_correction<'a>(
         &self,
         found_config: &FoundConfig,

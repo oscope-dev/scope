@@ -1,10 +1,11 @@
+use crate::error::FileCacheError;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -19,7 +20,7 @@ pub enum FileCacheStatus {
 pub trait FileCache: Sync {
     async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus>;
     async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()>;
-    async fn persist(&self) -> Result<()>;
+    async fn persist(&self) -> Result<(), FileCacheError>;
 }
 
 pub enum CacheStorage {
@@ -51,7 +52,7 @@ impl FileCache for NoOpCache {
         Ok(())
     }
 
-    async fn persist(&self) -> Result<()> {
+    async fn persist(&self) -> Result<(), FileCacheError> {
         Ok(())
     }
 }
@@ -97,6 +98,7 @@ impl FileBasedCache {
 
 #[async_trait]
 impl FileCache for FileBasedCache {
+    #[tracing::instrument(skip_all, fields(check.name = %check_name))]
     async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus> {
         match make_checksum(path).await {
             Ok(checksum) => {
@@ -115,6 +117,7 @@ impl FileCache for FileBasedCache {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(check.name = %check_name))]
     async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()> {
         match make_checksum(path).await {
             Ok(checksum) => {
@@ -130,18 +133,27 @@ impl FileCache for FileBasedCache {
         Ok(())
     }
 
-    async fn persist(&self) -> Result<()> {
+    #[tracing::instrument(skip_all)]
+    async fn persist(&self) -> Result<(), FileCacheError> {
+        let file_path = PathBuf::from(&self.path);
+        let parent = match file_path.parent() {
+            Some(parent) => parent,
+            None => {
+                return Err(FileCacheError::FsError);
+            }
+        };
+        std::fs::create_dir_all(parent)?;
         let cache_data = self.data.read().await;
         match serde_json::to_string(cache_data.deref()) {
             Ok(text) => {
                 if let Err(e) = std::fs::write(&self.path, text.as_bytes()) {
-                    warn!("Error writing cache data {:?}", e);
-                    warn!(target: "user", "Failed to write updated cache to disk, next run will show incorrect results")
+                    warn!(target: "user", "Failed to write updated cache to disk, next run will show incorrect results");
+                    return Err(FileCacheError::WriteIoError(e));
                 }
             }
             Err(e) => {
-                warn!("Error deserializing cache data {:?}", e);
                 warn!(target: "user", "Unable to update cached value, next run will show incorrect results");
+                return Err(FileCacheError::SerializationError(e));
             }
         }
 

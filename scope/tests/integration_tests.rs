@@ -91,7 +91,7 @@ fn test_run_check_path_exists() {
         .assert();
 
     result.failure().stdout(predicate::str::contains(
-        "Check path-exists failed. Fix ran successfully",
+        "Check `path-exists` failed. Fix ran successfully",
     ));
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -104,8 +104,75 @@ fn test_run_check_path_exists() {
         .assert();
 
     result.failure().stdout(predicate::str::contains(
-        "Check path-exists-fix-in-scope-dir failed. Fix ran successfully.",
+        "Check `path-exists-fix-in-scope-dir` failed. Fix ran successfully.",
     ));
 
     working_dir.close().unwrap();
+}
+
+#[test]
+fn test_run_setup() {
+    let working_dir = setup_working_dir();
+    working_dir
+        .child("foo/requirements.txt")
+        .write_str("initial cache")
+        .unwrap();
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_1")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result
+        .failure()
+        .stdout(predicate::str::contains(
+            "Check `setup` failed. Fix ran successfully.",
+        ))
+        .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_2")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result
+        .success()
+        .stdout(predicate::str::contains("Check `setup` was successful."));
+
+    working_dir
+        .child("foo/requirements.txt")
+        .write_str("cache buster")
+        .unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_setup_3")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=setup")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .assert();
+
+    result.failure().stdout(predicate::str::contains(
+        "Check `setup` failed. Fix ran successfully.",
+    ));
 }

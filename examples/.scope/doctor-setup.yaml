@@ -8,5 +8,5 @@ spec:
       - '**/requirements.txt'
   setup:
     exec:
-      - bin/setup
+      - ../bin/pip-install.sh
   description: You need to run bin/setup

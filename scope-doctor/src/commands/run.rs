@@ -41,7 +41,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             if let Some(old) =
                 check_map.insert(check.full_name(), DoctorTypes::Setup(check.clone()))
             {
-                warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
+                warn!(target: "user", "Check `{}` has multiple definitions, only the last will be processed.", old.name().bold());
             }
         }
     }
@@ -72,7 +72,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 should_pass = false;
             }
             CacheResults::NoWorkNeeded => {
-                info!(target: "user", "Check {} was successful", model.name().bold());
+                info!(target: "user", "Check `{}` was successful.", model.name().bold());
             }
         }
     }
@@ -96,22 +96,22 @@ async fn handle_check_failure(
     cache: &dyn FileCache,
 ) -> Result<()> {
     if !check.has_correction() {
-        warn!(target: "user", "Check {} failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
+        warn!(target: "user", "Check `{}` failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
         return Ok(());
     };
 
     if !is_fix {
-        info!(target: "user", "Check {} failed. {}: Run with --fix to auto-fix", check.name().bold(), "Suggestion".bold());
+        info!(target: "user", "Check `{}` failed. {}: Run with --fix to auto-fix", check.name().bold(), "Suggestion".bold());
         return Ok(());
     }
 
     let correction_result = check.run_correction(found_config, cache).await?;
     match correction_result {
         CorrectionResults::Success => {
-            info!(target: "user", "Check {} failed. {} ran successfully.", check.name().bold(), "Fix".bold());
+            info!(target: "user", "Check `{}` failed. {} ran successfully.", check.name().bold(), "Fix".bold());
         }
         CorrectionResults::Failure => {
-            warn!(target: "user", "Check {} failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
+            warn!(target: "user", "Check `{}` failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
         }
     }
 
