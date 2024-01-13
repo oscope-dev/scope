@@ -9,6 +9,7 @@ pub enum ConfigError {
     },
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
 pub enum FileCacheError {
     #[error("Unable to access filesystem to do cache operations.")]
