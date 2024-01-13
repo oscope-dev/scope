@@ -58,3 +58,8 @@ jobs:
       version: ${{ needs.make-versions.outputs.release-version }}
       release-options: ""
       environment: "release"
+
+  docs:
+    needs:
+      - check
+    uses: ./.github/workflows/gh-pages.yml
