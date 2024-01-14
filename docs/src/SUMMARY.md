@@ -1,9 +1,9 @@
 # Summary
 
 - [Home](./index.md)
-- [Local Setup](./setup/index.md)
-  - [Doctor Setup](./setup/doctor-setup.md)
-  - [Doctor Check](./setup/doctor-check.md)
+- [Doctor](./doctor/index.md)
+  - [Doctor Setup](./doctor/doctor-setup.md)
+  - [Doctor Check](./doctor/doctor-check.md)
 - [Error Detection](./errors/known-error.md)
-- [Report](./report/upload)
+- [Report](./report/upload.md)
 - [Intercept](./report/intercept.md) 
