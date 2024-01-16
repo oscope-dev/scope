@@ -62,4 +62,4 @@ jobs:
   docs:
     needs:
       - check
-    uses: ./.github/workflows/gh-pages.yml
+    uses: ./.github/workflows/gh-page.yml
