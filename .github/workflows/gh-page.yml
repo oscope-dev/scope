@@ -23,22 +23,8 @@ jobs:
 
       - run: mdbook build docs
 
-      - run: |
-          tar \
-              --dereference --hard-dereference \
-              --directory "docs/book" \
-              -cvf "$RUNNER_TEMP/artifact.tar" \
-              .
-
-      - name: Upload artifact
-        id: upload-artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-pages
-          path: ${{ runner.temp }}/artifact.tar
-          retention-days: ${{ inputs.retention-days }}
-          if-no-files-found: error
-
-      - name: Upload Pages artifact
+      - name: Publish to pages
         uses: actions/upload-pages-artifact@v2
         if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: docs/book
