@@ -23,6 +23,13 @@ jobs:
 
       - run: mdbook build docs
 
+      - name: Save page
+        uses: actions/upload-artifact@v4
+        with:
+          name: gh-pages
+          path: docs/book
+          if-no-files-found: error
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.ref == 'refs/heads/main' }}
