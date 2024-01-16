@@ -1,4 +1,4 @@
-# Machine Management
+# Scope Doctor
 
 Scope supports two types of management instructions. `Setup` instructions are based on file contents, and `Check` instructions are based on scripts.
 
