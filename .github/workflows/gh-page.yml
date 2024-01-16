@@ -23,16 +23,22 @@ jobs:
 
       - run: mdbook build docs
 
-      - name: Save page
+      - run: |
+          tar \
+              --dereference --hard-dereference \
+              --directory "docs/books" \
+              -cvf "$RUNNER_TEMP/artifact.tar" \
+              .
+
+      - name: Upload artifact
+        id: upload-artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gh-pages
-          path: docs/book
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: ${{ inputs.retention-days }}
           if-no-files-found: error
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
         if: ${{ github.ref == 'refs/heads/main' }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/book
