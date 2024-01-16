@@ -26,7 +26,7 @@ jobs:
       - run: |
           tar \
               --dereference --hard-dereference \
-              --directory "docs/books" \
+              --directory "docs/book" \
               -cvf "$RUNNER_TEMP/artifact.tar" \
               .
 
