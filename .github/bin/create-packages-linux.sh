@@ -37,8 +37,8 @@ docker run --rm -v "${TARGET_DIR}:/tmp" -w /tmp goreleaser/nfpm \
   --target "/tmp/upload"
 
 tar -C "${TARGET_DIR}/x86_64-unknown-linux-gnu/artifact/" \
-  -cvzf "${TARGET_DIR}/upload/scope-${{ inputs.version }}-x86_64-unknown-linux-gnu.tgz" \
+  -cvzf "${TARGET_DIR}/upload/scope-${VERSION}-x86_64-unknown-linux-gnu.tgz" \
   scope scope-intercept
 tar -C "${TARGET_DIR}/aarch64-unknown-linux-gnu/artifact/" \
-  -cvzf "${TARGET_DIR}/upload/scope-${{ inputs.version }}-aarch64-unknown-linux-gnu.tgz" \
+  -cvzf "${TARGET_DIR}/upload/scope-${VERSION}-aarch64-unknown-linux-gnu.tgz" \
   scope scope-intercept
