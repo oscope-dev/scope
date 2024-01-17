@@ -1,0 +1,59 @@
+name: Build Darwin Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-for-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      - name: Build artifacts
+        run: |
+          .github/bin/build-macos.sh ${{ inputs.version }}
+      - name: Create archive
+        run: |
+          tar -C target/universal-apple-darwin/release/ -cvzf target/scope-darwin.tgz scope scope-intercept
+      - name: Save artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-darwin
+          path: target/scope-darwin.tgz
+          if-no-files-found: error
+  build-for-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      - name: Build artifacts
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          .github/bin/build-linux.sh ${{ inputs.version }}
+          .github/bin/create-packages-linux.sh ${{ inputs.version }}
+      - name: Create archive
+        run: |
+          tar -C target/x86_64-unknown-linux-gnu/artifact/ -cvzf target/upload/scope-${{ inputs.version }}-x86_64-unknown-linux-gnu.tgz scope scope-intercept
+          tar -C target/aarch64-unknown-linux-gnu/artifact/ -cvzf target/upload/scope-${{ inputs.version }}-aarch64-unknown-linux-gnu.tgz scope scope-intercept
+      - name: Upload Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            target/upload/scope-${{ inputs.version }}-x86_64-unknown-linux-gnu.tgz
+            target/upload/scope-${{ inputs.version }}-aarch64-unknown-linux-gnu.tgz
+            target/upload/scope-${{ inputs.version }}-1.aarch64.rpm
+            target/upload/scope-${{ inputs.version }}-1.x86_64.rpm
+            target/upload/scope_${{ inputs.version }}_amd64.deb
+            target/upload/scope_${{ inputs.version }}_arm64.deb
+          if-no-files-found: error

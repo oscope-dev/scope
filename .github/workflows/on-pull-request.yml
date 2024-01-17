@@ -29,8 +29,8 @@ jobs:
       - name: cargo clippy
         run: cargo clippy -- -D warnings
 
-  build-darwin:
-    uses: ./.github/workflows/build-macos.yml
+  build-artifacts:
+    uses: ./.github/workflows/build-artifacts.yml
     needs: [ check ]
     with:
       version: "0.0.1-SNAPSHOT"
