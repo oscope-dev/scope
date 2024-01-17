@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-for-macos:
-    uses: ./.github/workflows/build-macos.yml
+  build-for-artifacts:
+    uses: ./.github/workflows/build-artifacts.yml
     with:
       version: ${{ inputs.version }}
 
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     needs:
-      - build-for-macos
+      - build-for-artifacts
     steps:
       - uses: actions/download-artifact@v4
         with:

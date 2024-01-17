@@ -1,0 +1,57 @@
+name: Build Darwin Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-for-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      - name: Build artifacts
+        run: |
+          .github/bin/build-macos.sh ${{ inputs.version }}
+      - name: Create archive
+        run: |
+          tar -C target/universal-apple-darwin/release/ -cvzf target/scope-darwin.tgz scope scope-intercept
+      - name: Save artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-darwin
+          path: target/scope-darwin.tgz
+          if-no-files-found: error
+  build-for-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      - name: Build artifacts
+        run: |
+          .github/bin/build-linux.sh ${{ inputs.version }}
+      - name: Create archive
+        run: |
+          tar -C target/x86_64-unknown-linux-gnu/artifact/ -cvzf target/scope-linux-x86_64.tgz scope scope-intercept
+          tar -C target/aarch64-unknown-linux-gnu/artifact/ -cvzf target/scope-linux-aarch64.tgz scope scope-intercept
+      - name: Linux amd64
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-amd64
+          path: target/scope-linux-x86_64.tgz
+          if-no-files-found: error
+      - name: Linux ARM
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-aarch64
+          path: target/scope-linux-aarch64.tgz
+          if-no-files-found: error
