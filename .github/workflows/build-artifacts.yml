@@ -30,7 +30,7 @@ jobs:
           name: release-darwin
           path: target/scope-darwin.tgz
           if-no-files-found: error
-  build-for-linux-amd64:
+  build-for-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
