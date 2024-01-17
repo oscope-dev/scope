@@ -48,7 +48,7 @@ jobs:
       - name: Upload Linux
         uses: actions/upload-artifact@v4
         with:
-          name: release-linux-amd64
+          name: release-linux
           path: |
             target/upload/scope-${{ inputs.version }}-x86_64-unknown-linux-gnu.tgz
             target/upload/scope-${{ inputs.version }}-aarch64-unknown-linux-gnu.tgz
