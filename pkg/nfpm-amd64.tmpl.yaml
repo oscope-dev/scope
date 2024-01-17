@@ -1,0 +1,16 @@
+name: "scope"
+arch: "amd64"
+platform: "linux"
+maintainer: "Ethan Hall <github@ethankhall.fastmail.com>"
+description: |
+  Scope is a tool to enable teams to manage local machine checks. An example would be a team that supports
+  other engineers may want to verify that the engineer asking for support's machine is setup correctly
+vendor: "Scope Releaser"
+version_schema: none
+homepage: "https://ethankhall.github.io/scope"
+license: "BSD 3-Clause"
+contents:
+- src: ./x86_64-unknown-linux-gnu/release/scope
+  dst: /usr/local/bin/scope
+- src: ./x86_64-unknown-linux-gnu/release/scope-intercept
+  dst: /usr/local/bin/scope-intercept
