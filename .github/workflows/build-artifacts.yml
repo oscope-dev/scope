@@ -38,6 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build artifacts
         run: |
+          cargo install cross --git https://github.com/cross-rs/cross
           .github/bin/build-linux.sh ${{ inputs.version }}
           .github/bin/create-packages-linux.sh ${{ inputs.version }}
       - name: Create archive
