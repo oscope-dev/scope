@@ -25,3 +25,7 @@ assert_cmd = "2.0.12"
 assert_fs = "1.1.0"
 escargot = "0.5.8"
 predicates = "3.0.4"
+
+[build-dependencies]
+vergen = { version = "8.3", features = ["build", "git", "git2"] }
+anyhow = "1.0.57"

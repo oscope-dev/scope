@@ -24,7 +24,7 @@ use tracing::{debug, error, info};
 /// engineers may want to verify that the engineer asking
 /// for support's machine is setup correctly.
 #[derive(Parser)]
-#[clap(author, version, about)]
+#[clap(author, version=env!("SCOPE_VERSION"), about)]
 struct Cli {
     #[clap(flatten)]
     logging: LoggingOpts,
