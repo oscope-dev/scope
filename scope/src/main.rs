@@ -44,6 +44,8 @@ enum Command {
     Report(ReportArgs),
     /// List the found config files, and resources detected
     List,
+    /// Print version info and exit
+    Version,
     #[command(external_subcommand)]
     #[allow(clippy::enum_variant_names)]
     ExternalSubCommand(Vec<String>),
@@ -85,6 +87,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
         Command::Doctor(args) => doctor_root(found_config, args).await,
         Command::Report(args) => report_root(found_config, args).await,
         Command::List => show_config(found_config).map(|_| 0),
+        Command::Version => print_version().await,
         Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await,
     }
 }
@@ -217,4 +220,14 @@ where
         }
         info!(target: "user", "{:^20} {:^60} {:^40}", check.name().white().bold(), check.spec.description(), loc);
     }
+}
+
+async fn print_version() -> Result<i32>{
+    info!(target: "user", "{:>16}: {:60}", "Version".white().bold(), env!("SCOPE_VERSION"));
+    info!(target: "user", "{:>16}: {:60}", "Build Timestamp".white().bold(), env!("VERGEN_BUILD_TIMESTAMP"));
+    info!(target: "user", "{:>16}: {:60}", "Describe".white().bold(), env!("VERGEN_GIT_DESCRIBE"));
+    info!(target: "user", "{:>16}: {:60}", "Commit SHA".white().bold(), env!("VERGEN_GIT_SHA"));
+    info!(target: "user", "{:>16}: {:60}", "Commit Date".white().bold(), env!("VERGEN_GIT_COMMIT_DATE"));
+
+    Ok(0)
 }

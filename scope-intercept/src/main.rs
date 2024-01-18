@@ -14,7 +14,7 @@ use tracing::{debug, error, info, warn};
 /// STDOUT and STDERR. After the program exits, the exit code will be checked, and if it's non-zero
 /// the output will be parsed for known errors.
 #[derive(Parser)]
-#[clap(author, version, about)]
+#[clap(author, version = env!("SCOPE_VERSION"), about)]
 struct Cli {
     #[clap(flatten)]
     logging: LoggingOpts,
