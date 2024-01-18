@@ -65,7 +65,7 @@ fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
     let mut parts: VecDeque<_> = exec.split(' ').map(|x| x.to_string()).collect();
     let mut command = parts.pop_front().unwrap();
 
-    if command.starts_with(".") {
+    if command.starts_with('.') {
         let full_command = parent_dir.join(command).clean().display().to_string();
         command = full_command;
     }
