@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-VERSION="${1:-'0.1.1-SNAPSHOT'}"
+export VERSION="${1:-'0.1.1-SNAPSHOT'}"
 
-cross build --target aarch64-unknown-linux-gnu --release --config package.version=\"${VERSION}\"
-cross build --target x86_64-unknown-linux-gnu --release --config package.version=\"${VERSION}\"
+cross build --target aarch64-unknown-linux-gnu --release
+cross build --target x86_64-unknown-linux-gnu --release
 
 echo "Built artifacts for amd64"
 file target/x86_64-unknown-linux-gnu/release/scope

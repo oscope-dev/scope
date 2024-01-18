@@ -62,9 +62,9 @@ metadata:
   name: path-exists
 spec:
   check:
-    target: scripts/does-path-env-exist.sh
+    target: ./scripts/does-path-env-exist.sh
   fix:
-    target: /bin/true
+    target: 'true'
   description: Check your shell for basic functionality
   help: You're shell does not have a path env. Reload your shell.
 ---
@@ -77,11 +77,21 @@ spec:
     target: /scripts/does-path-env-exist.sh
   description: Check your shell for basic functionality
   help: You're shell does not have a path env. Reload your shell.
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorCheck
+metadata:
+  name: path-exists
+spec:
+  check:
+    target: does-path-env-exist.sh
+  description: Check your shell for basic functionality
+  help: You're shell does not have a path env. Reload your shell.
 ";
 
         let path = Path::new("/foo/bar/file.yaml");
         let configs = parse_models_from_string(path, text).unwrap();
-        assert_eq!(2, configs.len());
+        assert_eq!(3, configs.len());
         assert_eq!(
             configs[0].get_doctor_check_spec().unwrap(),
             DoctorExec {
@@ -89,7 +99,7 @@ spec:
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
-                fix_exec: Some("/bin/true".to_string())
+                fix_exec: Some("true".to_string())
             }
         );
         assert_eq!(
@@ -99,6 +109,16 @@ spec:
                 description: "Check your shell for basic functionality".to_string(),
                 help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
                 check_exec: "/scripts/does-path-env-exist.sh".to_string(),
+                fix_exec: None,
+            }
+        );
+        assert_eq!(
+            configs[2].get_doctor_check_spec().unwrap(),
+            DoctorExec {
+                order: 100,
+                description: "Check your shell for basic functionality".to_string(),
+                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
+                check_exec: "does-path-env-exist.sh".to_string(),
                 fix_exec: None,
             }
         );

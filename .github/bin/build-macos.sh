@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-VERSION="${1:-'0.1.1-SNAPSHOT'}"
+export VERSION="${1:-'0.1.1-SNAPSHOT'}"
 
-cargo build --release --target aarch64-apple-darwin --config package.version=\"${VERSION}\"
-cargo build --release --target x86_64-apple-darwin --config package.version=\"${VERSION}\"
+cargo build --release --target aarch64-apple-darwin
+cargo build --release --target x86_64-apple-darwin
 rm -rf target/universal-apple-darwin/release || true
 mkdir -p target/universal-apple-darwin/release
 
