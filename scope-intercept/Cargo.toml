@@ -14,3 +14,6 @@ dotenv = "0.15"
 inquire = {  version = "0.6", features = ["editor"]}
 
 scope-lib = { path = "../scope-lib" }
+
+[build-dependencies]
+anyhow = "1.0.57"
