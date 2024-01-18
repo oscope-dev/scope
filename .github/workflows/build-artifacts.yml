@@ -16,6 +16,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-tags: true
       - run: rustup update
       - uses: Swatinem/rust-cache@v2
       - name: Build artifacts
@@ -34,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-tags: true
       - run: rustup update
       - uses: Swatinem/rust-cache@v2
       - name: Build artifacts
