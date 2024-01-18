@@ -28,3 +28,4 @@ colored = "2.1"
 minijinja = "1.0"
 strum = { version = "0.25", features = ["derive"] }
 itertools = { version = "0.12", features = [] }
+path-clean = "1.0.1"

@@ -3,7 +3,7 @@ use crate::models::prelude::{
     ReportUploadLocation,
 };
 use crate::models::ScopeModel;
-use crate::{FILE_DIR_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
+use crate::{FILE_DIR_ANNOTATION, FILE_EXEC_PATH_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
@@ -270,6 +270,11 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
                 FILE_DIR_ANNOTATION.to_string(),
                 file_path.parent().unwrap().display().to_string(),
             );
+
+            value.metadata.annotations.insert(
+                FILE_EXEC_PATH_ANNOTATION.to_string(),
+                build_exec_path(file_path),
+            );
             Some(value)
         }
         Err(e) => {
@@ -277,6 +282,20 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
             None
         }
     }
+}
+
+fn build_exec_path(file_path: &Path) -> String {
+    let mut paths = vec![file_path.parent().unwrap().display().to_string()];
+    for ancestor in file_path.ancestors() {
+        let bin_path = ancestor.join("bin");
+        if bin_path.exists() {
+            paths.push(bin_path.display().to_string());
+        }
+    }
+
+    paths.push(std::env::var("PATH").unwrap_or_default());
+
+    paths.join(":")
 }
 
 fn expand_to_files(paths: &Vec<PathBuf>) -> Vec<PathBuf> {

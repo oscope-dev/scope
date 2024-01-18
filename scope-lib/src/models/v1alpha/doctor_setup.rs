@@ -110,7 +110,7 @@ spec:
      - flig/bar/**/*
   setup:
     exec:
-      - bin/setup
+      - ./bin/setup
   description: Check your shell for basic functionality
 ";
 
@@ -123,6 +123,41 @@ spec:
                 order: 100,
                 description: "Check your shell for basic functionality".to_string(),
                 exec: DoctorSetupExec::Exec(vec!["/foo/bar/.scope/bin/setup".to_string()]),
+                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                    paths: vec!["flig/bar/**/*".to_string()],
+                    base_path: PathBuf::from("/foo/bar"),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_command_without_rel_path() {
+        let text = "
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorSetup
+metadata:
+  name: setup
+spec:
+  cache:
+    paths:
+     - flig/bar/**/*
+  setup:
+    exec:
+      - sleep infinity
+  description: Check your shell for basic functionality
+";
+
+        let path = Path::new("/foo/bar/.scope/file.yaml");
+        let configs = parse_models_from_string(path, text).unwrap();
+        assert_eq!(1, configs.len());
+        assert_eq!(
+            configs[0].get_doctor_setup_spec().unwrap(),
+            DoctorSetup {
+                order: 100,
+                description: "Check your shell for basic functionality".to_string(),
+                exec: DoctorSetupExec::Exec(vec!["sleep infinity".to_string()]),
                 cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
                     paths: vec!["flig/bar/**/*".to_string()],
                     base_path: PathBuf::from("/foo/bar"),

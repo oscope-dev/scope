@@ -1,9 +1,11 @@
 use crate::models::internal::ParsedConfig;
 use crate::models::ModelRoot;
 use anyhow::{anyhow, Result};
+use path_clean::PathClean;
 use serde_yaml::Value;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
+
 use strum::EnumString;
 
 mod doctor_exec;
@@ -59,18 +61,22 @@ pub fn parse_v1_alpha1(root: &ModelRoot<Value>) -> Result<ParsedConfig> {
     Ok(parsed)
 }
 
-fn extract_command_path(parent_dir: &Path, command: &str) -> String {
-    let mut parts: VecDeque<_> = command.split(' ').collect();
-    let command = parts.pop_front().unwrap();
+fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
+    let mut parts: VecDeque<_> = exec.split(' ').map(|x| x.to_string()).collect();
+    let mut command = parts.pop_front().unwrap();
 
-    if Path::new(command).is_absolute() {
-        command.to_string()
-    } else {
-        let full_command = parent_dir.join(command).display().to_string();
-        parts.push_front(&full_command);
-        let parts: Vec<_> = parts.iter().cloned().collect();
-        parts.join(" ")
+    if command.starts_with(".") {
+        let full_command = parent_dir.join(command).clean().display().to_string();
+        command = full_command;
     }
+
+    parts.push_front(command);
+
+    parts
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[test]
@@ -78,10 +84,12 @@ fn test_extract_command_path() {
     let base_path = Path::new("/foo/bar");
     assert_eq!(
         "/foo/bar/scripts/foo.sh",
-        extract_command_path(base_path, "scripts/foo.sh")
+        extract_command_path(base_path, "./scripts/foo.sh")
     );
     assert_eq!(
         "/scripts/foo.sh",
         extract_command_path(base_path, "/scripts/foo.sh")
     );
+    assert_eq!("foo", extract_command_path(base_path, "foo"));
+    assert_eq!("foo bar", extract_command_path(base_path, "foo bar"));
 }
