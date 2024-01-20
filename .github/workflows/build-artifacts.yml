@@ -50,6 +50,8 @@ jobs:
       - name: Create archive
         run: |
           .github/bin/create-packages-linux.sh ${{ inputs.version }}
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.3.0
       - name: sign artifacts
         run: |
           echo $COSIGN_PRIVATE_KEY | wc

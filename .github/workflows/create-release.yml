@@ -36,7 +36,6 @@ jobs:
           merge-multiple: true
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.3.0
-
       - name: create-release
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
