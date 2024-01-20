@@ -34,7 +34,14 @@ jobs:
           pattern: release-*
           path: artifacts
           merge-multiple: true
-      - name: create-relase
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.3.0
+      - name: sign artifacts
+        run: |
+          for FILE in artifacts/*.{rpm,deb,tgz}; do
+            cosign sign-blob --yes "${FILE}" --bundle "${FILE}.bundle"
+          done
+      - name: create-release
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |

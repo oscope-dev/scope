@@ -42,3 +42,7 @@ tar -C "${TARGET_DIR}/x86_64-unknown-linux-gnu/artifact/" \
 tar -C "${TARGET_DIR}/aarch64-unknown-linux-gnu/artifact/" \
   -cvzf "${TARGET_DIR}/upload/scope-${VERSION}-aarch64-unknown-linux-gnu.tgz" \
   scope scope-intercept
+
+for FILE in "${TARGET_DIR}"/upload/*.{deb,rpm,tgz}; do
+  shasum -a 256 "${FILE}" | cut -d' ' -f 1 > "${FILE}.sha256"
+done
