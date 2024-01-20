@@ -10,6 +10,8 @@ use scope_lib::prelude::{
     CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture,
     OutputDestination, ScopeModel,
 };
+
+use scope_analyze::prelude::{analyze_root, AnalyzeArgs};
 use scope_lib::{HelpMetadata, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;
@@ -48,6 +50,8 @@ enum Command {
     Doctor(DoctorArgs),
     /// Generate a bug report based from a command that was ran
     Report(ReportArgs),
+    /// Analyze logs, output, etc for known errors.
+    Analyze(AnalyzeArgs),
     /// List the found config files, and resources detected
     List,
     /// Print version info and exit
@@ -95,6 +99,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
         Command::List => show_config(found_config).map(|_| 0),
         Command::Version(args) => print_version(args).await,
         Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await,
+        Command::Analyze(args) => analyze_root(found_config, args).await,
     }
 }
 
