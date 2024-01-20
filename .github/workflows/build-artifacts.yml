@@ -50,6 +50,16 @@ jobs:
       - name: Create archive
         run: |
           .github/bin/create-packages-linux.sh ${{ inputs.version }}
+      - name: sign artifacts
+        run: |
+          echo $COSIGN_PRIVATE_KEY | wc
+          echo COSIGN_PASSWORD | wc
+          for FILE in artifacts/*.{rpm,deb,tgz}; do
+            cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY "${FILE}" --bundle "${FILE}.bundle"
+          done
+        env:
+          COSIGN_PRIVATE_KEY: ${{secrets.COSIGN_PRIVATE_KEY}}
+          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
       - name: Upload Linux
         uses: actions/upload-artifact@v4
         with:
