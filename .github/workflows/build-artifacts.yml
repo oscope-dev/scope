@@ -34,7 +34,6 @@ jobs:
           path: |
             target/scope-${{ inputs.version }}-darwin.tgz
             target/scope-${{ inputs.version }}-darwin.tgz.sha256
-            target/scope-${{ inputs.version }}-darwin.tgz.sig
           if-no-files-found: error
   build-for-linux:
     runs-on: ubuntu-latest
@@ -43,8 +42,6 @@ jobs:
         with:
           fetch-tags: true
       - run: rustup update
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.3.0
       - uses: Swatinem/rust-cache@v2
       - name: Build artifacts
         run: |
