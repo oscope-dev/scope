@@ -1456,6 +1456,7 @@ dependencies = [
  "pathdiff",
  "predicates",
  "regex",
+ "scope-analyze",
  "scope-doctor",
  "scope-lib",
  "scope-report",
@@ -1464,6 +1465,18 @@ dependencies = [
  "tracing",
  "vergen",
  "which",
+]
+
+[[package]]
+name = "scope-analyze"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "scope-lib",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
