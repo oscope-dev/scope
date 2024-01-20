@@ -38,6 +38,8 @@ jobs:
         uses: sigstore/cosign-installer@v3.3.0
       - name: sign artifacts
         run: |
+          echo $COSIGN_PRIVATE_KEY | wc -m
+          echo COSIGN_PASSWORD | wc -m
           for FILE in artifacts/*.{rpm,deb,tgz}; do
             cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY "${FILE}" --bundle "${FILE}.bundle"
           done
