@@ -47,14 +47,19 @@ struct VersionArgs {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Run checks that will "checkup" your machine.
+    #[clap(alias("d"))]
     Doctor(DoctorArgs),
     /// Generate a bug report based from a command that was ran
+    #[clap(alias("r"))]
     Report(ReportArgs),
     /// Analyze logs, output, etc for known errors.
+    #[clap(alias("a"))]
     Analyze(AnalyzeArgs),
     /// List the found config files, and resources detected
+    #[clap(alias("l"))]
     List,
     /// Print version info and exit
+    #[clap(alias("v"))]
     Version(VersionArgs),
     #[command(external_subcommand)]
     #[allow(clippy::enum_variant_names)]
