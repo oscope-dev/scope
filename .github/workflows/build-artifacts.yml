@@ -19,8 +19,6 @@ jobs:
         with:
           fetch-tags: true
       - run: rustup update
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.3.0
       - uses: Swatinem/rust-cache@v2
       - name: Build artifacts
         run: |
@@ -52,8 +50,6 @@ jobs:
         run: |
           cargo install cross --git https://github.com/cross-rs/cross
           .github/bin/build-linux.sh ${{ inputs.version }}
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.3.0
       - name: Create archive
         run: |
           .github/bin/create-packages-linux.sh ${{ inputs.version }}
