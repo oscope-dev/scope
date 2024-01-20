@@ -45,5 +45,4 @@ tar -C "${TARGET_DIR}/aarch64-unknown-linux-gnu/artifact/" \
 
 for FILE in "${TARGET_DIR}"/upload/*.{deb,rpm,tgz}; do
   shasum -a 256 "${FILE}" | cut -d' ' -f 1 > "${FILE}.sha256"
-  cosign sign-blob --key env://COSIGN_PRIVATE_KEY "${FILE}" --output-file "${FILE}.sig"
 done
