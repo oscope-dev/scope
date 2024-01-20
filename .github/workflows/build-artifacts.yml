@@ -63,6 +63,9 @@ jobs:
       - name: Create archive
         run: |
           .github/bin/create-packages-linux.sh ${{ inputs.version }}
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       - name: Upload Linux
         uses: actions/upload-artifact@v4
         with:
