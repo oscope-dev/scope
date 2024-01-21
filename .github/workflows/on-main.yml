@@ -58,6 +58,7 @@ jobs:
       version: ${{ needs.make-versions.outputs.release-version }}
       release-options: ""
       environment: "release"
+    secrets: inherit
 
   docs:
     needs:
