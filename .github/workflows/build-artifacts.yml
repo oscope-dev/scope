@@ -6,6 +6,14 @@ on:
       version:
         required: true
         type: string
+    secrets:
+      COSIGN_PRIVATE_KEY:
+        description: 'Used sign artifacts'
+        required: true
+      COSIGN_PASSWORD:
+        description: 'Used to unlock the secret'
+        required: true
+
 
 concurrency:
   group: ${{ github.workflow }}-macos-${{ github.event.pull_request.number || github.ref }}
