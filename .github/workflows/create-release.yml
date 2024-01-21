@@ -12,6 +12,13 @@ on:
       environment:
         required: true
         type: string
+    secrets:
+      COSIGN_PRIVATE_KEY:
+        description: 'Used sign artifacts'
+        required: true
+      COSIGN_PASSWORD:
+        description: 'Used to unlock the secret'
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-release-${{ github.event.pull_request.number || github.ref }}
@@ -38,14 +45,12 @@ jobs:
         uses: sigstore/cosign-installer@v3.3.0
       - name: sign artifacts
         run: |
-          echo $COSIGN_PRIVATE_KEY | wc -m
-          echo COSIGN_PASSWORD | wc -m
+          echo '${{ secrets.COSIGN_PRIVATE_KEY }}' > cosign.key
           for FILE in artifacts/*.{rpm,deb,tgz}; do
-            cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY "${FILE}" --bundle "${FILE}.bundle"
+           cosign sign-blob --yes --key cosign.key "${FILE}" --bundle "${FILE}.bundle"
           done
         env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
       - name: create-release
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
