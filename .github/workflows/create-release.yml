@@ -46,7 +46,7 @@ jobs:
       - name: sign artifacts
         run: |
           echo '${{ secrets.COSIGN_PRIVATE_KEY }}' > cosign.key
-          for FILE in target/upload/*.{rpm,deb,tgz}; do
+          for FILE in artifacts/*.{rpm,deb,tgz}; do
            cosign sign-blob --yes --key cosign.key "${FILE}" --bundle "${FILE}.bundle"
           done
         env:
