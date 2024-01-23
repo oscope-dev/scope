@@ -80,7 +80,7 @@ impl LoggingOpts {
         let offset = UtcOffset::from_whole_seconds(offset_in_sec).unwrap_or(UtcOffset::UTC);
         let output_fmt = OffsetTime::new(offset, format_description!("[hour]:[minute]:[second]"));
         let console_output = tracing_subscriber::fmt::layer()
-            .event_format(Format::default().with_target(false).compact())
+            .event_format(Format::default().with_target(false).without_time().compact())
             .with_timer(output_fmt)
             .fmt_fields(PrettyFields::new());
 
