@@ -1,6 +1,7 @@
 use crate::error::FileCacheError;
 use anyhow::Result;
 use async_trait::async_trait;
+use mockall::automock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -16,6 +17,7 @@ pub enum FileCacheStatus {
     FileChanged,
 }
 
+#[automock]
 #[async_trait]
 pub trait FileCache: Sync {
     async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus>;

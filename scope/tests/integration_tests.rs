@@ -153,7 +153,7 @@ fn test_run_setup() {
 
     result
         .success()
-        .stdout(predicate::str::contains("Check `setup` was successful."));
+        .stdout(predicate::str::contains("Check `setup` cache valid."));
 
     working_dir
         .child("foo/requirements.txt")
