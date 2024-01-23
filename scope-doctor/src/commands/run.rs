@@ -71,8 +71,11 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 handle_check_failure(args.fix, found_config, model, cache.deref()).await?;
                 should_pass = false;
             }
-            CacheResults::NoWorkNeeded => {
+            CacheResults::CheckSucceeded => {
                 info!(target: "user", "Check `{}` was successful.", model.name().bold());
+            }
+            CacheResults::FilesNotChanged => {
+                info!(target: "user", "Check `{}` cache valid.", model.name().bold());
             }
         }
     }

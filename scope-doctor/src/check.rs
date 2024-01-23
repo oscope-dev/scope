@@ -3,6 +3,7 @@ use crate::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use async_trait::async_trait;
 
+#[cfg(not(test))]
 use glob::glob;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorExec, DoctorSetup, DoctorSetupExec, FoundConfig, ModelRoot,
@@ -57,7 +58,8 @@ impl Deref for DoctorTypes {
 
 #[derive(Debug, PartialEq)]
 pub enum CacheResults {
-    NoWorkNeeded,
+    CheckSucceeded,
+    FilesNotChanged,
     FixRequired,
 }
 
@@ -122,7 +124,7 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         .await?;
 
         let cache_results = match output.exit_code == Some(0) {
-            true => CacheResults::NoWorkNeeded,
+            true => CacheResults::CheckSucceeded,
             false => CacheResults::FixRequired,
         };
 
@@ -189,7 +191,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
         .await?;
 
         if result {
-            Ok(CacheResults::NoWorkNeeded)
+            Ok(CacheResults::FilesNotChanged)
         } else {
             Ok(CacheResults::FixRequired)
         }
@@ -251,6 +253,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
     }
 }
 
+#[cfg(not(test))]
 async fn process_glob<'b, F, Ret: 'b>(
     model: &ModelRoot<DoctorSetup>,
     fun: F,
@@ -273,4 +276,104 @@ where
     }
 
     Ok(true)
+}
+
+#[cfg(test)]
+async fn process_glob<'b, F, Ret: 'b>(
+    model: &ModelRoot<DoctorSetup>,
+    fun: F,
+) -> Result<bool, RuntimeError>
+where
+    F: Fn(PathBuf) -> Ret,
+    Ret: Future<Output = Result<bool, RuntimeError>>,
+{
+    let DoctorSetupCache::Paths(cache) = &model.spec.cache;
+
+    for glob_str in &cache.paths {
+        let check_result = fun(PathBuf::from(&glob_str)).await?;
+        if !check_result {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::check::{CacheResults, CheckRuntime, CorrectionResults};
+    use crate::file_cache::{FileCacheStatus, MockFileCache};
+    use scope_lib::prelude::{
+        DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec, FoundConfig,
+        ModelRoot,
+    };
+    use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn test_cache_miss() {
+        use mockall::predicate::{always, eq};
+
+        let model: ModelRoot<DoctorSetup> = ModelRoot {
+            api_version: "".to_string(),
+            kind: "".to_string(),
+            metadata: Default::default(),
+            spec: DoctorSetup {
+                order: 0,
+                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                    paths: vec!["foo/bar".to_string()],
+                    base_path: Default::default(),
+                }),
+                exec: DoctorSetupExec::Exec(vec!["/usr/bin/false".to_string()]),
+                description: "".to_string(),
+            },
+        };
+
+        let mut cache = MockFileCache::new();
+        cache
+            .expect_check_file()
+            .with(always(), eq(PathBuf::from("foo/bar")))
+            .returning(|_, _| Ok(FileCacheStatus::FileChanged));
+
+        let found_config = FoundConfig::empty(PathBuf::from("/"));
+        assert_eq!(
+            CacheResults::FixRequired,
+            model.check_cache(&found_config, &cache).await.unwrap()
+        );
+        assert_eq!(
+            CorrectionResults::Failure,
+            model.run_correction(&found_config, &cache).await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_hit() {
+        use mockall::predicate::{always, eq};
+
+        let model: ModelRoot<DoctorSetup> = ModelRoot {
+            api_version: "".to_string(),
+            kind: "".to_string(),
+            metadata: Default::default(),
+            spec: DoctorSetup {
+                order: 0,
+                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                    paths: vec!["foo/bar".to_string()],
+                    base_path: Default::default(),
+                }),
+                exec: DoctorSetupExec::Exec(vec!["/usr/bin/false".to_string()]),
+                description: "".to_string(),
+            },
+        };
+
+        let mut cache = MockFileCache::new();
+        cache
+            .expect_check_file()
+            .with(always(), eq(PathBuf::from("foo/bar")))
+            .returning(|_, _| Ok(FileCacheStatus::FileMatches));
+
+        let found_config = FoundConfig::empty(PathBuf::from("/"));
+        assert_eq!(
+            CacheResults::FilesNotChanged,
+            model.check_cache(&found_config, &cache).await.unwrap()
+        );
+    }
 }
