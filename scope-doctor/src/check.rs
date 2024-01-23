@@ -301,10 +301,13 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-    use scope_lib::prelude::{DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec, FoundConfig, ModelRoot};
     use crate::check::{CacheResults, CheckRuntime, CorrectionResults};
     use crate::file_cache::{FileCacheStatus, MockFileCache};
+    use scope_lib::prelude::{
+        DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec, FoundConfig,
+        ModelRoot,
+    };
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_cache_miss() {
