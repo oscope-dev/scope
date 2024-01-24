@@ -2,7 +2,6 @@ use clap::{ArgGroup, Parser};
 use std::fs::File;
 use std::path::PathBuf;
 
-
 use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
@@ -75,7 +74,12 @@ impl LoggingOpts {
             .with_writer(non_blocking);
 
         let console_output = tracing_subscriber::fmt::layer()
-            .event_format(Format::default().with_target(false).without_time().compact())
+            .event_format(
+                Format::default()
+                    .with_target(false)
+                    .without_time()
+                    .compact(),
+            )
             .fmt_fields(PrettyFields::new());
 
         let level_filter = self.to_level_filter();
