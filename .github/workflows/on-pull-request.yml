@@ -19,10 +19,10 @@ jobs:
          filters: |
            artifacts:
              - '**/*.rs'
-             - Cargo.*
-             - **/Cargo.*
-             - Cross.toml
-             - .github/bin/*
+             - 'Cargo.*'
+             - '**/Cargo.*'
+             - 'Cross.toml'
+             - '.github/bin/*'
            docs:
             - 'docs/**'
   check:
