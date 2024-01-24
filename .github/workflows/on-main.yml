@@ -86,4 +86,7 @@ jobs:
     if: ${{ needs.filter.outputs.docs == 'true' }}
     needs:
       - filter
-    uses: ./.github/workflows/gh-page.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/gh-page.yml
