@@ -30,7 +30,7 @@ jobs:
   tests:
     needs: [ filter ]
     if: ${{ needs.filter.outputs.artifacts == 'true' }}
-    name: Check
+    name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
