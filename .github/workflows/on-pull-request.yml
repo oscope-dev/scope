@@ -34,3 +34,17 @@ jobs:
     needs: [ check ]
     with:
       version: "0.0.1-SNAPSHOT"
+
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          docs:
+            - 'docs/**'
+
+    - name: Builds Docs
+      if: ${{ steps.filter.outputs.docs == 'true' }}
+      uses: ./.github/workflows/gh-pages.yml

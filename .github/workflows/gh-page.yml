@@ -2,9 +2,6 @@ name: Build Github Pages
 
 on:
   workflow_call:
-  pull_request:
-    paths:
-      - 'docs/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
