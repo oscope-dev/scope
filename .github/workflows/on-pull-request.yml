@@ -58,13 +58,9 @@ jobs:
       version: "0.0.1-SNAPSHOT"
 
   build-docs:
-    runs-on: ubuntu-latest
     needs: [ filter ]
     if: ${{ needs.filter.outputs.docs == 'true' }}
-    steps:
-    - uses: actions/checkout@v3
-    - name: Builds Docs
-      uses: ./.github/workflows/gh-page.yml
+    uses: ./.github/workflows/gh-page.yml
 
   check:
     if: always()
