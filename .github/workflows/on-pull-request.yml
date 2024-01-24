@@ -13,18 +13,20 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       rust: ${{ steps.filter.outputs.rust }}
     steps:
-     - uses: dorny/paths-filter@v2
-       id: filter
-       with:
-         filters: |
-           artifacts:
-             - '**/*.rs'
-             - 'Cargo.*'
-             - '**/Cargo.*'
-             - 'Cross.toml'
-             - '.github/bin/*'
-           docs:
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          artifacts:
+            - '**/*.rs'
+            - 'Cargo.*'
+            - '**/Cargo.*'
+            - 'Cross.toml'
+            - '.github/bin/*'
+            - '.github/bin/workflows'
+          docs:
             - 'docs/**'
+            - '.github/bin/workflows'
   tests:
     needs: [ filter ]
     if: ${{ needs.filter.outputs.artifacts == 'true' }}
