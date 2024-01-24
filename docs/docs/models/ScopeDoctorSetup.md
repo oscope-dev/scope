@@ -1,8 +1,8 @@
-# Doctor Setup 
+---
+sidebar_position: 1
+---
 
-Setup instructions are used to install dependencies, run db migrations, and other changes based on files present in the repo. These instructions will most often be run after a `git pull` or other similar step.
-
-Looking at `doctor-setup.yaml` in the examples repo
+# ScopeDoctorSetup
 
 ```yaml
 apiVersion: scope.github.com/v1alpha

@@ -16,7 +16,7 @@ pub struct DoctorRunArgs {
     pub only: Option<Vec<String>>,
     /// When set, if a fix is specified it will also run.
     #[arg(long, short, default_value = "true")]
-    fix: bool,
+    fix: Option<bool>,
     /// Location to store cache between runs
     #[arg(long, env = "SCOPE_DOCTOR_CACHE_DIR")]
     pub cache_dir: Option<String>,
@@ -68,7 +68,8 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         let exec_result = model.check_cache(found_config, cache.deref()).await?;
         match exec_result {
             CacheResults::FixRequired => {
-                handle_check_failure(args.fix, found_config, model, cache.deref()).await?;
+                handle_check_failure(args.fix.unwrap_or(true), found_config, model, cache.deref())
+                    .await?;
                 should_pass = false;
             }
             CacheResults::CheckSucceeded => {

@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # Scope Intercept
 
 Reporting bugs after the fact is useful, but if the tool can determine that there was an error and prompt the user to report a bug is better. Scope Intercept is an `env` "replacement" that can be used in [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix)) in scripts.
