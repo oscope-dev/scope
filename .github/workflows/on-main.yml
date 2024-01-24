@@ -22,10 +22,10 @@ jobs:
               - '**/Cargo.*'
               - 'Cross.toml'
               - '.github/bin/*'
-              - '.github/bin/workflows'
+              - '.github/workflows/*'
             docs:
               - 'docs/**'
-              - '.github/bin/workflows'
+              - '.github/workflows/*'
   check:
     needs: [ filter ]
     if: ${{ needs.filter.outputs.artifacts == 'true' }}
