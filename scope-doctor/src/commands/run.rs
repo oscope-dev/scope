@@ -68,7 +68,13 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         let exec_result = model.check_cache(found_config, cache.deref()).await?;
         match exec_result {
             CacheResults::FixRequired => {
-                handle_check_failure(args.fix.unwrap_or_else(|| true), found_config, model, cache.deref()).await?;
+                handle_check_failure(
+                    args.fix.unwrap_or_else(|| true),
+                    found_config,
+                    model,
+                    cache.deref(),
+                )
+                .await?;
                 should_pass = false;
             }
             CacheResults::CheckSucceeded => {
