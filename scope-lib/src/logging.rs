@@ -1,11 +1,9 @@
 use clap::{ArgGroup, Parser};
 use std::fs::File;
 use std::path::PathBuf;
-use time::macros::format_description;
-use time::UtcOffset;
+
 use tracing::info;
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
     fmt::format::{Format, JsonFields, PrettyFields},
@@ -75,13 +73,13 @@ impl LoggingOpts {
             .fmt_fields(JsonFields::new())
             .with_writer(non_blocking);
 
-        let offset_in_sec = chrono::Local::now().offset().local_minus_utc();
-
-        let offset = UtcOffset::from_whole_seconds(offset_in_sec).unwrap_or(UtcOffset::UTC);
-        let output_fmt = OffsetTime::new(offset, format_description!("[hour]:[minute]:[second]"));
         let console_output = tracing_subscriber::fmt::layer()
-            .event_format(Format::default().with_target(false).compact())
-            .with_timer(output_fmt)
+            .event_format(
+                Format::default()
+                    .with_target(false)
+                    .without_time()
+                    .compact(),
+            )
             .fmt_fields(PrettyFields::new());
 
         let level_filter = self.to_level_filter();
