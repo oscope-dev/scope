@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docs: ${{ steps.filter.outputs.docs }}
-      rust: ${{ steps.filter.outputs.rust }}
+      artifacts: ${{ steps.filter.outputs.artifacts }}
     steps:
       - uses: dorny/paths-filter@v2
         id: filter
