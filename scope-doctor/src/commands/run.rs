@@ -69,7 +69,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         match exec_result {
             CacheResults::FixRequired => {
                 handle_check_failure(
-                    args.fix.unwrap_or_else(|| true),
+                    args.fix.unwrap_or(true),
                     found_config,
                     model,
                     cache.deref(),
