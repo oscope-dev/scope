@@ -12,6 +12,9 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       artifacts: ${{ steps.filter.outputs.artifacts }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -32,7 +35,7 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: rustup update
       - uses: Swatinem/rust-cache@v2
       - name: cargo build
@@ -58,7 +61,7 @@ jobs:
       snapshot-version: ${{ steps.version.outputs.snapshot-version }}
       release-version: ${{ steps.version.outputs.release-version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: create pre-release
