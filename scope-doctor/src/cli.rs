@@ -16,6 +16,7 @@ enum DoctorCommands {
     /// List all doctor config, giving you the ability to know what is possible
     List(DoctorListArgs),
     /// Create an example config file
+    #[command(hide(true))]
     Init(DoctorInitArgs),
 }
 
