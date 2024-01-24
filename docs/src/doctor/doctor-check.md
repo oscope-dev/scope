@@ -15,7 +15,7 @@ spec:
   fix:
     target: ../bin/truey
   description: Check your shell for basic functionality
-  help: You're shell does not have a path env. Reload your shell.
+  help: Your shell does not have a path env. Reload your shell.
 ```
 
 The kind is `ScopeDoctorCheck`, letting scope know that this is a Check instruction.
