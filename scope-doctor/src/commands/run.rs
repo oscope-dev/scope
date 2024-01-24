@@ -7,7 +7,7 @@ use scope_lib::prelude::{FoundConfig, ScopeModel};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::PathBuf;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -100,7 +100,7 @@ async fn handle_check_failure(
     cache: &dyn FileCache,
 ) -> Result<()> {
     if !check.has_correction() {
-        warn!(target: "user", "Check `{}` failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
+        error!(target: "user", "Check `{}` failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
         return Ok(());
     };
 
@@ -115,7 +115,7 @@ async fn handle_check_failure(
             info!(target: "user", "Check `{}` failed. {} ran successfully.", check.name().bold(), "Fix".bold());
         }
         CorrectionResults::Failure => {
-            warn!(target: "user", "Check `{}` failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
+            error!(target: "user", "Check `{}` failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
         }
     }
 
