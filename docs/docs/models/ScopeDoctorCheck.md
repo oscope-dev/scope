@@ -23,6 +23,16 @@ spec:
 
 The kind is `ScopeDoctorCheck`, letting scope know that this is a Check instruction.
 
+## Exit Codes
+
+Depending on the exit code, different effects will happen
+
+| Exit Code   | Check Effect                                                       | Fix Effect                                 |
+|-------------|--------------------------------------------------------------------|--------------------------------------------|
+| `0`         | No work needed                                                     | Fix was successful                         |
+| `1 - 99`    | Work required                                                      | Fix ran, but failed                        |
+| `100+`      | Work is required, but fix should not run. Do not run other checks. | Fix ran, failed, and execution should stop |
+
 ## Schema
 
 - `.spec.check.target` is a script to run, used to check if the system is working. If the script exits 0, that indicates success. Otherwise, that something is wrong. The scripts are relative to the folder containing spec file. If this file was at `$HOME/workspace/example/.scope/check.yaml` the command to run would be  `$HOME/workspace/example/.scope/scripts/does-path-env-exist.sh`

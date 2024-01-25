@@ -22,6 +22,16 @@ spec:
 
 The kind is `ScopeDoctorSetup`, letting scope know that this is a Setup instruction.
 
+## Exit Codes
+
+Depending on the exit code, different effects will happen
+
+| Exit Code   | Setup                                              |
+|-------------|----------------------------------------------------|
+| `0`         | Fix was successful                                 |
+| `1 - 99`    | Fix ran, but failed, other steps should still run. |
+| `100+`      | Fix ran, failed, and execution should stop         |
+
 ## Schema
 
 - `.spec.cache.paths` is an array of `globstar` files that will be used to check for changes. These paths are relative to the "project dir". If this file was at `$HOME/workspace/example/.scope/doctor-setup.yaml` the project dir would be `$HOME/workspace/example`. For this example, the search glob would be `$HOME/workspace/example/**/requirements.txt`.

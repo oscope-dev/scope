@@ -61,12 +61,34 @@ pub enum CacheResults {
     CheckSucceeded,
     FilesNotChanged,
     FixRequired,
+    StopExecution,
+}
+
+impl From<&OutputCapture> for CacheResults {
+    fn from(value: &OutputCapture) -> Self {
+        match value.exit_code {
+            Some(0) => CacheResults::CheckSucceeded,
+            Some(100..=i32::MAX) => CacheResults::StopExecution,
+            _ => CacheResults::FixRequired,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum CorrectionResults {
     Success,
     Failure,
+    FailAndStop,
+}
+
+impl From<&OutputCapture> for CorrectionResults {
+    fn from(value: &OutputCapture) -> Self {
+        match value.exit_code {
+            Some(0) => CorrectionResults::Success,
+            Some(100..=i32::MAX) => CorrectionResults::FailAndStop,
+            _ => CorrectionResults::Failure,
+        }
+    }
 }
 
 #[async_trait]
@@ -123,12 +145,7 @@ impl CheckRuntime for ModelRoot<DoctorExec> {
         })
         .await?;
 
-        let cache_results = match output.exit_code == Some(0) {
-            true => CacheResults::CheckSucceeded,
-            false => CacheResults::FixRequired,
-        };
-
-        Ok(cache_results)
+        Ok(CacheResults::from(&output))
     }
 
     #[tracing::instrument(skip_all, fields(check.name = self.name()))]
@@ -217,7 +234,7 @@ impl CheckRuntime for ModelRoot<DoctorSetup> {
             .await?;
 
             if capture.exit_code != Some(0) {
-                return Ok(CorrectionResults::Failure);
+                return Ok(CorrectionResults::from(&capture));
             }
         }
 
