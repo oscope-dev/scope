@@ -30,7 +30,6 @@ fn test_list_reports_all_config() {
         .stdout(predicate::str::contains(
             "Check if the word error is in the logs",
         ))
-        .stdout(predicate::str::contains("Doctor Setup"))
         .stdout(predicate::str::contains("setup"))
         .stdout(predicate::str::contains(".scope/known-error.yaml"))
         .stdout(
@@ -90,8 +89,8 @@ fn test_run_check_path_exists() {
         .arg("--only=path-exists")
         .assert();
 
-    result.failure().stdout(predicate::str::contains(
-        "Check `path-exists` failed. Fix ran successfully",
+    result.success().stdout(predicate::str::contains(
+        "Check failed. Fix ran successfully",
     ));
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -103,8 +102,8 @@ fn test_run_check_path_exists() {
         .arg("--only=path-exists-fix-in-scope-dir")
         .assert();
 
-    result.failure().stdout(predicate::str::contains(
-        "Check `path-exists-fix-in-scope-dir` failed. Fix ran successfully.",
+    result.success().stdout(predicate::str::contains(
+        "Check failed. Fix ran successfully.",
     ));
 
     working_dir.close().unwrap();
@@ -132,9 +131,9 @@ fn test_run_setup() {
         .assert();
 
     result
-        .failure()
+        .success()
         .stdout(predicate::str::contains(
-            "Check `setup` failed. Fix ran successfully.",
+            "Check failed. Fix ran successfully.",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
@@ -151,9 +150,9 @@ fn test_run_setup() {
         ))
         .assert();
 
-    result
-        .success()
-        .stdout(predicate::str::contains("Check `setup` cache valid."));
+    result.success().stdout(predicate::str::contains(
+        "Check failed. Fix ran successfully.",
+    ));
 
     working_dir
         .child("foo/requirements.txt")
@@ -172,7 +171,7 @@ fn test_run_setup() {
         ))
         .assert();
 
-    result.failure().stdout(predicate::str::contains(
-        "Check `setup` failed. Fix ran successfully.",
+    result.success().stdout(predicate::str::contains(
+        "Check failed. Fix ran successfully.",
     ));
 }

@@ -25,6 +25,7 @@ pub trait FileCache: Sync {
     async fn persist(&self) -> Result<(), FileCacheError>;
 }
 
+#[derive(Debug)]
 pub enum CacheStorage {
     NoCache(NoOpCache),
     File(FileBasedCache),

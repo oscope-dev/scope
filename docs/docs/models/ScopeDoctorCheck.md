@@ -1,8 +1,11 @@
 ---
-sidebar_position: 2
+sidebar_position: 10
 ---
 
 # ScopeDoctorCheck
+
+**Deprecated**, use [ScopeDoctorGroup](./ScopeDoctorGroup.md) instead.
+Scope will translate this file to a Group when running internally.
 
 Looking at `doctor-check-path-exists.yaml` in the example folder.
 

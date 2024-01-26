@@ -1,10 +1,12 @@
 use crate::models::v1alpha::extract_command_path;
-use crate::prelude::DoctorExec;
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
+use crate::models::prelude::{
+    DoctorGroup, DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand,
+};
 use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,19 +32,25 @@ fn default_order() -> i32 {
     100
 }
 
-pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExec> {
+pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorGroup> {
     let parsed: DoctorCheckSpec = serde_yaml::from_value(value.clone())?;
 
     let check_path = extract_command_path(base_path, &parsed.check.target);
-    let fix_exec = parsed
-        .fix
-        .map(|path| extract_command_path(base_path, &path.target));
+    let fix_exec = parsed.fix.map(|path| DoctorGroupActionCommand {
+        commands: vec![extract_command_path(base_path, &path.target)],
+    });
 
-    Ok(DoctorExec {
-        order: parsed.order,
-        help_text: parsed.help,
-        check_exec: check_path,
-        fix_exec,
+    Ok(DoctorGroup {
+        actions: vec![DoctorGroupAction {
+            description: parsed.description.clone(),
+            fix: fix_exec,
+            check: DoctorGroupActionCheck {
+                command: Some(DoctorGroupActionCommand {
+                    commands: vec![check_path],
+                }),
+                files: None,
+            },
+        }],
         description: parsed.description,
     })
 }
@@ -50,7 +58,7 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorExec> {
 #[cfg(test)]
 mod tests {
     use crate::models::parse_models_from_string;
-    use crate::prelude::DoctorExec;
+    use crate::models::prelude::{DoctorGroup, DoctorGroupAction};
     use std::path::Path;
 
     #[test]
@@ -93,33 +101,39 @@ spec:
         let configs = parse_models_from_string(path, text).unwrap();
         assert_eq!(3, configs.len());
         assert_eq!(
-            configs[0].get_doctor_check_spec().unwrap(),
-            DoctorExec {
-                order: 100,
+            configs[0].get_doctor_group().unwrap(),
+            DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
-                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-                check_exec: "/foo/bar/scripts/does-path-env-exist.sh".to_string(),
-                fix_exec: Some("true".to_string())
+                actions: vec![DoctorGroupAction::make_from(
+                    "Check your shell for basic functionality",
+                    Some(vec!["true"]),
+                    None,
+                    Some(vec!["/foo/bar/scripts/does-path-env-exist.sh"])
+                )]
             }
         );
         assert_eq!(
-            configs[1].get_doctor_check_spec().unwrap(),
-            DoctorExec {
-                order: 100,
+            configs[1].get_doctor_group().unwrap(),
+            DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
-                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-                check_exec: "/scripts/does-path-env-exist.sh".to_string(),
-                fix_exec: None,
+                actions: vec![DoctorGroupAction::make_from(
+                    "Check your shell for basic functionality",
+                    None,
+                    None,
+                    Some(vec!["/scripts/does-path-env-exist.sh"])
+                )]
             }
         );
         assert_eq!(
-            configs[2].get_doctor_check_spec().unwrap(),
-            DoctorExec {
-                order: 100,
+            configs[2].get_doctor_group().unwrap(),
+            DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
-                help_text: "You're shell does not have a path env. Reload your shell.".to_string(),
-                check_exec: "does-path-env-exist.sh".to_string(),
-                fix_exec: None,
+                actions: vec![DoctorGroupAction::make_from(
+                    "Check your shell for basic functionality",
+                    None,
+                    None,
+                    Some(vec!["does-path-env-exist.sh"])
+                )]
             }
         );
     }

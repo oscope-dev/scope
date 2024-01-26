@@ -1,0 +1,12 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorSetup
+metadata:
+  name: setup
+spec:
+  cache:
+    paths:
+     - flig/bar/**/*
+  setup:
+    exec:
+      - sleep infinity
+  description: Check your shell for basic functionality

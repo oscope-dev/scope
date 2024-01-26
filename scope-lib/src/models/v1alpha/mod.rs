@@ -9,12 +9,13 @@ use std::path::{Path, PathBuf};
 use strum::EnumString;
 
 mod doctor_exec;
+mod doctor_group;
 mod doctor_setup;
 mod known_error;
 mod report_definition;
 mod report_location;
 
-#[derive(Debug, PartialEq, EnumString)]
+#[derive(Debug, PartialEq, EnumString, Clone)]
 #[strum(ascii_case_insensitive)]
 pub enum KnownKinds {
     ScopeReportDefinition,
@@ -22,6 +23,7 @@ pub enum KnownKinds {
     ScopeKnownError,
     ScopeDoctorCheck,
     ScopeDoctorSetup,
+    ScopeDoctorGroup,
     #[strum(default)]
     UnknownKind(String),
 }
@@ -37,7 +39,7 @@ pub fn parse_v1_alpha1(root: &ModelRoot<Value>) -> Result<ParsedConfig> {
     let parsed = match known_kinds {
         KnownKinds::ScopeDoctorCheck => {
             let exec_check = doctor_exec::parse(containing_dir, &root.spec)?;
-            ParsedConfig::DoctorCheck(root.with_spec(exec_check))
+            ParsedConfig::DoctorGroup(root.with_spec(exec_check))
         }
         KnownKinds::ScopeKnownError => {
             let known_error = known_error::parse(&root.spec)?;
@@ -53,7 +55,11 @@ pub fn parse_v1_alpha1(root: &ModelRoot<Value>) -> Result<ParsedConfig> {
         }
         KnownKinds::ScopeDoctorSetup => {
             let setup = doctor_setup::parse(containing_dir, &root.spec)?;
-            ParsedConfig::DoctorSetup(root.with_spec(setup))
+            ParsedConfig::DoctorGroup(root.with_spec(setup))
+        }
+        KnownKinds::ScopeDoctorGroup => {
+            let group = doctor_group::parse(containing_dir, &root.spec)?;
+            ParsedConfig::DoctorGroup(root.with_spec(group))
         }
         _ => return Err(anyhow!("Unable to parse v1alpha/{}", kind)),
     };
