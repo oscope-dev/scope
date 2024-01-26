@@ -1,9 +1,9 @@
-use crate::check::{CacheResults, CheckRuntime, CorrectionResults, DoctorTypes};
+use crate::check::{ActionRunResult, CacheResults, CorrectionResults, DoctorActionRun};
 use crate::file_cache::{CacheStorage, FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use scope_lib::prelude::{FoundConfig, ScopeModel};
+use scope_lib::prelude::{DoctorGroup, FoundConfig, ModelRoot, ScopeModel};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -26,22 +26,16 @@ pub struct DoctorRunArgs {
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
-    let mut check_map: BTreeMap<String, DoctorTypes> = Default::default();
-    for check in found_config.doctor_exec.values() {
-        if check.should_run_check(args) {
-            if let Some(old) = check_map.insert(check.full_name(), DoctorTypes::Exec(check.clone()))
-            {
-                warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
-            }
-        }
-    }
+    let mut check_map: BTreeMap<String, ModelRoot<DoctorGroup>> = Default::default();
+    for check in found_config.doctor_group.values() {
+        let should_group_run = match &args.only {
+            None => true,
+            Some(names) => names.contains(&check.name().to_string())
+        };
 
-    for check in found_config.doctor_setup.values() {
-        if check.should_run_check(args) {
-            if let Some(old) =
-                check_map.insert(check.full_name(), DoctorTypes::Setup(check.clone()))
-            {
-                warn!(target: "user", "Check `{}` has multiple definitions, only the last will be processed.", old.name().bold());
+        if should_group_run {
+            if let Some(old) = check_map.insert(check.full_name(), check.clone()) {
+                warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
             }
         }
     }
@@ -58,7 +52,6 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     };
 
     let mut checks_to_run: Vec<_> = check_map.values().collect();
-    checks_to_run.sort_by_key(|l| l.order());
 
     let mut should_pass = true;
     let mut skip_remaining = false;
@@ -71,27 +64,24 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             continue;
         }
 
-        let exec_result = model.check_cache(found_config, cache.deref()).await?;
-        match exec_result {
-            CacheResults::FixRequired => {
-                skip_remaining = handle_check_failure(
-                    args.fix.unwrap_or(true),
-                    found_config,
-                    model,
-                    cache.deref(),
-                )
-                .await?;
-                should_pass = false;
-            }
-            CacheResults::CheckSucceeded => {
-                info!(target: "user", "Check `{}` was successful.", model.name().bold());
-            }
-            CacheResults::FilesNotChanged => {
-                info!(target: "user", "Check `{}` cache valid.", model.name().bold());
-            }
-            CacheResults::StopExecution => {
-                error!(target: "user", "Check `{}` has failed and wants to stop execution. All other checks will be skipped.", model.name().bold());
-                skip_remaining = true;
+        for action in &model.spec.actions {
+            let run = DoctorActionRun {
+                model,
+                action,
+                working_dir: &found_config.working_dir,
+                file_cache: &cache,
+                run_fix: args.fix.unwrap_or(true),
+            };
+
+            match run.run_action().await? {
+                ActionRunResult::Stop => {
+                    skip_remaining = true;
+                    break;
+                },
+                ActionRunResult::Failed => {
+                    should_pass = false;
+                },
+                _ => {},
             }
         }
     }
@@ -106,39 +96,4 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     } else {
         Ok(1)
     }
-}
-
-async fn handle_check_failure(
-    is_fix: bool,
-    found_config: &FoundConfig,
-    check: &DoctorTypes,
-    cache: &dyn FileCache,
-) -> Result<bool> {
-    if !check.has_correction() {
-        error!(target: "user", "Check `{}` failed. {}: {}", check.name().bold(), "Suggestion".bold(), check.help_text());
-        return Ok(true);
-    };
-
-    if !is_fix {
-        info!(target: "user", "Check `{}` failed. {}: Run with --fix to auto-fix", check.name().bold(), "Suggestion".bold());
-        return Ok(true);
-    }
-
-    let correction_result = check.run_correction(found_config, cache).await?;
-    let continue_executing = match correction_result {
-        CorrectionResults::Success => {
-            info!(target: "user", "Check `{}` failed. {} ran successfully.", check.name().bold(), "Fix".bold());
-            true
-        }
-        CorrectionResults::Failure => {
-            error!(target: "user", "Check `{}` failed. The fix ran and {}.", check.name().bold(), "Failed".red().bold());
-            true
-        }
-        CorrectionResults::FailAndStop => {
-            error!(target: "user", "Check `{}` failed. The fix ran and {}. The fix exited with a 'stop' code, skipping remaining checks.", check.name().bold(), "Failed".red().bold());
-            false
-        }
-    };
-
-    Ok(continue_executing)
 }

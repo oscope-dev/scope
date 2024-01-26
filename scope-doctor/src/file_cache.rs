@@ -25,9 +25,11 @@ pub trait FileCache: Sync {
     async fn persist(&self) -> Result<(), FileCacheError>;
 }
 
+#[derive(Debug)]
 pub enum CacheStorage {
     NoCache(NoOpCache),
     File(FileBasedCache),
+    MockCache(MockFileCache),
 }
 
 impl Deref for CacheStorage {
@@ -37,6 +39,7 @@ impl Deref for CacheStorage {
         match self {
             CacheStorage::NoCache(d) => d,
             CacheStorage::File(f) => f,
+            CacheStorage::MockCache(m) => m,
         }
     }
 }

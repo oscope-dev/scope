@@ -1,5 +1,5 @@
 use crate::models::internal::ParsedConfig;
-use crate::{FILE_DIR_ANNOTATION, FILE_PATH_ANNOTATION};
+use crate::{FILE_DIR_ANNOTATION, FILE_EXEC_PATH_ANNOTATION, FILE_PATH_ANNOTATION};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
@@ -48,6 +48,13 @@ impl ModelMetadata {
             .cloned()
             .unwrap_or_else(|| "unknown".to_string())
     }
+
+    fn exec_path(&self) -> String {
+        self.annotations
+            .get(FILE_EXEC_PATH_ANNOTATION)
+            .cloned()
+            .unwrap_or_else(|| std::env::var("PATH").unwrap_or_else(|_| "".to_string()))
+    }
 }
 
 pub trait ScopeModel {
@@ -82,6 +89,10 @@ impl<V> ModelRoot<V> {
     }
     pub fn containing_dir(&self) -> String {
         self.metadata.containing_dir()
+    }
+
+    pub fn exec_path(&self) -> String {
+        self.metadata.exec_path()
     }
 }
 
