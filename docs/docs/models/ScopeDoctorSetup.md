@@ -1,8 +1,11 @@
 ---
-sidebar_position: 1
+sidebar_position: 11
 ---
 
 # ScopeDoctorSetup
+
+**Deprecated**, use [ScopeDoctorGroup](./ScopeDoctorGroup.md) instead.
+Scope will translate this file to a Group when running internally.
 
 ```yaml
 apiVersion: scope.github.com/v1alpha
