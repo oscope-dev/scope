@@ -102,11 +102,9 @@ fn test_run_check_path_exists() {
         .arg("--only=path-exists-fix-in-scope-dir")
         .assert();
 
-    result
-        .success()
-        .stdout(predicate::str::contains(
-            "Check failed. Fix ran successfully.",
-        ));
+    result.success().stdout(predicate::str::contains(
+        "Check failed. Fix ran successfully.",
+    ));
 
     working_dir.close().unwrap();
 }
