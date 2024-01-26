@@ -11,7 +11,7 @@ use scope_lib::prelude::{
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -92,34 +92,35 @@ pub struct DoctorActionRun<'a> {
 }
 
 impl<'a> DoctorActionRun<'a> {
+    #[instrument(skip_all, fields(check.name = self.model.name(), action.description = self.action.description ))]
     pub async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
         let should_continue = match check_status {
             CacheResults::FixNotRequired => {
-                info!(target: "user", "Check `{}#{}` was successful.", self.model.name().bold(), self.action.description.bold());
+                info!(target: "user", name = self.model.name(), "Check was successful.");
                 ActionRunResult::Succeeded
             }
             CacheResults::FixRequired => {
                 if !self.run_fix {
-                    info!(target: "user", "Check `{}#{}` failed. {}: Run with --fix to auto-fix", self.model.name().bold(), self.action.description.bold(), "Suggestion".bold());
+                    info!(target: "user", name = self.model.name(), "Check failed. {}: Run with --fix to auto-fix", "Suggestion".bold());
                     ActionRunResult::Succeeded
                 } else {
                     let fix_results = self.run_fixes().await?;
                     match fix_results {
                         CorrectionResults::Success => {
-                            info!(target: "user", "Check `{}#{}` failed. {} ran successfully.", self.model.name().bold(), self.action.description.bold(), "Fix".bold());
+                            info!(target: "user",name = self.model.name(), "Check failed. {} ran successfully.", "Fix".bold());
                             ActionRunResult::Succeeded
                         }
                         CorrectionResults::NoFixSpecified => {
-                            info!(target: "user", "Check `{}#{}` failed. No fix was specified.", self.model.name().bold(), self.action.description.bold());
+                            info!(target: "user", name = self.model.name(), "Check failed. No fix was specified.");
                             ActionRunResult::Stop
                         }
                         CorrectionResults::Failure => {
-                            error!(target: "user", "Check `{}#{}` failed. The fix ran and {}.", self.model.name().bold(), self.action.description.bold(), "Failed".red().bold());
+                            error!(target: "user", name = self.model.name(), "Check failed. The fix ran and {}.", "Failed".red().bold());
                             ActionRunResult::Failed
                         }
                         CorrectionResults::FailAndStop => {
-                            error!(target: "user", "Check `{}#{}` failed. The fix ran and {}. The fix exited with a 'stop' code, skipping remaining checks.", self.model.name().bold(), self.action.description.bold(), "Failed".red().bold());
+                            error!(target: "user", name = self.model.name(), "Check failed. The fix ran and {}. The fix exited with a 'stop' code, skipping remaining checks.", "Failed".red().bold());
                             ActionRunResult::Stop
                         }
                     }
