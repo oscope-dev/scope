@@ -321,7 +321,7 @@ mod test {
     use crate::check::{CacheResults, CheckRuntime, CorrectionResults};
     use crate::file_cache::{FileCacheStatus, MockFileCache};
     use scope_lib::prelude::{
-        DoctorSetup, DoctorSetupCache, DoctorSetupCachePath, DoctorSetupExec, FoundConfig,
+        DoctorSetup, DoctorSetupCache, DoctorGroupCachePath, DoctorSetupExec, FoundConfig,
         ModelRoot,
     };
     use std::path::PathBuf;
@@ -336,7 +336,7 @@ mod test {
             metadata: Default::default(),
             spec: DoctorSetup {
                 order: 0,
-                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                cache: DoctorSetupCache::Paths(DoctorGroupCachePath {
                     paths: vec!["foo/bar".to_string()],
                     base_path: Default::default(),
                 }),
@@ -372,7 +372,7 @@ mod test {
             metadata: Default::default(),
             spec: DoctorSetup {
                 order: 0,
-                cache: DoctorSetupCache::Paths(DoctorSetupCachePath {
+                cache: DoctorSetupCache::Paths(DoctorGroupCachePath {
                     paths: vec!["foo/bar".to_string()],
                     base_path: Default::default(),
                 }),

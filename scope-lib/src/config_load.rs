@@ -1,6 +1,5 @@
 use crate::models::prelude::{
-    DoctorExec, DoctorSetup, KnownError, ModelRoot, ParsedConfig, ReportDefinition,
-    ReportUploadLocation,
+    DoctorGroup, KnownError, ModelRoot, ParsedConfig, ReportDefinition, ReportUploadLocation,
 };
 use crate::models::ScopeModel;
 use crate::{FILE_DIR_ANNOTATION, FILE_EXEC_PATH_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR};
@@ -105,8 +104,7 @@ impl ConfigOptions {
 pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub raw_config: Vec<ModelRoot<Value>>,
-    pub doctor_exec: BTreeMap<String, ModelRoot<DoctorExec>>,
-    pub doctor_setup: BTreeMap<String, ModelRoot<DoctorSetup>>,
+    pub doctor_group: BTreeMap<String, ModelRoot<DoctorGroup>>,
     pub known_error: BTreeMap<String, ModelRoot<KnownError>>,
     pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocation>>,
     pub report_definition: Option<ModelRoot<ReportDefinition>>,
@@ -122,10 +120,9 @@ impl FoundConfig {
         Self {
             working_dir,
             raw_config: Vec::new(),
-            doctor_exec: BTreeMap::new(),
+            doctor_group: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
-            doctor_setup: BTreeMap::new(),
             report_definition: None,
             config_path: Vec::new(),
             run_id: ConfigOptions::generate_run_id(),
@@ -148,10 +145,9 @@ impl FoundConfig {
         let mut this = Self {
             working_dir,
             raw_config: raw_config.clone(),
-            doctor_exec: BTreeMap::new(),
+            doctor_group: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
-            doctor_setup: BTreeMap::new(),
             report_definition: None,
             config_path,
             bin_path: [scope_path, default_path].join(":"),
@@ -197,11 +193,8 @@ impl FoundConfig {
 
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
-            ParsedConfig::DoctorCheck(exec) => {
-                insert_if_absent(&mut self.doctor_exec, exec);
-            }
-            ParsedConfig::DoctorSetup(exec) => {
-                insert_if_absent(&mut self.doctor_setup, exec);
+            ParsedConfig::DoctorGroup(exec) => {
+                insert_if_absent(&mut self.doctor_group, exec);
             }
             ParsedConfig::KnownError(known_error) => {
                 insert_if_absent(&mut self.known_error, known_error);

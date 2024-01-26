@@ -1,0 +1,12 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorSetup
+metadata:
+  name: setup
+spec:
+  cache:
+    paths:
+      - flig/bar/**/*
+  setup:
+    exec:
+      - ./bin/setup
+  description: Check your shell for basic functionality

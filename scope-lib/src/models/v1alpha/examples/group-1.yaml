@@ -1,0 +1,22 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: foo
+spec:
+  description: Check your shell for basic functionality
+  actions:
+    - description: foo1
+      check:
+        paths:
+          - 'flig/bar/**/*'
+        commands:
+          - ./foo1.sh
+      fix:
+        commands:
+          - ./fix1.sh
+    - description: foo2
+      check:
+        paths:
+          - '*/*.txt'
+        commands:
+          - sleep infinity
