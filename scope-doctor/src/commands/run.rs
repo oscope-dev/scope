@@ -1,13 +1,13 @@
-use crate::check::{ActionRunResult, CacheResults, CorrectionResults, DoctorActionRun};
-use crate::file_cache::{CacheStorage, FileBasedCache, FileCache, NoOpCache};
+use crate::check::{ActionRunResult, DoctorActionRun};
+use crate::file_cache::{CacheStorage, FileBasedCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
 use scope_lib::prelude::{DoctorGroup, FoundConfig, ModelRoot, ScopeModel};
 use std::collections::BTreeMap;
-use std::ops::Deref;
+
 use std::path::PathBuf;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -30,7 +30,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     for check in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
             None => true,
-            Some(names) => names.contains(&check.name().to_string())
+            Some(names) => names.contains(&check.name().to_string()),
         };
 
         if should_group_run {
@@ -51,7 +51,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         CacheStorage::File(FileBasedCache::new(&cache_path)?)
     };
 
-    let mut checks_to_run: Vec<_> = check_map.values().collect();
+    let checks_to_run: Vec<_> = check_map.values().collect();
 
     let mut should_pass = true;
     let mut skip_remaining = false;
@@ -77,11 +77,11 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 ActionRunResult::Stop => {
                     skip_remaining = true;
                     break;
-                },
+                }
                 ActionRunResult::Failed => {
                     should_pass = false;
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
     }
