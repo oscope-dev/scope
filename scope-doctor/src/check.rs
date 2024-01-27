@@ -362,7 +362,7 @@ impl GlobWalker for DefaultGlobWalker {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::check::{ActionRunResult, DoctorActionRun, MockGlobWalker, RuntimeError};
     use crate::file_cache::{FileCache, NoOpCache};
     use anyhow::{anyhow, Result};
