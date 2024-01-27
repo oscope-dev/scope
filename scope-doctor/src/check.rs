@@ -70,12 +70,13 @@ pub struct DoctorActionRun<'a> {
     pub model: &'a ModelRoot<DoctorGroup>,
     pub action: &'a DoctorGroupAction,
     pub working_dir: &'a Path,
+    #[allow(clippy::borrowed_box)]
     pub file_cache: &'a Box<dyn FileCache>,
     pub run_fix: bool,
     #[educe(Debug(ignore))]
-    pub exec_runner: Box<dyn ExecutionProvider>,
+    pub exec_runner: &'a dyn ExecutionProvider,
     #[educe(Debug(ignore))]
-    pub glob_walker: Box<dyn GlobWalker>,
+    pub glob_walker: &'a dyn GlobWalker,
 }
 
 impl<'a> DoctorActionRun<'a> {
@@ -290,6 +291,7 @@ impl<'a> DoctorActionRun<'a> {
 
 #[automock]
 #[async_trait]
+#[allow(clippy::borrowed_box)]
 pub trait GlobWalker {
     async fn have_globs_changed(
         &self,
@@ -466,8 +468,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -495,8 +497,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -524,8 +526,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -554,8 +556,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -590,8 +592,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -626,8 +628,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -658,8 +660,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;
@@ -691,8 +693,8 @@ mod test {
             working_dir: &path,
             file_cache: &file_cache,
             run_fix: true,
-            exec_runner: Box::new(exec_runner),
-            glob_walker: Box::new(glob_walker),
+            exec_runner: &exec_runner,
+            glob_walker: &glob_walker,
         };
 
         let result = run.run_action().await?;

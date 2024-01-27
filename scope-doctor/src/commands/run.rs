@@ -73,8 +73,8 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 working_dir: &found_config.working_dir,
                 file_cache: &cache,
                 run_fix: args.fix.unwrap_or(true),
-                exec_runner: Box::<DefaultExecutionProvider>::default(),
-                glob_walker: Box::<DefaultGlobWalker>::default(),
+                exec_runner: &DefaultExecutionProvider::default(),
+                glob_walker: &DefaultGlobWalker::default(),
             };
 
             match run.run_action().await? {
