@@ -49,11 +49,9 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
     let parsed: DoctorGroupSpec = serde_yaml::from_value(value.clone())?;
 
     let mut actions: Vec<_> = Default::default();
-    let mut count = 0;
-    for spec_action in parsed.actions {
-        count += 1;
+    for (count, spec_action) in parsed.actions.into_iter().enumerate() {
         actions.push(DoctorGroupAction {
-            name: spec_action.name.unwrap_or_else(|| format!("{}", count)),
+            name: spec_action.name.unwrap_or_else(|| format!("{}", count + 1)),
             required: spec_action.required,
             description: spec_action
                 .description

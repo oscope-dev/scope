@@ -7,7 +7,7 @@ pub struct DoctorGroupAction {
     pub description: String,
     pub fix: Option<DoctorGroupActionCommand>,
     pub check: DoctorGroupActionCheck,
-    pub required: bool
+    pub required: bool,
 }
 
 impl DoctorGroupAction {

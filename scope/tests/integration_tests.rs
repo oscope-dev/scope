@@ -91,7 +91,7 @@ fn test_run_check_path_exists() {
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully, group: \"path-exists\", name: \"1\""
+        "Check failed. Fix ran successfully, group: \"path-exists\", name: \"1\"",
     ));
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -105,7 +105,7 @@ fn test_run_check_path_exists() {
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully, group: \"path-exists-fix-in-scope-dir\", name: \"1\""
+        "Check failed. Fix ran successfully, group: \"path-exists-fix-in-scope-dir\", name: \"1\"",
     ));
 
     working_dir.close().unwrap();
@@ -136,7 +136,7 @@ fn test_run_setup() {
     result
         .success()
         .stdout(predicate::str::contains(
-            "Check failed. Fix ran successfully, group: \"setup\", name: \"1\""
+            "Check failed. Fix ran successfully, group: \"setup\", name: \"1\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
@@ -155,7 +155,7 @@ fn test_run_setup() {
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully, group: \"setup\", name: \"1\""
+        "Check failed. Fix ran successfully, group: \"setup\", name: \"1\"",
     ));
 
     working_dir

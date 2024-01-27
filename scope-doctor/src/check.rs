@@ -1,7 +1,7 @@
-use std::cmp;
-use std::cmp::max;
 use crate::file_cache::{CacheStorage, FileCacheStatus};
 use anyhow::Result;
+use std::cmp;
+use std::cmp::max;
 
 use colored::Colorize;
 #[cfg(not(test))]
@@ -118,7 +118,7 @@ impl<'a> DoctorActionRun<'a> {
     }
 
     pub async fn run_fixes(&self) -> Result<CorrectionResults, RuntimeError> {
-        if self.action.fix == None {
+        if self.action.fix.is_none() {
             return Ok(CorrectionResults::NoFixSpecified);
         }
 
@@ -226,17 +226,20 @@ impl<'a> DoctorActionRun<'a> {
             })
             .await?;
 
-            info!("check ran command {} and result was {:?}", command, output.exit_code);
+            info!(
+                "check ran command {} and result was {:?}",
+                command, output.exit_code
+            );
 
             let command_result = match output.exit_code {
                 Some(0) => CacheResults::FixNotRequired,
                 Some(100..=i32::MAX) => CacheResults::StopExecution,
-                _ => CacheResults::FixRequired
+                _ => CacheResults::FixRequired,
             };
 
             let next = match &result {
                 None => command_result,
-                Some(prev) => cmp::max(prev.clone(), command_result.clone())
+                Some(prev) => cmp::max(prev.clone(), command_result.clone()),
             };
 
             result.replace(next);
