@@ -56,6 +56,8 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
 
     Ok(DoctorGroup {
         actions: vec![DoctorGroupAction {
+            name: "1".to_string(),
+            required: true,
             description: parsed.description.clone(),
             fix: Some(exec),
             check: DoctorGroupActionCheck {
@@ -87,6 +89,8 @@ mod tests {
             DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction {
+                    name: "1".to_string(),
+                    required: true,
                     description: "Check your shell for basic functionality".to_string(),
                     fix: Some(DoctorGroupActionCommand::from(vec![
                         "/foo/bar/.scope/bin/setup"
@@ -114,6 +118,8 @@ mod tests {
             DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction {
+                    name: "1".to_string(),
+                    required: true,
                     description: "Check your shell for basic functionality".to_string(),
                     fix: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
                     check: DoctorGroupActionCheck {

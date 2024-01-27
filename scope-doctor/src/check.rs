@@ -1,5 +1,7 @@
 use crate::file_cache::{CacheStorage, FileCacheStatus};
 use anyhow::Result;
+use std::cmp;
+use std::cmp::max;
 
 use colored::Colorize;
 #[cfg(not(test))]
@@ -34,11 +36,11 @@ pub enum RuntimeError {
     PatternError(#[from] glob::PatternError),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Ord, Eq, PartialOrd)]
 pub enum CacheResults {
-    FixNotRequired,
-    FixRequired,
-    StopExecution,
+    FixNotRequired = 1,
+    FixRequired = 2,
+    StopExecution = 3,
 }
 
 impl CacheResults {
@@ -47,32 +49,12 @@ impl CacheResults {
     }
 }
 
-impl From<&OutputCapture> for CacheResults {
-    fn from(value: &OutputCapture) -> Self {
-        match value.exit_code {
-            Some(0) => CacheResults::FixNotRequired,
-            Some(100..=i32::MAX) => CacheResults::StopExecution,
-            _ => CacheResults::FixRequired,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub enum CorrectionResults {
     NoFixSpecified,
     Success,
-    Failure,
+    FailContinue,
     FailAndStop,
-}
-
-impl From<&OutputCapture> for CorrectionResults {
-    fn from(value: &OutputCapture) -> Self {
-        match value.exit_code {
-            Some(0) => CorrectionResults::Success,
-            Some(100..=i32::MAX) => CorrectionResults::FailAndStop,
-            _ => CorrectionResults::Failure,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -92,35 +74,35 @@ pub struct DoctorActionRun<'a> {
 }
 
 impl<'a> DoctorActionRun<'a> {
-    #[instrument(skip_all, fields(check.name = self.model.name(), action.description = self.action.description ))]
+    #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     pub async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
         let should_continue = match check_status {
             CacheResults::FixNotRequired => {
-                info!(target: "user", name = self.model.name(), "Check was successful.");
+                info!(target: "user", name = self.model.name(), "Check was successful");
                 ActionRunResult::Succeeded
             }
             CacheResults::FixRequired => {
                 if !self.run_fix {
-                    info!(target: "user", name = self.model.name(), "Check failed. {}: Run with --fix to auto-fix", "Suggestion".bold());
+                    info!(target: "user", group = self.model.name(), name = self.action.name,  "Check failed. {}: Run with --fix to auto-fix", "Suggestion".bold());
                     ActionRunResult::Succeeded
                 } else {
                     let fix_results = self.run_fixes().await?;
                     match fix_results {
                         CorrectionResults::Success => {
-                            info!(target: "user",name = self.model.name(), "Check failed. {} ran successfully.", "Fix".bold());
+                            info!(target: "user",group = self.model.name(), name = self.action.name, "Check failed. {} ran successfully", "Fix".bold());
                             ActionRunResult::Succeeded
                         }
                         CorrectionResults::NoFixSpecified => {
-                            info!(target: "user", name = self.model.name(), "Check failed. No fix was specified.");
+                            info!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. No fix was specified");
                             ActionRunResult::Stop
                         }
-                        CorrectionResults::Failure => {
-                            error!(target: "user", name = self.model.name(), "Check failed. The fix ran and {}.", "Failed".red().bold());
+                        CorrectionResults::FailContinue => {
+                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}", "Failed".red().bold());
                             ActionRunResult::Failed
                         }
                         CorrectionResults::FailAndStop => {
-                            error!(target: "user", name = self.model.name(), "Check failed. The fix ran and {}. The fix exited with a 'stop' code, skipping remaining checks.", "Failed".red().bold());
+                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}, and was required", "Failed".red().bold());
                             ActionRunResult::Stop
                         }
                     }
@@ -136,32 +118,44 @@ impl<'a> DoctorActionRun<'a> {
     }
 
     pub async fn run_fixes(&self) -> Result<CorrectionResults, RuntimeError> {
-        let mut output = None;
+        if self.action.fix.is_none() {
+            return Ok(CorrectionResults::NoFixSpecified);
+        }
+
+        let mut highest_exit_code = 0;
         if let Some(action_command) = &self.action.fix {
+            if action_command.commands.is_empty() {
+                return Ok(CorrectionResults::NoFixSpecified);
+            }
             for command in &action_command.commands {
                 let result = self.run_single_fix(command).await?;
-                match (result, &output) {
-                    (CorrectionResults::FailAndStop, _) => {
-                        return Ok(CorrectionResults::FailAndStop);
-                    }
-                    (CorrectionResults::Failure, _) => {
-                        output.replace(CorrectionResults::Failure);
-                    }
-                    (CorrectionResults::Success, None) => {
-                        output.replace(CorrectionResults::Success);
-                    }
-                    _ => {}
+                highest_exit_code = max(highest_exit_code, result);
+                if highest_exit_code >= 100 {
+                    return Ok(CorrectionResults::FailAndStop);
                 }
             }
         }
 
-        match output {
-            None => Ok(CorrectionResults::NoFixSpecified),
-            Some(v) => Ok(v),
+        if let Some(action_command) = &self.action.check.command {
+            let check_status = self.evaluate_command_check(action_command).await?;
+            info!("re-running check returned {:?}", check_status);
+            match check_status {
+                CacheResults::StopExecution => Ok(CorrectionResults::FailAndStop),
+                CacheResults::FixNotRequired => Ok(CorrectionResults::Success),
+                CacheResults::FixRequired => {
+                    if self.action.required {
+                        Ok(CorrectionResults::FailAndStop)
+                    } else {
+                        Ok(CorrectionResults::FailContinue)
+                    }
+                }
+            }
+        } else {
+            Ok(CorrectionResults::Success)
         }
     }
 
-    async fn run_single_fix(&self, command: &str) -> Result<CorrectionResults, RuntimeError> {
+    async fn run_single_fix(&self, command: &str) -> Result<i32, RuntimeError> {
         let args = vec![command.to_string()];
         let capture = OutputCapture::capture_output(CaptureOpts {
             working_dir: self.working_dir,
@@ -172,7 +166,9 @@ impl<'a> DoctorActionRun<'a> {
         })
         .await?;
 
-        Ok(CorrectionResults::from(&capture))
+        info!("fix ran {} and exited {:?}", command, capture.exit_code);
+
+        Ok(capture.exit_code.unwrap_or(-1))
     }
 
     pub async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
@@ -217,6 +213,7 @@ impl<'a> DoctorActionRun<'a> {
         &self,
         action_command: &DoctorGroupActionCommand,
     ) -> Result<CacheResults, RuntimeError> {
+        let mut result: Option<CacheResults> = None;
         for command in &action_command.commands {
             let args = vec![command.clone()];
             let path = format!("{}:{}", self.model.containing_dir(), self.model.exec_path());
@@ -229,13 +226,29 @@ impl<'a> DoctorActionRun<'a> {
             })
             .await?;
 
-            let cache_results = CacheResults::from(&output);
-            if !cache_results.is_success() {
-                return Ok(cache_results);
+            info!(
+                "check ran command {} and result was {:?}",
+                command, output.exit_code
+            );
+
+            let command_result = match output.exit_code {
+                Some(0) => CacheResults::FixNotRequired,
+                Some(100..=i32::MAX) => CacheResults::StopExecution,
+                _ => CacheResults::FixRequired,
+            };
+
+            let next = match &result {
+                None => command_result,
+                Some(prev) => cmp::max(prev.clone(), command_result.clone()),
+            };
+
+            result.replace(next);
+            if result == Some(CacheResults::StopExecution) {
+                break;
             }
         }
 
-        Ok(CacheResults::FixRequired)
+        Ok(result.unwrap_or(CacheResults::FixRequired))
     }
 }
 

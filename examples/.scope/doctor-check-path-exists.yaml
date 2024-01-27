@@ -4,7 +4,7 @@ metadata:
   name: path-exists
 spec:
   check:
-    target: ./scripts/does-path-env-exist.sh
+    target: ./scripts/fail-first-call path-exists
   fix:
     target: ../bin/truey
   description: Check your shell for basic functionality

@@ -27,6 +27,7 @@ spec:
       fix:
         commands:
           - ./scripts/fix-node-version.sh
+      required: false
     - description: Install packages
       check:
         paths:
@@ -45,7 +46,6 @@ In the example above, there are two actions, the first ensures that node is oper
 
 An action is a discrete step, they run in order defined.
 The action should be atomic, and target a single resolution.
-If an action fails, the following actions will still run, unless `fix.commands` or `check.commands` exit with an error code `>=100`.
 
 Notice an action can provide both `paths` and `commands`, if either of them indicate that the fix should run, it will run.
 In the event there are no defined check, the fix will _always_ run.
@@ -53,26 +53,17 @@ In the event there are no defined check, the fix will _always_ run.
 ## Fix
 
 When the checks determine that something isn't correct, a fix is the way to automate the resolution.
-When provided, `scope` will run them in order, if a command fails, the next command will continue to run unless the script exists with `>=100`
+When provided, `scope` will run them in order.
 
 ## Commands
 
 A command can either be relative, or use the PATH.
 To target a script relative to the group it must start with `.`, and giving a relative path to the group file.
 
-## Exit Codes
-
-Depending on the exit code, different effects will happen
-
-| Exit Code   | Check Effect                                                       | Fix Effect                                 |
-|-------------|--------------------------------------------------------------------|--------------------------------------------|
-| `0`         | No work needed                                                     | Fix was successful                         |
-| `1 - 99`    | Work required                                                      | Fix ran, but failed                        |
-| `100+`      | Work is required, but fix should not run. Do not run other checks. | Fix ran, failed, and execution should stop |
-
 ## Schema
 
 - `.spec.action` a series of steps to check and fix for the group.
+- `.spec.action[].required` default true, when true action failing check & fix will stop all execution. 
 - `.spec.action[].check.paths` A list of globs to check for a change.
 - `.spec.action[].check.commands` A list of commands to execute, using the exit code to determine if changes are needed.
 - `.spec.action[].fix.commands` A list of commands to execute, attempting to resolve issues detected by the action.
