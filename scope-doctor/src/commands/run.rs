@@ -43,7 +43,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     }
 
     let cache: Box<dyn FileCache> = if args.no_cache {
-        Box::new(NoOpCache::default())
+        Box::<NoOpCache>::default()
     } else {
         let cache_dir = args
             .cache_dir
@@ -73,8 +73,8 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 working_dir: &found_config.working_dir,
                 file_cache: &cache,
                 run_fix: args.fix.unwrap_or(true),
-                exec_runner: Box::new(DefaultExecutionProvider::default()),
-                glob_walker: Box::new(DefaultGlobWalker::default()),
+                exec_runner: Box::<DefaultExecutionProvider>::default(),
+                glob_walker: Box::<DefaultGlobWalker>::default(),
             };
 
             match run.run_action().await? {

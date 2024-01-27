@@ -143,10 +143,16 @@ impl<'a> DoctorActionRun<'a> {
 
         if highest_exit_code == 0 {
             if let Some(paths) = &self.action.check.files {
-                if let Err(e) = self.glob_walker.update_cache(&paths.base_path,
-                                              &paths.paths,
-                                              self.model.name(),
-                                              self.file_cache).await {
+                if let Err(e) = self
+                    .glob_walker
+                    .update_cache(
+                        &paths.base_path,
+                        &paths.paths,
+                        self.model.name(),
+                        self.file_cache,
+                    )
+                    .await
+                {
                     warn!("Unable to update cache: {:?}", e);
                     info!(target: "user", "Unable to properly update cache, next run will re-evaluate action");
                 }
@@ -158,7 +164,7 @@ impl<'a> DoctorActionRun<'a> {
                 Ok(CorrectionResults::FailAndStop)
             } else {
                 Ok(CorrectionResults::FailContinue)
-            }
+            };
         }
 
         if let Some(action_command) = &self.action.check.command {
@@ -288,7 +294,7 @@ pub trait GlobWalker {
     async fn have_globs_changed(
         &self,
         base_dir: &Path,
-        paths: &Vec<String>,
+        paths: &[String],
         cache_name: &str,
         file_cache: &Box<dyn FileCache>,
     ) -> Result<bool, RuntimeError>;
@@ -296,7 +302,7 @@ pub trait GlobWalker {
     async fn update_cache(
         &self,
         base_dir: &Path,
-        paths: &Vec<String>,
+        paths: &[String],
         cache_name: &str,
         file_cache: &Box<dyn FileCache>,
     ) -> Result<(), RuntimeError>;
@@ -310,7 +316,7 @@ impl GlobWalker for DefaultGlobWalker {
     async fn have_globs_changed(
         &self,
         base_dir: &Path,
-        paths: &Vec<String>,
+        paths: &[String],
         cache_name: &str,
         file_cache: &Box<dyn FileCache>,
     ) -> Result<bool, RuntimeError> {
@@ -333,7 +339,7 @@ impl GlobWalker for DefaultGlobWalker {
     async fn update_cache(
         &self,
         base_dir: &Path,
-        paths: &Vec<String>,
+        paths: &[String],
         cache_name: &str,
         file_cache: &Box<dyn FileCache>,
     ) -> Result<(), RuntimeError> {
@@ -342,7 +348,9 @@ impl GlobWalker for DefaultGlobWalker {
         for glob_str in paths {
             let glob_path = format!("{}/{}", base_dir.display(), glob_str);
             for path in glob(&glob_path)?.filter_map(Result::ok) {
-                file_cache.update_cache_entry(cache_name.to_string(), &path).await?;
+                file_cache
+                    .update_cache_entry(cache_name.to_string(), &path)
+                    .await?;
             }
         }
 
@@ -355,7 +363,11 @@ mod test {
     use crate::check::{ActionRunResult, DoctorActionRun, MockGlobWalker, RuntimeError};
     use crate::file_cache::{FileCache, NoOpCache};
     use anyhow::{anyhow, Result};
-    use scope_lib::prelude::{DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder, DoctorGroupActionCommand, DoctorGroupBuilder, DoctorGroupCachePath, MockExecutionProvider, ModelMetadataBuilder, ModelRoot, ModelRootBuilder, OutputCaptureBuilder};
+    use scope_lib::prelude::{
+        DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
+        DoctorGroupActionCommand, DoctorGroupBuilder, DoctorGroupCachePath, MockExecutionProvider,
+        ModelMetadataBuilder, ModelRoot, ModelRootBuilder, OutputCaptureBuilder,
+    };
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 
@@ -416,8 +428,13 @@ mod test {
             .unwrap()
     }
 
-    fn command_result(mock: &mut MockExecutionProvider, command: &'static str, expected_results: Vec<i32>) {
-        let mut exectation = mock.expect_run_command()
+    fn command_result(
+        mock: &mut MockExecutionProvider,
+        command: &'static str,
+        expected_results: Vec<i32>,
+    ) {
+        let mut exectation = mock
+            .expect_run_command()
             .withf(|params| params.args == vec![command.to_string()])
             .times(expected_results.len());
         for code in expected_results {
@@ -435,7 +452,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1, 0]);
@@ -464,7 +481,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
@@ -493,7 +510,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
@@ -523,7 +540,7 @@ mod test {
         action.required = false;
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
@@ -552,14 +569,20 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let mut glob_walker = MockGlobWalker::new();
-        glob_walker.expect_have_globs_changed().times(1).returning(|_, _, _, _| Ok(false));
-        glob_walker.expect_update_cache().times(1).returning(|_, _, _, _| Ok(()));
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_update_cache()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
 
         let run = DoctorActionRun {
             model: &model,
@@ -582,14 +605,20 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let mut glob_walker = MockGlobWalker::new();
-        glob_walker.expect_have_globs_changed().times(1).returning(|_, _, _, _| Ok(false));
-        glob_walker.expect_update_cache().times(1).returning(|_, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_update_cache()
+            .times(1)
+            .returning(|_, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
 
         let run = DoctorActionRun {
             model: &model,
@@ -612,13 +641,16 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
         let mut glob_walker = MockGlobWalker::new();
-        glob_walker.expect_have_globs_changed().times(1).returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
 
         let run = DoctorActionRun {
             model: &model,
@@ -642,13 +674,16 @@ mod test {
         action.required = false;
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::new(NoOpCache::default());
+        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
         let mut glob_walker = MockGlobWalker::new();
-        glob_walker.expect_have_globs_changed().times(1).returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
 
         let run = DoctorActionRun {
             model: &model,
