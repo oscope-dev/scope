@@ -9,6 +9,7 @@ use scope_lib::prelude::{
 use std::collections::BTreeMap;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 #[derive(Debug, Parser)]
@@ -27,6 +28,25 @@ pub struct DoctorRunArgs {
     pub no_cache: bool,
 }
 
+fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
+    if args.no_cache {
+        Arc::<NoOpCache>::default()
+    } else {
+        let cache_dir = args
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| "/tmp/scope".to_string());
+        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
+        match FileBasedCache::new(&cache_path) {
+            Ok(cache) => Arc::new(cache),
+            Err(e) => {
+                warn!("Unable to create cache {:?}", e);
+                Arc::<NoOpCache>::default()
+            }
+        }
+    }
+}
+
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
     let mut check_map: BTreeMap<String, ModelRoot<DoctorGroup>> = Default::default();
     for check in found_config.doctor_group.values() {
@@ -42,16 +62,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         }
     }
 
-    let cache: Box<dyn FileCache> = if args.no_cache {
-        Box::<NoOpCache>::default()
-    } else {
-        let cache_dir = args
-            .cache_dir
-            .clone()
-            .unwrap_or_else(|| "/tmp/scope".to_string());
-        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
-        Box::new(FileBasedCache::new(&cache_path)?)
-    };
+    let cache: Arc<dyn FileCache> = get_cache(args);
 
     let checks_to_run: Vec<_> = check_map.values().collect();
 
@@ -71,7 +82,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 model,
                 action,
                 working_dir: &found_config.working_dir,
-                file_cache: &cache,
+                file_cache: cache.clone(),
                 run_fix: args.fix.unwrap_or(true),
                 exec_runner: &DefaultExecutionProvider::default(),
                 glob_walker: &DefaultGlobWalker::default(),

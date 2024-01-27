@@ -1,6 +1,7 @@
 use crate::redact::Redactor;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use derive_builder::Builder;
 use mockall::automock;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -8,7 +9,6 @@ use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use derive_builder::Builder;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;

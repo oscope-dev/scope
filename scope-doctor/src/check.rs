@@ -12,6 +12,7 @@ use scope_lib::prelude::{
     DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
 };
 use std::path::Path;
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, info, instrument, warn};
 
@@ -70,8 +71,7 @@ pub struct DoctorActionRun<'a> {
     pub model: &'a ModelRoot<DoctorGroup>,
     pub action: &'a DoctorGroupAction,
     pub working_dir: &'a Path,
-    #[allow(clippy::borrowed_box)]
-    pub file_cache: &'a Box<dyn FileCache>,
+    pub file_cache: Arc<dyn FileCache>,
     pub run_fix: bool,
     #[educe(Debug(ignore))]
     pub exec_runner: &'a dyn ExecutionProvider,
@@ -150,7 +150,7 @@ impl<'a> DoctorActionRun<'a> {
                         &paths.base_path,
                         &paths.paths,
                         self.model.name(),
-                        self.file_cache,
+                        self.file_cache.clone(),
                     )
                     .await
                 {
@@ -233,7 +233,7 @@ impl<'a> DoctorActionRun<'a> {
                 &paths.base_path,
                 &paths.paths,
                 self.model.name(),
-                self.file_cache,
+                self.file_cache.clone(),
             )
             .await?;
 
@@ -291,14 +291,13 @@ impl<'a> DoctorActionRun<'a> {
 
 #[automock]
 #[async_trait]
-#[allow(clippy::borrowed_box)]
 pub trait GlobWalker {
     async fn have_globs_changed(
         &self,
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
-        file_cache: &Box<dyn FileCache>,
+        file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError>;
 
     async fn update_cache(
@@ -306,7 +305,7 @@ pub trait GlobWalker {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
-        file_cache: &Box<dyn FileCache>,
+        file_cache: Arc<dyn FileCache>,
     ) -> Result<(), RuntimeError>;
 }
 
@@ -320,7 +319,7 @@ impl GlobWalker for DefaultGlobWalker {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
-        file_cache: &Box<dyn FileCache>,
+        file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError> {
         use glob::glob;
 
@@ -343,7 +342,7 @@ impl GlobWalker for DefaultGlobWalker {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
-        file_cache: &Box<dyn FileCache>,
+        file_cache: Arc<dyn FileCache>,
     ) -> Result<(), RuntimeError> {
         use glob::glob;
 
@@ -372,6 +371,7 @@ mod test {
     };
     use std::collections::BTreeMap;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     fn build_run_fail_fix_succeed_action() -> DoctorGroupAction {
         DoctorGroupActionBuilder::default()
@@ -454,7 +454,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1, 0]);
@@ -466,7 +466,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -483,7 +483,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
@@ -495,7 +495,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -512,7 +512,7 @@ mod test {
         let action = build_run_fail_fix_succeed_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
@@ -524,7 +524,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -542,7 +542,7 @@ mod test {
         action.required = false;
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
@@ -554,7 +554,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -571,7 +571,7 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
@@ -590,7 +590,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -607,7 +607,7 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
@@ -626,7 +626,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -643,7 +643,7 @@ mod test {
         let action = build_file_fix_action();
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
@@ -658,7 +658,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
@@ -676,7 +676,7 @@ mod test {
         action.required = false;
         let model = make_model(vec![action.clone()]);
         let path = PathBuf::from("/tmp/foo");
-        let file_cache: Box<dyn FileCache> = Box::<NoOpCache>::default();
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
@@ -691,7 +691,7 @@ mod test {
             model: &model,
             action: &action,
             working_dir: &path,
-            file_cache: &file_cache,
+            file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,

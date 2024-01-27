@@ -20,7 +20,7 @@ pub enum FileCacheStatus {
 
 #[automock]
 #[async_trait]
-pub trait FileCache: Sync + Debug {
+pub trait FileCache: Sync + Send + Debug {
     async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus>;
     async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()>;
     async fn persist(&self) -> Result<(), FileCacheError>;

@@ -19,7 +19,7 @@ pub trait HelpMetadata {
 pub mod prelude {
     pub use crate::capture::{
         CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider,
-        MockExecutionProvider, OutputCapture, OutputDestination, OutputCaptureBuilder
+        MockExecutionProvider, OutputCapture, OutputCaptureBuilder, OutputDestination,
     };
     pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
