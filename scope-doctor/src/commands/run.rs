@@ -1,5 +1,5 @@
 use crate::check::{ActionRunResult, DefaultGlobWalker, DoctorActionRun};
-use crate::file_cache::{CacheStorage, FileBasedCache, NoOpCache};
+use crate::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
@@ -42,15 +42,15 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         }
     }
 
-    let cache = if args.no_cache {
-        CacheStorage::NoCache(NoOpCache::default())
+    let cache: Box<dyn FileCache> = if args.no_cache {
+        Box::new(NoOpCache::default())
     } else {
         let cache_dir = args
             .cache_dir
             .clone()
             .unwrap_or_else(|| "/tmp/scope".to_string());
         let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
-        CacheStorage::File(FileBasedCache::new(&cache_path)?)
+        Box::new(FileBasedCache::new(&cache_path)?)
     };
 
     let checks_to_run: Vec<_> = check_map.values().collect();

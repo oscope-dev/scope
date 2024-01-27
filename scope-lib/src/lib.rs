@@ -18,15 +18,12 @@ pub trait HelpMetadata {
 
 pub mod prelude {
     pub use crate::capture::{
-        CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputCapture,
-        OutputDestination,
+        CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider,
+        MockExecutionProvider, OutputCapture, OutputDestination, OutputCaptureBuilder
     };
     pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
-    pub use crate::models::prelude::{
-        DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand, DoctorGroupCachePath,
-        ModelMetadata, ModelRoot, ParsedConfig, ScopeModel,
-    };
+    pub use crate::models::prelude::*;
     pub use crate::report::ReportBuilder;
     pub use crate::HelpMetadata;
 }

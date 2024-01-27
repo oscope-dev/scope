@@ -8,6 +8,7 @@ use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use derive_builder::Builder;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
@@ -26,13 +27,22 @@ impl RwLockOutput {
     }
 }
 
+#[derive(Default, Builder)]
+#[builder(setter(into))]
 pub struct OutputCapture {
+    #[builder(default)]
     pub working_dir: PathBuf,
+    #[builder(default)]
     stdout: Vec<(DateTime<Utc>, String)>,
+    #[builder(default)]
     stderr: Vec<(DateTime<Utc>, String)>,
+    #[builder(default)]
     pub exit_code: Option<i32>,
+    #[builder(default)]
     start_time: DateTime<Utc>,
+    #[builder(default)]
     end_time: DateTime<Utc>,
+    #[builder(default)]
     pub command: String,
 }
 

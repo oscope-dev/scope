@@ -1,6 +1,6 @@
 use crate::HelpMetadata;
-use std::path::PathBuf;
 use derive_builder::Builder;
+use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
@@ -47,13 +47,6 @@ pub struct DoctorGroupCachePath {
     pub base_path: PathBuf,
 }
 
-#[derive(Debug, PartialEq, Clone, Builder)]
-#[builder(setter(into))]
-pub struct DoctorGroupActionCheck {
-    pub command: Option<DoctorGroupActionCommand>,
-    pub files: Option<DoctorGroupCachePath>,
-}
-
 impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
     fn from(value: (&str, Vec<&str>)) -> Self {
         let pb = PathBuf::from(value.0);
@@ -64,6 +57,13 @@ impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
             base_path: pb,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
+pub struct DoctorGroupActionCheck {
+    pub command: Option<DoctorGroupActionCommand>,
+    pub files: Option<DoctorGroupCachePath>,
 }
 
 #[derive(Debug, PartialEq, Clone, Builder)]
