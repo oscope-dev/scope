@@ -12,7 +12,7 @@ use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, info, instrument, warn};
@@ -69,19 +69,19 @@ pub enum ActionRunResult {
 #[derive(Educe, Builder)]
 #[educe(Debug)]
 #[builder(setter(into))]
-pub struct DoctorActionRun<'a> {
-    pub model: &'a ModelRoot<DoctorGroup>,
-    pub action: &'a DoctorGroupAction,
-    pub working_dir: &'a Path,
+pub struct DoctorActionRun {
+    pub model: ModelRoot<DoctorGroup>,
+    pub action: DoctorGroupAction,
+    pub working_dir: PathBuf,
     pub file_cache: Arc<dyn FileCache>,
     pub run_fix: bool,
     #[educe(Debug(ignore))]
-    pub exec_runner: &'a dyn ExecutionProvider,
+    pub exec_runner: Arc<dyn ExecutionProvider>,
     #[educe(Debug(ignore))]
-    pub glob_walker: &'a dyn GlobWalker,
+    pub glob_walker: Arc<dyn GlobWalker>,
 }
 
-impl<'a> DoctorActionRun<'a> {
+impl DoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     pub async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
@@ -194,7 +194,7 @@ impl<'a> DoctorActionRun<'a> {
         let capture = self
             .exec_runner
             .run_command(CaptureOpts {
-                working_dir: self.working_dir,
+                working_dir: &self.working_dir,
                 args: &args,
                 output_dest: OutputDestination::StandardOut,
                 path: &self.model.exec_path(),
@@ -257,7 +257,7 @@ impl<'a> DoctorActionRun<'a> {
             let output = self
                 .exec_runner
                 .run_command(CaptureOpts {
-                    working_dir: self.working_dir,
+                    working_dir: &self.working_dir,
                     args: &args,
                     output_dest: OutputDestination::Logging,
                     path: &path,
@@ -456,18 +456,18 @@ mod tests {
         exec_runner: MockExecutionProvider,
         glob_walker: MockGlobWalker,
     ) -> DoctorActionRun {
-        let model = make_model(actions);
+        let model = make_model(actions.clone());
         let path = PathBuf::from("/tmp/foo");
         let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
 
         DoctorActionRun {
-            model: &model,
-            action: &actions[0],
-            working_dir: &path,
+            model,
+            action: actions[0].clone(),
+            working_dir: path,
             file_cache,
             run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
+            exec_runner: Arc::new(exec_runner),
+            glob_walker: Arc::new(glob_walker),
         }
     }
 

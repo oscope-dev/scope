@@ -68,6 +68,8 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
     let mut should_pass = true;
     let mut skip_remaining = false;
+    let exec_runner = Arc::new(DefaultExecutionProvider::default());
+    let glob_walker = Arc::new(DefaultGlobWalker::default());
 
     for model in checks_to_run {
         debug!(target: "user", "Running check {}", model.name());
@@ -79,13 +81,13 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
         for action in &model.spec.actions {
             let run = DoctorActionRun {
-                model,
-                action,
-                working_dir: &found_config.working_dir,
+                model: model.clone(),
+                action: action.clone(),
+                working_dir: found_config.working_dir.clone(),
                 file_cache: cache.clone(),
                 run_fix: args.fix.unwrap_or(true),
-                exec_runner: &DefaultExecutionProvider::default(),
-                glob_walker: &DefaultGlobWalker::default(),
+                exec_runner: exec_runner.clone(),
+                glob_walker: glob_walker.clone(),
             };
 
             match run.run_action().await? {
