@@ -76,6 +76,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             match run.run_action().await? {
                 ActionRunResult::Stop => {
                     skip_remaining = true;
+                    should_pass = false;
                     break;
                 }
                 ActionRunResult::Failed => {

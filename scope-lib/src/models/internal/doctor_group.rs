@@ -3,19 +3,24 @@ use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DoctorGroupAction {
+    pub name: String,
     pub description: String,
     pub fix: Option<DoctorGroupActionCommand>,
     pub check: DoctorGroupActionCheck,
+    pub required: bool
 }
 
 impl DoctorGroupAction {
     pub fn make_from(
+        name: &str,
         description: &str,
         fix_command: Option<Vec<&str>>,
         check_path: Option<(&str, Vec<&str>)>,
         check_command: Option<Vec<&str>>,
     ) -> Self {
         Self {
+            required: true,
+            name: name.to_string(),
             description: description.to_string(),
             fix: fix_command.map(|commands| DoctorGroupActionCommand {
                 commands: commands.iter().map(|x| x.to_string()).collect(),

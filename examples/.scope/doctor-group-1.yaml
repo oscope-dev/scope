@@ -1,23 +1,18 @@
 apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
-  name: foo
+  name: group-1
 spec:
   description: Check your shell for basic functionality
   actions:
     - description: foo1
       check:
-        paths:
-          - 'flig/bar/**/*'
         commands:
-          - ./foo1.sh
+          - ./scripts/fail-first-call foo
       fix:
         commands:
-          - ./fix1.sh
-      required: false
+          - ../bin/pip-install.sh
     - description: foo2
       check:
         paths:
-          - '*/*.txt'
-        commands:
-          - sleep infinity
+          - '**/requirements.txt'

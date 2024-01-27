@@ -42,6 +42,8 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorGroup> {
 
     Ok(DoctorGroup {
         actions: vec![DoctorGroupAction {
+            name: "1".to_string(),
+            required: true,
             description: parsed.description.clone(),
             fix: fix_exec,
             check: DoctorGroupActionCheck {
@@ -105,6 +107,7 @@ spec:
             DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
+                    "1",
                     "Check your shell for basic functionality",
                     Some(vec!["true"]),
                     None,
@@ -117,6 +120,7 @@ spec:
             DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
+                    "1",
                     "Check your shell for basic functionality",
                     None,
                     None,
@@ -129,6 +133,7 @@ spec:
             DoctorGroup {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
+                    "1",
                     "Check your shell for basic functionality",
                     None,
                     None,

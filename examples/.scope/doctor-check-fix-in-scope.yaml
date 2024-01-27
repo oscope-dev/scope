@@ -4,7 +4,7 @@ metadata:
   name: path-exists-fix-in-scope-dir
 spec:
   check:
-    target: ./scripts/does-path-env-exist.sh
+    target: ./scripts/fail-first-call path-exists-fix-in-scope-dir
   fix:
     target: ./scripts/truey
   description: Check your shell for basic functionality

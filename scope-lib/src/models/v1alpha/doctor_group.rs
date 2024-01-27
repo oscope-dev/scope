@@ -26,9 +26,16 @@ pub struct DoctorFixSpec {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DoctorGroupActionSpec {
+    pub name: Option<String>,
     pub description: Option<String>,
     pub check: DoctorCheckSpec,
     pub fix: Option<DoctorFixSpec>,
+    #[serde(default = "doctor_group_action_required_default")]
+    pub required: bool,
+}
+
+fn doctor_group_action_required_default() -> bool {
+    true
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,8 +49,12 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
     let parsed: DoctorGroupSpec = serde_yaml::from_value(value.clone())?;
 
     let mut actions: Vec<_> = Default::default();
+    let mut count = 0;
     for spec_action in parsed.actions {
+        count += 1;
         actions.push(DoctorGroupAction {
+            name: spec_action.name.unwrap_or_else(|| format!("{}", count)),
+            required: spec_action.required,
             description: spec_action
                 .description
                 .unwrap_or_else(|| "default".to_string()),
@@ -99,6 +110,8 @@ mod tests {
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![
                     DoctorGroupAction {
+                        name: "1".to_string(),
+                        required: false,
                         description: "foo1".to_string(),
                         fix: Some(DoctorGroupActionCommand::from(vec![
                             "/foo/bar/.scope/fix1.sh"
@@ -114,6 +127,8 @@ mod tests {
                         }
                     },
                     DoctorGroupAction {
+                        name: "2".to_string(),
+                        required: true,
                         description: "foo2".to_string(),
                         fix: None,
                         check: DoctorGroupActionCheck {

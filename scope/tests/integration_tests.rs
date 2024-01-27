@@ -87,10 +87,11 @@ fn test_run_check_path_exists() {
         .arg("doctor")
         .arg("run")
         .arg("--only=path-exists")
+        .env("NO_COLOR", "1")
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully",
+        "Check failed. Fix ran successfully, group: \"path-exists\", name: \"1\""
     ));
 
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
@@ -100,10 +101,11 @@ fn test_run_check_path_exists() {
         .arg("doctor")
         .arg("run")
         .arg("--only=path-exists-fix-in-scope-dir")
+        .env("NO_COLOR", "1")
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully.",
+        "Check failed. Fix ran successfully, group: \"path-exists-fix-in-scope-dir\", name: \"1\""
     ));
 
     working_dir.close().unwrap();
@@ -128,12 +130,13 @@ fn test_run_setup() {
             "--cache-dir={}/.cache",
             working_dir.to_str().unwrap()
         ))
+        .env("NO_COLOR", "1")
         .assert();
 
     result
         .success()
         .stdout(predicate::str::contains(
-            "Check failed. Fix ran successfully.",
+            "Check failed. Fix ran successfully, group: \"setup\", name: \"1\""
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
@@ -148,10 +151,11 @@ fn test_run_setup() {
             "--cache-dir={}/.cache",
             working_dir.to_str().unwrap()
         ))
+        .env("NO_COLOR", "1")
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully.",
+        "Check failed. Fix ran successfully, group: \"setup\", name: \"1\""
     ));
 
     working_dir
@@ -169,9 +173,43 @@ fn test_run_setup() {
             "--cache-dir={}/.cache",
             working_dir.to_str().unwrap()
         ))
+        .env("NO_COLOR", "1")
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check failed. Fix ran successfully.",
+        "Check failed. Fix ran successfully, group: \"setup\", name: \"1\"",
     ));
+}
+
+#[test]
+fn test_run_group_1() {
+    let working_dir = setup_working_dir();
+    working_dir
+        .child("foo/requirements.txt")
+        .write_str("initial cache")
+        .unwrap();
+
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_group_1")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=group-1")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .env("NO_COLOR", "1")
+        .assert();
+
+    result
+        .failure()
+        .stdout(predicate::str::contains(
+            "Check failed. Fix ran successfully, group: \"group-1\", name: \"1\"",
+        ))
+        .stdout(predicate::str::contains(
+            "Check failed. No fix was specified, group: \"group-1\", name: \"2\"",
+        ))
+        .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 }
