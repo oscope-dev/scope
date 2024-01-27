@@ -1,5 +1,7 @@
 use crate::redact::Redactor;
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use mockall::automock;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write;
@@ -55,6 +57,22 @@ pub enum CaptureError {
         #[from]
         error: std::string::FromUtf8Error,
     },
+}
+
+#[automock]
+#[async_trait]
+pub trait ExecutionProvider {
+    async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError>;
+}
+
+#[derive(Default, Debug)]
+pub struct DefaultExecutionProvider {}
+
+#[async_trait]
+impl ExecutionProvider for DefaultExecutionProvider {
+    async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError> {
+        OutputCapture::capture_output(opts).await
+    }
 }
 
 pub struct CaptureOpts<'a> {

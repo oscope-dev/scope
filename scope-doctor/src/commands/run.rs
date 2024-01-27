@@ -1,9 +1,11 @@
-use crate::check::{ActionRunResult, DoctorActionRun};
+use crate::check::{ActionRunResult, DefaultGlobWalker, DoctorActionRun};
 use crate::file_cache::{CacheStorage, FileBasedCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use scope_lib::prelude::{DoctorGroup, FoundConfig, ModelRoot, ScopeModel};
+use scope_lib::prelude::{
+    DefaultExecutionProvider, DoctorGroup, FoundConfig, ModelRoot, ScopeModel,
+};
 use std::collections::BTreeMap;
 
 use std::path::PathBuf;
@@ -71,6 +73,8 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 working_dir: &found_config.working_dir,
                 file_cache: &cache,
                 run_fix: args.fix.unwrap_or(true),
+                exec_runner: Box::new(DefaultExecutionProvider::default()),
+                glob_walker: Box::new(DefaultGlobWalker::default()),
             };
 
             match run.run_action().await? {

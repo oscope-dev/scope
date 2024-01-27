@@ -6,6 +6,7 @@ use serde_yaml::Value;
 use std::collections::BTreeMap;
 
 use strum::EnumString;
+use derive_builder::Builder;
 
 mod internal;
 mod v1alpha;
@@ -65,7 +66,8 @@ pub trait ScopeModel {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
 pub struct ModelRoot<V> {
     pub api_version: String,

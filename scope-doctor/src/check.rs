@@ -3,15 +3,14 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
+use async_trait::async_trait;
 use colored::Colorize;
-#[cfg(not(test))]
-use glob::glob;
+use educe::Educe;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
-    DoctorGroupCachePath, ModelRoot, OutputCapture, OutputDestination, ScopeModel,
+    DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
 };
-use std::future::Future;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use thiserror::Error;
 use tracing::{error, info, instrument};
 
@@ -64,13 +63,18 @@ pub enum ActionRunResult {
     Stop,
 }
 
-#[derive(Debug)]
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct DoctorActionRun<'a> {
     pub model: &'a ModelRoot<DoctorGroup>,
     pub action: &'a DoctorGroupAction,
     pub working_dir: &'a Path,
     pub file_cache: &'a CacheStorage,
     pub run_fix: bool,
+    #[educe(Debug(ignore))]
+    pub exec_runner: Box<dyn ExecutionProvider>,
+    #[educe(Debug(ignore))]
+    pub glob_walker: Box<dyn GlobWalker>,
 }
 
 impl<'a> DoctorActionRun<'a> {
@@ -157,14 +161,16 @@ impl<'a> DoctorActionRun<'a> {
 
     async fn run_single_fix(&self, command: &str) -> Result<i32, RuntimeError> {
         let args = vec![command.to_string()];
-        let capture = OutputCapture::capture_output(CaptureOpts {
-            working_dir: self.working_dir,
-            args: &args,
-            output_dest: OutputDestination::StandardOut,
-            path: &self.model.exec_path(),
-            env_vars: Default::default(),
-        })
-        .await?;
+        let capture = self
+            .exec_runner
+            .run_command(CaptureOpts {
+                working_dir: self.working_dir,
+                args: &args,
+                output_dest: OutputDestination::StandardOut,
+                path: &self.model.exec_path(),
+                env_vars: Default::default(),
+            })
+            .await?;
 
         info!("fix ran {} and exited {:?}", command, capture.exit_code);
 
@@ -193,14 +199,10 @@ impl<'a> DoctorActionRun<'a> {
         &self,
         paths: &DoctorGroupCachePath,
     ) -> Result<CacheResults, RuntimeError> {
-        let result = process_glob(&paths.base_path, &paths.paths, |path| {
-            let check_full_name = self.model.file_path().clone();
-            async move {
-                let file_result = self.file_cache.check_file(check_full_name, &path).await?;
-                Ok(file_result == FileCacheStatus::FileMatches)
-            }
-        })
-        .await?;
+        let result = self
+            .glob_walker
+            .walk_globs(&paths.base_path, &paths.paths, self.model.name(), self.file_cache)
+            .await?;
 
         if result {
             Ok(CacheResults::FixNotRequired)
@@ -217,14 +219,16 @@ impl<'a> DoctorActionRun<'a> {
         for command in &action_command.commands {
             let args = vec![command.clone()];
             let path = format!("{}:{}", self.model.containing_dir(), self.model.exec_path());
-            let output = OutputCapture::capture_output(CaptureOpts {
-                working_dir: self.working_dir,
-                args: &args,
-                output_dest: OutputDestination::Logging,
-                path: &path,
-                env_vars: Default::default(),
-            })
-            .await?;
+            let output = self
+                .exec_runner
+                .run_command(CaptureOpts {
+                    working_dir: self.working_dir,
+                    args: &args,
+                    output_dest: OutputDestination::Logging,
+                    path: &path,
+                    env_vars: Default::default(),
+                })
+                .await?;
 
             info!(
                 "check ran command {} and result was {:?}",
@@ -252,45 +256,66 @@ impl<'a> DoctorActionRun<'a> {
     }
 }
 
-#[cfg(not(test))]
-async fn process_glob<'b, F, Ret: 'b>(
-    base_dir: &Path,
-    paths: &Vec<String>,
-    fun: F,
-) -> Result<bool, RuntimeError>
-where
-    F: Fn(PathBuf) -> Ret,
-    Ret: Future<Output = Result<bool, RuntimeError>>,
-{
-    for glob_str in paths {
-        let glob_path = format!("{}/{}", base_dir.display(), glob_str);
-        for path in glob(&glob_path)?.filter_map(Result::ok) {
-            let check_result = fun(path).await?;
-            if !check_result {
-                return Ok(false);
+#[async_trait]
+pub trait GlobWalker {
+    async fn walk_globs(
+        &self,
+        base_dir: &Path,
+        paths: &Vec<String>,
+        cache_name: &str,
+        file_cache: &CacheStorage,
+    ) -> Result<bool, RuntimeError>;
+}
+
+#[derive(Debug, Default)]
+pub struct DefaultGlobWalker {
+}
+
+#[async_trait]
+impl GlobWalker for DefaultGlobWalker {
+    async fn walk_globs(
+        &self,
+        base_dir: &Path,
+        paths: &Vec<String>,
+        cache_name: &str,
+        file_cache: &CacheStorage,
+    ) -> Result<bool, RuntimeError>
+    {
+        use glob::glob;
+
+        for glob_str in paths {
+            let glob_path = format!("{}/{}", base_dir.display(), glob_str);
+            for path in glob(&glob_path)?.filter_map(Result::ok) {
+                let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
+                let check_result = file_result == FileCacheStatus::FileMatches;
+                if !check_result {
+                    return Ok(false);
+                }
             }
         }
-    }
 
-    Ok(true)
+        Ok(true)
+    }
 }
 
 #[cfg(test)]
-async fn process_glob<'b, F, Ret: 'b>(
-    _base_dir: &Path,
-    paths: &Vec<String>,
-    fun: F,
-) -> Result<bool, RuntimeError>
-where
-    F: Fn(PathBuf) -> Ret,
-    Ret: Future<Output = Result<bool, RuntimeError>>,
-{
-    for glob_str in paths {
-        let check_result = fun(PathBuf::from(&glob_str)).await?;
-        if !check_result {
-            return Ok(false);
-        }
-    }
+mod test {
+    use anyhow::Result;
+    use crate::check::DoctorActionRun;
 
-    Ok(true)
+    #[tokio::test]
+    fn test_only_exec_will_re_run() -> Result<()> {
+
+        DoctorActionRun {
+            model: &ModelRoot {},
+            action: &DoctorGroupAction {},
+            working_dir: &(),
+            file_cache: &(),
+            run_fix: false,
+            exec_runner: Box::new(()),
+            glob_walker: Box::new(()),
+        };
+        
+        Ok(())
+    }
 }

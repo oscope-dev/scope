@@ -17,7 +17,10 @@ pub trait HelpMetadata {
 }
 
 pub mod prelude {
-    pub use crate::capture::{CaptureError, CaptureOpts, OutputCapture, OutputDestination};
+    pub use crate::capture::{
+        CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputCapture,
+        OutputDestination,
+    };
     pub use crate::config_load::{build_config_path, ConfigOptions, FoundConfig};
     pub use crate::logging::LoggingOpts;
     pub use crate::models::prelude::{
