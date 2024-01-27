@@ -1769,6 +1769,7 @@ dependencies = [
  "async-trait",
  "clap",
  "colored",
+ "derive_builder",
  "educe",
  "glob",
  "mockall",

@@ -5,6 +5,7 @@ use std::cmp::max;
 
 use async_trait::async_trait;
 use colored::Colorize;
+use derive_builder::Builder;
 use educe::Educe;
 use mockall::automock;
 use scope_lib::prelude::{
@@ -65,8 +66,9 @@ pub enum ActionRunResult {
     Stop,
 }
 
-#[derive(Educe)]
+#[derive(Educe, Builder)]
 #[educe(Debug)]
+#[builder(setter(into))]
 pub struct DoctorActionRun<'a> {
     pub model: &'a ModelRoot<DoctorGroup>,
     pub action: &'a DoctorGroupAction,
@@ -449,28 +451,36 @@ mod test {
         }
     }
 
-    #[tokio::test]
-    async fn test_only_exec_will_re_run() -> Result<()> {
-        let action = build_run_fail_fix_succeed_action();
-        let model = make_model(vec![action.clone()]);
+    fn setup_test(
+        actions: Vec<DoctorGroupAction>,
+        exec_runner: MockExecutionProvider,
+        glob_walker: MockGlobWalker,
+    ) -> DoctorActionRun {
+        let model = make_model(actions);
         let path = PathBuf::from("/tmp/foo");
         let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
-        let mut exec_runner = MockExecutionProvider::new();
 
-        command_result(&mut exec_runner, "check", vec![1, 0]);
-        command_result(&mut exec_runner, "fix", vec![0]);
-
-        let glob_walker = MockGlobWalker::new();
-
-        let run = DoctorActionRun {
+        DoctorActionRun {
             model: &model,
-            action: &action,
+            action: &actions[0],
             working_dir: &path,
             file_cache,
             run_fix: true,
             exec_runner: &exec_runner,
             glob_walker: &glob_walker,
-        };
+        }
+    }
+
+    #[tokio::test]
+    async fn test_only_exec_will_re_run() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![1, 0]);
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Succeeded, result);
@@ -481,25 +491,13 @@ mod test {
     #[tokio::test]
     async fn test_fail_fix_succeed_check_fails() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
         command_result(&mut exec_runner, "fix", vec![0]);
 
-        let glob_walker = MockGlobWalker::new();
-
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Stop, result);
@@ -510,25 +508,13 @@ mod test {
     #[tokio::test]
     async fn test_fail_fix_fails() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
         command_result(&mut exec_runner, "fix", vec![1]);
 
-        let glob_walker = MockGlobWalker::new();
-
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Stop, result);
@@ -540,26 +526,14 @@ mod test {
     async fn test_not_required_continue() -> Result<()> {
         let mut action = build_run_fail_fix_succeed_action();
         action.required = false;
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
+
         let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
 
         command_result(&mut exec_runner, "check", vec![1]);
         command_result(&mut exec_runner, "fix", vec![1]);
 
-        let glob_walker = MockGlobWalker::new();
-
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
-
+        let run = setup_test(vec![action], exec_runner, glob_walker);
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Failed, result);
 
@@ -569,14 +543,12 @@ mod test {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works() -> Result<()> {
         let action = build_file_fix_action();
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
+
+        let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
-        let mut glob_walker = MockGlobWalker::new();
         glob_walker
             .expect_have_globs_changed()
             .times(1)
@@ -586,15 +558,7 @@ mod test {
             .times(1)
             .returning(|_, _, _, _| Ok(()));
 
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Succeeded, result);
@@ -605,14 +569,12 @@ mod test {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works_unable_to_update_cache() -> Result<()> {
         let action = build_file_fix_action();
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
+
+        let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
-        let mut glob_walker = MockGlobWalker::new();
         glob_walker
             .expect_have_globs_changed()
             .times(1)
@@ -622,15 +584,7 @@ mod test {
             .times(1)
             .returning(|_, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
 
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Succeeded, result);
@@ -641,28 +595,17 @@ mod test {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_fails() -> Result<()> {
         let action = build_file_fix_action();
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
         let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
-        let mut glob_walker = MockGlobWalker::new();
         glob_walker
             .expect_have_globs_changed()
             .times(1)
             .returning(|_, _, _, _| Ok(false));
 
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Stop, result);
@@ -674,28 +617,18 @@ mod test {
     async fn test_file_not_required_succeed() -> Result<()> {
         let mut action = build_file_fix_action();
         action.required = false;
-        let model = make_model(vec![action.clone()]);
-        let path = PathBuf::from("/tmp/foo");
-        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
+
         let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
-        let mut glob_walker = MockGlobWalker::new();
         glob_walker
             .expect_have_globs_changed()
             .times(1)
             .returning(|_, _, _, _| Ok(false));
 
-        let run = DoctorActionRun {
-            model: &model,
-            action: &action,
-            working_dir: &path,
-            file_cache,
-            run_fix: true,
-            exec_runner: &exec_runner,
-            glob_walker: &glob_walker,
-        };
+        let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunResult::Failed, result);
