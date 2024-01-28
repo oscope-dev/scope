@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use mockall::automock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 use std::fs::File;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -19,27 +20,10 @@ pub enum FileCacheStatus {
 
 #[automock]
 #[async_trait]
-pub trait FileCache: Sync {
+pub trait FileCache: Sync + Send + Debug {
     async fn check_file(&self, check_name: String, path: &Path) -> Result<FileCacheStatus>;
     async fn update_cache_entry(&self, check_name: String, path: &Path) -> Result<()>;
     async fn persist(&self) -> Result<(), FileCacheError>;
-}
-
-#[derive(Debug)]
-pub enum CacheStorage {
-    NoCache(NoOpCache),
-    File(FileBasedCache),
-}
-
-impl Deref for CacheStorage {
-    type Target = dyn FileCache;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            CacheStorage::NoCache(d) => d,
-            CacheStorage::File(f) => f,
-        }
-    }
 }
 
 #[derive(Default, Debug)]

@@ -1,5 +1,8 @@
 use crate::redact::Redactor;
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use derive_builder::Builder;
+use mockall::automock;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Write;
@@ -24,13 +27,22 @@ impl RwLockOutput {
     }
 }
 
+#[derive(Default, Builder)]
+#[builder(setter(into))]
 pub struct OutputCapture {
+    #[builder(default)]
     pub working_dir: PathBuf,
+    #[builder(default)]
     stdout: Vec<(DateTime<Utc>, String)>,
+    #[builder(default)]
     stderr: Vec<(DateTime<Utc>, String)>,
+    #[builder(default)]
     pub exit_code: Option<i32>,
+    #[builder(default)]
     start_time: DateTime<Utc>,
+    #[builder(default)]
     end_time: DateTime<Utc>,
+    #[builder(default)]
     pub command: String,
 }
 
@@ -55,6 +67,22 @@ pub enum CaptureError {
         #[from]
         error: std::string::FromUtf8Error,
     },
+}
+
+#[automock]
+#[async_trait]
+pub trait ExecutionProvider {
+    async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError>;
+}
+
+#[derive(Default, Debug)]
+pub struct DefaultExecutionProvider {}
+
+#[async_trait]
+impl ExecutionProvider for DefaultExecutionProvider {
+    async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError> {
+        OutputCapture::capture_output(opts).await
+    }
 }
 
 pub struct CaptureOpts<'a> {

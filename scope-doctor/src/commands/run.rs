@@ -1,13 +1,16 @@
-use crate::check::{ActionRunResult, DoctorActionRun};
-use crate::file_cache::{CacheStorage, FileBasedCache, NoOpCache};
+use crate::check::{ActionRunResult, DefaultGlobWalker, DoctorActionRun};
+use crate::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
-use scope_lib::prelude::{DoctorGroup, FoundConfig, ModelRoot, ScopeModel};
+use scope_lib::prelude::{
+    DefaultExecutionProvider, DoctorGroup, FoundConfig, ModelRoot, ScopeModel,
+};
 use std::collections::BTreeMap;
 
 use std::path::PathBuf;
-use tracing::{debug, info, warn};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -25,6 +28,25 @@ pub struct DoctorRunArgs {
     pub no_cache: bool,
 }
 
+fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
+    if args.no_cache {
+        Arc::<NoOpCache>::default()
+    } else {
+        let cache_dir = args
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| "/tmp/scope".to_string());
+        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
+        match FileBasedCache::new(&cache_path) {
+            Ok(cache) => Arc::new(cache),
+            Err(e) => {
+                warn!("Unable to create cache {:?}", e);
+                Arc::<NoOpCache>::default()
+            }
+        }
+    }
+}
+
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
     let mut check_map: BTreeMap<String, ModelRoot<DoctorGroup>> = Default::default();
     for check in found_config.doctor_group.values() {
@@ -40,21 +62,14 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         }
     }
 
-    let cache = if args.no_cache {
-        CacheStorage::NoCache(NoOpCache::default())
-    } else {
-        let cache_dir = args
-            .cache_dir
-            .clone()
-            .unwrap_or_else(|| "/tmp/scope".to_string());
-        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
-        CacheStorage::File(FileBasedCache::new(&cache_path)?)
-    };
+    let cache: Arc<dyn FileCache> = get_cache(args);
 
     let checks_to_run: Vec<_> = check_map.values().collect();
 
     let mut should_pass = true;
     let mut skip_remaining = false;
+    let exec_runner = Arc::new(DefaultExecutionProvider::default());
+    let glob_walker = Arc::new(DefaultGlobWalker::default());
 
     for model in checks_to_run {
         debug!(target: "user", "Running check {}", model.name());
@@ -66,23 +81,54 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
         for action in &model.spec.actions {
             let run = DoctorActionRun {
-                model,
-                action,
-                working_dir: &found_config.working_dir,
-                file_cache: &cache,
+                model: model.clone(),
+                action: action.clone(),
+                working_dir: found_config.working_dir.clone(),
+                file_cache: cache.clone(),
                 run_fix: args.fix.unwrap_or(true),
+                exec_runner: exec_runner.clone(),
+                glob_walker: glob_walker.clone(),
             };
 
-            match run.run_action().await? {
-                ActionRunResult::Stop => {
+            let action_result = run.run_action().await?;
+
+            match action_result {
+                ActionRunResult::CheckSucceeded => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check was successful");
+                }
+                ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix was successful");
+                }
+                ActionRunResult::CheckFailedFixFailed => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {}", "failed".red().bold());
+                }
+                ActionRunResult::CheckFailedFixSucceedVerifyFailed => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix ran, verification {}", "failed".red().bold());
+                }
+                ActionRunResult::CheckFailedNoRunFix => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check failed, fix was not run");
+                }
+                ActionRunResult::CheckFailedNoFixProvided => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, no fix provided");
+                }
+                ActionRunResult::CheckFailedFixFailedStop => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {} and aborted", "failed".red().bold());
+                }
+            }
+
+            match action_result {
+                ActionRunResult::CheckSucceeded
+                | ActionRunResult::CheckFailedFixSucceedVerifySucceed => {}
+                ActionRunResult::CheckFailedFixFailedStop => {
+                    should_pass = false;
                     skip_remaining = true;
-                    should_pass = false;
-                    break;
                 }
-                ActionRunResult::Failed => {
+                _ => {
+                    if action.required {
+                        skip_remaining = true;
+                    }
                     should_pass = false;
                 }
-                _ => {}
             }
         }
     }

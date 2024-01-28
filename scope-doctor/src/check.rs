@@ -1,17 +1,19 @@
-use crate::file_cache::{CacheStorage, FileCacheStatus};
+use crate::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
-use colored::Colorize;
-#[cfg(not(test))]
-use glob::glob;
+use crate::check::ActionRunResult::CheckFailedFixSucceedVerifySucceed;
+use async_trait::async_trait;
+use derive_builder::Builder;
+use educe::Educe;
+use mockall::automock;
 use scope_lib::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
-    DoctorGroupCachePath, ModelRoot, OutputCapture, OutputDestination, ScopeModel,
+    DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
 };
-use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, info, instrument};
 
@@ -50,128 +52,118 @@ impl CacheResults {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum CorrectionResults {
-    NoFixSpecified,
-    Success,
-    FailContinue,
-    FailAndStop,
-}
-
-#[derive(Debug, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum ActionRunResult {
-    Succeeded,
-    Failed,
-    Stop,
+    CheckSucceeded,
+    CheckFailedFixSucceedVerifySucceed,
+    CheckFailedFixFailed,
+    CheckFailedFixSucceedVerifyFailed,
+    CheckFailedNoRunFix,
+    CheckFailedNoFixProvided,
+    CheckFailedFixFailedStop,
 }
 
-#[derive(Debug)]
-pub struct DoctorActionRun<'a> {
-    pub model: &'a ModelRoot<DoctorGroup>,
-    pub action: &'a DoctorGroupAction,
-    pub working_dir: &'a Path,
-    pub file_cache: &'a CacheStorage,
+#[derive(Educe, Builder)]
+#[educe(Debug)]
+#[builder(setter(into))]
+pub struct DoctorActionRun {
+    pub model: ModelRoot<DoctorGroup>,
+    pub action: DoctorGroupAction,
+    pub working_dir: PathBuf,
+    pub file_cache: Arc<dyn FileCache>,
     pub run_fix: bool,
+    #[educe(Debug(ignore))]
+    pub exec_runner: Arc<dyn ExecutionProvider>,
+    #[educe(Debug(ignore))]
+    pub glob_walker: Arc<dyn GlobWalker>,
 }
 
-impl<'a> DoctorActionRun<'a> {
+impl DoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     pub async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
-        let should_continue = match check_status {
-            CacheResults::FixNotRequired => {
-                info!(target: "user", name = self.model.name(), "Check was successful");
-                ActionRunResult::Succeeded
-            }
-            CacheResults::FixRequired => {
-                if !self.run_fix {
-                    info!(target: "user", group = self.model.name(), name = self.action.name,  "Check failed. {}: Run with --fix to auto-fix", "Suggestion".bold());
-                    ActionRunResult::Succeeded
-                } else {
-                    let fix_results = self.run_fixes().await?;
-                    match fix_results {
-                        CorrectionResults::Success => {
-                            info!(target: "user",group = self.model.name(), name = self.action.name, "Check failed. {} ran successfully", "Fix".bold());
-                            ActionRunResult::Succeeded
-                        }
-                        CorrectionResults::NoFixSpecified => {
-                            info!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. No fix was specified");
-                            ActionRunResult::Stop
-                        }
-                        CorrectionResults::FailContinue => {
-                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}", "Failed".red().bold());
-                            ActionRunResult::Failed
-                        }
-                        CorrectionResults::FailAndStop => {
-                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}, and was required", "Failed".red().bold());
-                            ActionRunResult::Stop
-                        }
-                    }
-                }
-            }
-            CacheResults::StopExecution => {
-                error!(target: "user", "Check `{}#{}` has failed and wants to stop execution. All other checks will be skipped.", self.model.name().bold(), self.action.description.bold());
-                ActionRunResult::Stop
-            }
-        };
-
-        Ok(should_continue)
-    }
-
-    pub async fn run_fixes(&self) -> Result<CorrectionResults, RuntimeError> {
-        if self.action.fix.is_none() {
-            return Ok(CorrectionResults::NoFixSpecified);
+        if check_status == CacheResults::FixNotRequired {
+            return Ok(ActionRunResult::CheckSucceeded);
         }
 
-        let mut highest_exit_code = 0;
-        if let Some(action_command) = &self.action.fix {
-            if action_command.commands.is_empty() {
-                return Ok(CorrectionResults::NoFixSpecified);
+        if !self.run_fix {
+            return Ok(ActionRunResult::CheckFailedNoRunFix);
+        }
+
+        let fix_result = self.run_fixes().await?;
+        match fix_result {
+            i32::MIN..=-1 => {
+                return Ok(ActionRunResult::CheckFailedNoFixProvided);
             }
+            0 => {}
+            1...100 => return Ok(ActionRunResult::CheckFailedFixFailed),
+            _ => return Ok(ActionRunResult::CheckFailedFixFailedStop),
+        }
+
+        if let Some(check_status) = self.evaluate_command_checks().await? {
+            if check_status != CacheResults::FixNotRequired {
+                return Ok(ActionRunResult::CheckFailedFixSucceedVerifyFailed);
+            }
+        }
+
+        self.update_caches().await;
+
+        Ok(CheckFailedFixSucceedVerifySucceed)
+    }
+
+    async fn update_caches(&self) {
+        if let Some(cache_path) = &self.action.check.files {
+            let result = self
+                .glob_walker
+                .update_cache(
+                    &cache_path.base_path,
+                    &cache_path.paths,
+                    self.model.name(),
+                    self.file_cache.clone(),
+                )
+                .await;
+
+            if let Err(e) = result {
+                info!("Unable to update cache, dropping update {:?}", e);
+                info!(target: "user", "Unable to update file cache, next run will re-run this action.")
+            }
+        }
+    }
+
+    async fn run_fixes(&self) -> Result<i32, RuntimeError> {
+        let mut highest_exit_code = -1;
+        if let Some(action_command) = &self.action.fix {
             for command in &action_command.commands {
                 let result = self.run_single_fix(command).await?;
                 highest_exit_code = max(highest_exit_code, result);
                 if highest_exit_code >= 100 {
-                    return Ok(CorrectionResults::FailAndStop);
+                    return Ok(highest_exit_code);
                 }
             }
         }
 
-        if let Some(action_command) = &self.action.check.command {
-            let check_status = self.evaluate_command_check(action_command).await?;
-            info!("re-running check returned {:?}", check_status);
-            match check_status {
-                CacheResults::StopExecution => Ok(CorrectionResults::FailAndStop),
-                CacheResults::FixNotRequired => Ok(CorrectionResults::Success),
-                CacheResults::FixRequired => {
-                    if self.action.required {
-                        Ok(CorrectionResults::FailAndStop)
-                    } else {
-                        Ok(CorrectionResults::FailContinue)
-                    }
-                }
-            }
-        } else {
-            Ok(CorrectionResults::Success)
-        }
+        Ok(highest_exit_code)
     }
 
     async fn run_single_fix(&self, command: &str) -> Result<i32, RuntimeError> {
         let args = vec![command.to_string()];
-        let capture = OutputCapture::capture_output(CaptureOpts {
-            working_dir: self.working_dir,
-            args: &args,
-            output_dest: OutputDestination::StandardOut,
-            path: &self.model.exec_path(),
-            env_vars: Default::default(),
-        })
-        .await?;
+        let capture = self
+            .exec_runner
+            .run_command(CaptureOpts {
+                working_dir: &self.working_dir,
+                args: &args,
+                output_dest: OutputDestination::StandardOut,
+                path: &self.model.exec_path(),
+                env_vars: Default::default(),
+            })
+            .await?;
 
         info!("fix ran {} and exited {:?}", command, capture.exit_code);
 
         Ok(capture.exit_code.unwrap_or(-1))
     }
 
-    pub async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
+    async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
@@ -179,28 +171,35 @@ impl<'a> DoctorActionRun<'a> {
             }
         }
 
-        if let Some(action_command) = &self.action.check.command {
-            let result = self.evaluate_command_check(action_command).await?;
-            if !result.is_success() {
-                return Ok(result);
-            }
+        if let Some(res) = self.evaluate_command_checks().await? {
+            return Ok(res);
         }
 
         Ok(CacheResults::FixRequired)
+    }
+
+    async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
+        if let Some(action_command) = &self.action.check.command {
+            let result = self.run_check_command(action_command).await?;
+            return Ok(Some(result));
+        }
+
+        Ok(None)
     }
 
     async fn evaluate_path_check(
         &self,
         paths: &DoctorGroupCachePath,
     ) -> Result<CacheResults, RuntimeError> {
-        let result = process_glob(&paths.base_path, &paths.paths, |path| {
-            let check_full_name = self.model.file_path().clone();
-            async move {
-                let file_result = self.file_cache.check_file(check_full_name, &path).await?;
-                Ok(file_result == FileCacheStatus::FileMatches)
-            }
-        })
-        .await?;
+        let result = self
+            .glob_walker
+            .have_globs_changed(
+                &paths.base_path,
+                &paths.paths,
+                self.model.name(),
+                self.file_cache.clone(),
+            )
+            .await?;
 
         if result {
             Ok(CacheResults::FixNotRequired)
@@ -209,7 +208,7 @@ impl<'a> DoctorActionRun<'a> {
         }
     }
 
-    async fn evaluate_command_check(
+    async fn run_check_command(
         &self,
         action_command: &DoctorGroupActionCommand,
     ) -> Result<CacheResults, RuntimeError> {
@@ -217,14 +216,16 @@ impl<'a> DoctorActionRun<'a> {
         for command in &action_command.commands {
             let args = vec![command.clone()];
             let path = format!("{}:{}", self.model.containing_dir(), self.model.exec_path());
-            let output = OutputCapture::capture_output(CaptureOpts {
-                working_dir: self.working_dir,
-                args: &args,
-                output_dest: OutputDestination::Logging,
-                path: &path,
-                env_vars: Default::default(),
-            })
-            .await?;
+            let output = self
+                .exec_runner
+                .run_command(CaptureOpts {
+                    working_dir: &self.working_dir,
+                    args: &args,
+                    output_dest: OutputDestination::Logging,
+                    path: &path,
+                    env_vars: Default::default(),
+                })
+                .await?;
 
             info!(
                 "check ran command {} and result was {:?}",
@@ -252,45 +253,323 @@ impl<'a> DoctorActionRun<'a> {
     }
 }
 
-#[cfg(not(test))]
-async fn process_glob<'b, F, Ret: 'b>(
-    base_dir: &Path,
-    paths: &Vec<String>,
-    fun: F,
-) -> Result<bool, RuntimeError>
-where
-    F: Fn(PathBuf) -> Ret,
-    Ret: Future<Output = Result<bool, RuntimeError>>,
-{
-    for glob_str in paths {
-        let glob_path = format!("{}/{}", base_dir.display(), glob_str);
-        for path in glob(&glob_path)?.filter_map(Result::ok) {
-            let check_result = fun(path).await?;
-            if !check_result {
-                return Ok(false);
+#[automock]
+#[async_trait]
+pub trait GlobWalker {
+    async fn have_globs_changed(
+        &self,
+        base_dir: &Path,
+        paths: &[String],
+        cache_name: &str,
+        file_cache: Arc<dyn FileCache>,
+    ) -> Result<bool, RuntimeError>;
+
+    async fn update_cache(
+        &self,
+        base_dir: &Path,
+        paths: &[String],
+        cache_name: &str,
+        file_cache: Arc<dyn FileCache>,
+    ) -> Result<(), RuntimeError>;
+}
+
+#[derive(Debug, Default)]
+pub struct DefaultGlobWalker {}
+
+#[async_trait]
+impl GlobWalker for DefaultGlobWalker {
+    async fn have_globs_changed(
+        &self,
+        base_dir: &Path,
+        paths: &[String],
+        cache_name: &str,
+        file_cache: Arc<dyn FileCache>,
+    ) -> Result<bool, RuntimeError> {
+        use glob::glob;
+
+        for glob_str in paths {
+            let glob_path = format!("{}/{}", base_dir.display(), glob_str);
+            for path in glob(&glob_path)?.filter_map(Result::ok) {
+                let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
+                let check_result = file_result == FileCacheStatus::FileMatches;
+                if !check_result {
+                    return Ok(false);
+                }
             }
         }
+
+        Ok(true)
     }
 
-    Ok(true)
+    async fn update_cache(
+        &self,
+        base_dir: &Path,
+        paths: &[String],
+        cache_name: &str,
+        file_cache: Arc<dyn FileCache>,
+    ) -> Result<(), RuntimeError> {
+        use glob::glob;
+
+        for glob_str in paths {
+            let glob_path = format!("{}/{}", base_dir.display(), glob_str);
+            for path in glob(&glob_path)?.filter_map(Result::ok) {
+                file_cache
+                    .update_cache_entry(cache_name.to_string(), &path)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
-async fn process_glob<'b, F, Ret: 'b>(
-    _base_dir: &Path,
-    paths: &Vec<String>,
-    fun: F,
-) -> Result<bool, RuntimeError>
-where
-    F: Fn(PathBuf) -> Ret,
-    Ret: Future<Output = Result<bool, RuntimeError>>,
-{
-    for glob_str in paths {
-        let check_result = fun(PathBuf::from(&glob_str)).await?;
-        if !check_result {
-            return Ok(false);
+mod tests {
+    use crate::check::{ActionRunResult, DoctorActionRun, MockGlobWalker, RuntimeError};
+    use crate::file_cache::{FileCache, NoOpCache};
+    use anyhow::{anyhow, Result};
+    use scope_lib::prelude::{
+        DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
+        DoctorGroupActionCommand, DoctorGroupBuilder, DoctorGroupCachePath, MockExecutionProvider,
+        ModelMetadataBuilder, ModelRoot, ModelRootBuilder, OutputCaptureBuilder,
+    };
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    fn build_run_fail_fix_succeed_action() -> DoctorGroupAction {
+        DoctorGroupActionBuilder::default()
+            .description("a test action")
+            .name("action")
+            .required(true)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .files(None)
+                    .command(Some(DoctorGroupActionCommand::from(vec!["check"])))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .build()
+            .unwrap()
+    }
+
+    fn build_file_fix_action() -> DoctorGroupAction {
+        DoctorGroupActionBuilder::default()
+            .description("a test action")
+            .name("action")
+            .required(true)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .command(None)
+                    .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .build()
+            .unwrap()
+    }
+
+    fn make_model(actions: Vec<DoctorGroupAction>) -> ModelRoot<DoctorGroup> {
+        let group = DoctorGroupBuilder::default()
+            .description("a description")
+            .actions(actions)
+            .build()
+            .unwrap();
+
+        ModelRootBuilder::default()
+            .api_version("fake")
+            .kind("fake-kind")
+            .metadata(
+                ModelMetadataBuilder::default()
+                    .name("fake-model")
+                    .annotations(BTreeMap::default())
+                    .labels(BTreeMap::default())
+                    .build()
+                    .unwrap(),
+            )
+            .spec(group)
+            .build()
+            .unwrap()
+    }
+
+    fn command_result(
+        mock: &mut MockExecutionProvider,
+        command: &'static str,
+        expected_results: Vec<i32>,
+    ) {
+        let mut counter = 0;
+        mock.expect_run_command()
+            .times(expected_results.len())
+            .withf(move |params| params.args[0].eq(command))
+            .returning(move |_| {
+                let resp_code = expected_results[counter];
+                counter += 1;
+                Ok(OutputCaptureBuilder::default()
+                    .exit_code(Some(resp_code))
+                    .build()
+                    .unwrap())
+            });
+    }
+
+    fn setup_test(
+        actions: Vec<DoctorGroupAction>,
+        exec_runner: MockExecutionProvider,
+        glob_walker: MockGlobWalker,
+    ) -> DoctorActionRun {
+        let model = make_model(actions.clone());
+        let path = PathBuf::from("/tmp/foo");
+        let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
+
+        DoctorActionRun {
+            model,
+            action: actions[0].clone(),
+            working_dir: path,
+            file_cache,
+            run_fix: true,
+            exec_runner: Arc::new(exec_runner),
+            glob_walker: Arc::new(glob_walker),
         }
     }
 
-    Ok(true)
+    #[tokio::test]
+    async fn test_only_exec_will_check_passes() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckSucceeded, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_only_exec_will_re_run() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![1, 0]);
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fail_fix_succeed_check_fails() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![1, 1]);
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifyFailed, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fail_fix_fails() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![1]);
+        command_result(&mut exec_runner, "fix", vec![1]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_cache_invalid_fix_works() -> Result<()> {
+        let action = build_file_fix_action();
+
+        let mut glob_walker = MockGlobWalker::new();
+        let mut exec_runner = MockExecutionProvider::new();
+
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_update_cache()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_cache_invalid_fix_works_unable_to_update_cache() -> Result<()> {
+        let action = build_file_fix_action();
+
+        let mut glob_walker = MockGlobWalker::new();
+        let mut exec_runner = MockExecutionProvider::new();
+
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+        glob_walker
+            .expect_update_cache()
+            .times(1)
+            .returning(|_, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_cache_invalid_fix_fails() -> Result<()> {
+        let action = build_file_fix_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "fix", vec![1]);
+
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
+
+        Ok(())
+    }
 }

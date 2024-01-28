@@ -1,7 +1,9 @@
 use crate::HelpMetadata;
+use derive_builder::Builder;
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 pub struct DoctorGroupAction {
     pub name: String,
     pub description: String,
@@ -38,16 +40,11 @@ impl DoctorGroupAction {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 pub struct DoctorGroupCachePath {
     pub paths: Vec<String>,
     pub base_path: PathBuf,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct DoctorGroupActionCheck {
-    pub command: Option<DoctorGroupActionCommand>,
-    pub files: Option<DoctorGroupCachePath>,
 }
 
 impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
@@ -62,7 +59,15 @@ impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
+pub struct DoctorGroupActionCheck {
+    pub command: Option<DoctorGroupActionCommand>,
+    pub files: Option<DoctorGroupCachePath>,
+}
+
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 pub struct DoctorGroupActionCommand {
     pub commands: Vec<String>,
 }
@@ -74,7 +79,8 @@ impl From<Vec<&str>> for DoctorGroupActionCommand {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 pub struct DoctorGroup {
     pub description: String,
     pub actions: Vec<DoctorGroupAction>,

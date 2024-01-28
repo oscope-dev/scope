@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::BTreeMap;
 
+use derive_builder::Builder;
 use strum::EnumString;
 
 mod internal;
@@ -13,7 +14,7 @@ mod v1alpha;
 pub mod prelude {
     pub use super::internal::prelude::*;
     pub use super::ScopeModel;
-    pub use super::{ModelMetadata, ModelRoot};
+    pub use super::{ModelMetadata, ModelMetadataBuilder, ModelRoot, ModelRootBuilder};
 }
 
 #[derive(Debug, PartialEq, EnumString)]
@@ -25,7 +26,8 @@ pub enum KnownApiVersion {
     UnknownApiVersion(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, Builder)]
+#[builder(setter(into))]
 pub struct ModelMetadata {
     pub name: String,
     #[serde(default)]
@@ -65,7 +67,8 @@ pub trait ScopeModel {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
 pub struct ModelRoot<V> {
     pub api_version: String,
