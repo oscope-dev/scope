@@ -3,8 +3,8 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
+use crate::check::ActionRunResult::CheckFailedFixSucceedVerifySucceed;
 use async_trait::async_trait;
-use colored::Colorize;
 use derive_builder::Builder;
 use educe::Educe;
 use mockall::automock;
@@ -15,7 +15,7 @@ use scope_lib::prelude::{
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, instrument};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -52,18 +52,15 @@ impl CacheResults {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum CorrectionResults {
-    NoFixSpecified,
-    Success,
-    FailContinue,
-    FailAndStop,
-}
-
-#[derive(Debug, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum ActionRunResult {
-    Succeeded,
-    Failed,
-    Stop,
+    CheckSucceeded,
+    CheckFailedFixSucceedVerifySucceed,
+    CheckFailedFixFailed,
+    CheckFailedFixSucceedVerifyFailed,
+    CheckFailedNoRunFix,
+    CheckFailedNoFixProvided,
+    CheckFailedFixFailedStop,
 }
 
 #[derive(Educe, Builder)]
@@ -85,108 +82,67 @@ impl DoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     pub async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
-        let should_continue = match check_status {
-            CacheResults::FixNotRequired => {
-                info!(target: "user", name = self.model.name(), "Check was successful");
-                ActionRunResult::Succeeded
-            }
-            CacheResults::FixRequired => {
-                if !self.run_fix {
-                    info!(target: "user", group = self.model.name(), name = self.action.name,  "Check failed. {}: Run with --fix to auto-fix", "Suggestion".bold());
-                    ActionRunResult::Succeeded
-                } else {
-                    let fix_results = self.run_fixes().await?;
-                    match fix_results {
-                        CorrectionResults::Success => {
-                            info!(target: "user",group = self.model.name(), name = self.action.name, "Check failed. {} ran successfully", "Fix".bold());
-                            ActionRunResult::Succeeded
-                        }
-                        CorrectionResults::NoFixSpecified => {
-                            info!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. No fix was specified");
-                            ActionRunResult::Stop
-                        }
-                        CorrectionResults::FailContinue => {
-                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}", "Failed".red().bold());
-                            ActionRunResult::Failed
-                        }
-                        CorrectionResults::FailAndStop => {
-                            error!(target: "user", group = self.model.name(), name = self.action.name, "Check failed. The fix ran and {}, and was required", "Failed".red().bold());
-                            ActionRunResult::Stop
-                        }
-                    }
-                }
-            }
-            CacheResults::StopExecution => {
-                error!(target: "user", "Check `{}#{}` has failed and wants to stop execution. All other checks will be skipped.", self.model.name().bold(), self.action.description.bold());
-                ActionRunResult::Stop
-            }
-        };
-
-        Ok(should_continue)
-    }
-
-    pub async fn run_fixes(&self) -> Result<CorrectionResults, RuntimeError> {
-        if self.action.fix.is_none() {
-            return Ok(CorrectionResults::NoFixSpecified);
+        if check_status == CacheResults::FixNotRequired {
+            return Ok(ActionRunResult::CheckSucceeded);
         }
 
-        let mut highest_exit_code = 0;
-        if let Some(action_command) = &self.action.fix {
-            if action_command.commands.is_empty() {
-                return Ok(CorrectionResults::NoFixSpecified);
+        if !self.run_fix {
+            return Ok(ActionRunResult::CheckFailedNoRunFix);
+        }
+
+        let fix_result = self.run_fixes().await?;
+        match fix_result {
+            i32::MIN..=-1 => {
+                return Ok(ActionRunResult::CheckFailedNoFixProvided);
             }
+            0 => {}
+            1...100 => return Ok(ActionRunResult::CheckFailedFixFailed),
+            _ => return Ok(ActionRunResult::CheckFailedFixFailedStop),
+        }
+
+        if let Some(check_status) = self.evaluate_command_checks().await? {
+            if check_status != CacheResults::FixNotRequired {
+                return Ok(ActionRunResult::CheckFailedFixSucceedVerifyFailed);
+            }
+        }
+
+        self.update_caches().await;
+
+        Ok(CheckFailedFixSucceedVerifySucceed)
+    }
+
+    async fn update_caches(&self) {
+        if let Some(cache_path) = &self.action.check.files {
+            let result = self
+                .glob_walker
+                .update_cache(
+                    &cache_path.base_path,
+                    &cache_path.paths,
+                    self.model.name(),
+                    self.file_cache.clone(),
+                )
+                .await;
+
+            if let Err(e) = result {
+                info!("Unable to update cache, dropping update {:?}", e);
+                info!(target: "user", "Unable to update file cache, next run will re-run this action.")
+            }
+        }
+    }
+
+    async fn run_fixes(&self) -> Result<i32, RuntimeError> {
+        let mut highest_exit_code = -1;
+        if let Some(action_command) = &self.action.fix {
             for command in &action_command.commands {
                 let result = self.run_single_fix(command).await?;
                 highest_exit_code = max(highest_exit_code, result);
                 if highest_exit_code >= 100 {
-                    return Ok(CorrectionResults::FailAndStop);
+                    return Ok(highest_exit_code);
                 }
             }
         }
 
-        if highest_exit_code == 0 {
-            if let Some(paths) = &self.action.check.files {
-                if let Err(e) = self
-                    .glob_walker
-                    .update_cache(
-                        &paths.base_path,
-                        &paths.paths,
-                        self.model.name(),
-                        self.file_cache.clone(),
-                    )
-                    .await
-                {
-                    warn!("Unable to update cache: {:?}", e);
-                    info!(target: "user", "Unable to properly update cache, next run will re-evaluate action");
-                }
-            }
-        }
-
-        if highest_exit_code != 0 {
-            return if self.action.required {
-                Ok(CorrectionResults::FailAndStop)
-            } else {
-                Ok(CorrectionResults::FailContinue)
-            };
-        }
-
-        if let Some(action_command) = &self.action.check.command {
-            let check_status = self.evaluate_command_check(action_command).await?;
-            info!("re-running check returned {:?}", check_status);
-            match check_status {
-                CacheResults::StopExecution => Ok(CorrectionResults::FailAndStop),
-                CacheResults::FixNotRequired => Ok(CorrectionResults::Success),
-                CacheResults::FixRequired => {
-                    if self.action.required {
-                        Ok(CorrectionResults::FailAndStop)
-                    } else {
-                        Ok(CorrectionResults::FailContinue)
-                    }
-                }
-            }
-        } else {
-            Ok(CorrectionResults::Success)
-        }
+        Ok(highest_exit_code)
     }
 
     async fn run_single_fix(&self, command: &str) -> Result<i32, RuntimeError> {
@@ -207,7 +163,7 @@ impl DoctorActionRun {
         Ok(capture.exit_code.unwrap_or(-1))
     }
 
-    pub async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
+    async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
@@ -215,14 +171,20 @@ impl DoctorActionRun {
             }
         }
 
-        if let Some(action_command) = &self.action.check.command {
-            let result = self.evaluate_command_check(action_command).await?;
-            if !result.is_success() {
-                return Ok(result);
-            }
+        if let Some(res) = self.evaluate_command_checks().await? {
+            return Ok(res);
         }
 
         Ok(CacheResults::FixRequired)
+    }
+
+    async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
+        if let Some(action_command) = &self.action.check.command {
+            let result = self.run_check_command(action_command).await?;
+            return Ok(Some(result));
+        }
+
+        Ok(None)
     }
 
     async fn evaluate_path_check(
@@ -246,7 +208,7 @@ impl DoctorActionRun {
         }
     }
 
-    async fn evaluate_command_check(
+    async fn run_check_command(
         &self,
         action_command: &DoctorGroupActionCommand,
     ) -> Result<CacheResults, RuntimeError> {
@@ -437,18 +399,18 @@ mod tests {
         command: &'static str,
         expected_results: Vec<i32>,
     ) {
-        let mut exectation = mock
-            .expect_run_command()
-            .withf(|params| params.args == vec![command.to_string()])
-            .times(expected_results.len());
-        for code in expected_results {
-            exectation = exectation.returning(move |_| {
+        let mut counter = 0;
+        mock.expect_run_command()
+            .times(expected_results.len())
+            .withf(move |params| params.args[0].eq(command))
+            .returning(move |_| {
+                let resp_code = expected_results[counter];
+                counter += 1;
                 Ok(OutputCaptureBuilder::default()
-                    .exit_code(Some(code))
+                    .exit_code(Some(resp_code))
                     .build()
                     .unwrap())
             });
-        }
     }
 
     fn setup_test(
@@ -472,6 +434,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_only_exec_will_check_passes() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        command_result(&mut exec_runner, "check", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action().await?;
+        assert_eq!(ActionRunResult::CheckSucceeded, result);
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_only_exec_will_re_run() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
@@ -483,7 +461,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Succeeded, result);
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
     }
@@ -500,7 +478,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Stop, result);
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifyFailed, result);
 
         Ok(())
     }
@@ -517,25 +495,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Stop, result);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_not_required_continue() -> Result<()> {
-        let mut action = build_run_fail_fix_succeed_action();
-        action.required = false;
-
-        let mut exec_runner = MockExecutionProvider::new();
-        let glob_walker = MockGlobWalker::new();
-
-        command_result(&mut exec_runner, "check", vec![1]);
-        command_result(&mut exec_runner, "fix", vec![1]);
-
-        let run = setup_test(vec![action], exec_runner, glob_walker);
-        let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Failed, result);
+        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())
     }
@@ -561,7 +521,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Succeeded, result);
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
     }
@@ -587,7 +547,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Succeeded, result);
+        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
     }
@@ -608,30 +568,7 @@ mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Stop, result);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_file_not_required_succeed() -> Result<()> {
-        let mut action = build_file_fix_action();
-        action.required = false;
-
-        let mut exec_runner = MockExecutionProvider::new();
-        let mut glob_walker = MockGlobWalker::new();
-
-        command_result(&mut exec_runner, "fix", vec![1]);
-
-        glob_walker
-            .expect_have_globs_changed()
-            .times(1)
-            .returning(|_, _, _, _| Ok(false));
-
-        let run = setup_test(vec![action], exec_runner, glob_walker);
-
-        let result = run.run_action().await?;
-        assert_eq!(ActionRunResult::Failed, result);
+        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())
     }

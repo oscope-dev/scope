@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -90,16 +90,42 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 glob_walker: glob_walker.clone(),
             };
 
-            match run.run_action().await? {
-                ActionRunResult::Stop => {
+            let action_result = run.run_action().await?;
+
+            match action_result {
+                ActionRunResult::CheckSucceeded => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check was successful");
+                }
+                ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix was successful");
+                }
+                ActionRunResult::CheckFailedFixFailed => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {}", "failed".red().bold());
+                }
+                ActionRunResult::CheckFailedFixSucceedVerifyFailed => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix ran, verification {}", "failed".red().bold());
+                }
+                ActionRunResult::CheckFailedNoRunFix => {
+                    info!(target: "user", group = model.name(), name = action.name, "Check failed, fix was not run");
+                }
+                ActionRunResult::CheckFailedNoFixProvided => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, no fix provided");
+                }
+                ActionRunResult::CheckFailedFixFailedStop => {
+                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {} and aborted", "failed".red().bold());
+                }
+            }
+
+            match action_result {
+                ActionRunResult::CheckSucceeded
+                | ActionRunResult::CheckFailedFixSucceedVerifySucceed => {}
+                ActionRunResult::CheckFailedFixFailedStop => {
+                    should_pass = false;
                     skip_remaining = true;
-                    should_pass = false;
-                    break;
                 }
-                ActionRunResult::Failed => {
+                _ => {
                     should_pass = false;
                 }
-                _ => {}
             }
         }
     }
