@@ -124,6 +124,9 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                     skip_remaining = true;
                 }
                 _ => {
+                    if action.required {
+                        skip_remaining = true;
+                    }
                     should_pass = false;
                 }
             }
