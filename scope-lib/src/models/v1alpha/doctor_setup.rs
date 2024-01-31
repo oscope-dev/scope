@@ -1,5 +1,4 @@
 use crate::models::prelude::*;
-use crate::models::v1alpha::extract_command_path;
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -46,12 +45,9 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
     };
 
     let exec = match parsed.setup {
-        DoctorSetupSpecExec::Exec(commands) => DoctorGroupActionCommand {
-            commands: commands
-                .iter()
-                .map(|p| extract_command_path(containing_dir, p))
-                .collect(),
-        },
+        DoctorSetupSpecExec::Exec(commands) => {
+            DoctorGroupActionCommand::from((containing_dir, commands))
+        }
     };
 
     Ok(DoctorGroup {
@@ -59,7 +55,11 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
             name: "1".to_string(),
             required: true,
             description: parsed.description.clone(),
-            fix: Some(exec),
+            fix: DoctorGroupActionFix {
+                command: Some(exec),
+                help_text: None,
+                help_url: None,
+            },
             check: DoctorGroupActionCheck {
                 command: None,
                 files: Some(cache),
@@ -74,7 +74,7 @@ mod tests {
     use crate::models::parse_models_from_string;
     use crate::models::prelude::{
         DoctorGroup, DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand,
-        DoctorGroupCachePath,
+        DoctorGroupActionFix, DoctorGroupCachePath,
     };
     use std::path::Path;
 
@@ -92,9 +92,13 @@ mod tests {
                     name: "1".to_string(),
                     required: true,
                     description: "Check your shell for basic functionality".to_string(),
-                    fix: Some(DoctorGroupActionCommand::from(vec![
-                        "/foo/bar/.scope/bin/setup"
-                    ])),
+                    fix: DoctorGroupActionFix {
+                        command: Some(DoctorGroupActionCommand::from(vec![
+                            "/foo/bar/.scope/bin/setup"
+                        ])),
+                        help_text: None,
+                        help_url: None,
+                    },
                     check: DoctorGroupActionCheck {
                         command: None,
                         files: Some(DoctorGroupCachePath::from((
@@ -121,7 +125,11 @@ mod tests {
                     name: "1".to_string(),
                     required: true,
                     description: "Check your shell for basic functionality".to_string(),
-                    fix: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
+                    fix: DoctorGroupActionFix {
+                        command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
+                        help_text: None,
+                        help_url: None,
+                    },
                     check: DoctorGroupActionCheck {
                         command: None,
                         files: Some(DoctorGroupCachePath::from((

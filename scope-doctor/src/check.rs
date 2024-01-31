@@ -132,7 +132,7 @@ impl DoctorActionRun {
 
     async fn run_fixes(&self) -> Result<i32, RuntimeError> {
         let mut highest_exit_code = -1;
-        if let Some(action_command) = &self.action.fix {
+        if let Some(action_command) = &self.action.fix.command {
             for command in &action_command.commands {
                 let result = self.run_single_fix(command).await?;
                 highest_exit_code = max(highest_exit_code, result);
@@ -330,8 +330,9 @@ mod tests {
     use anyhow::{anyhow, Result};
     use scope_lib::prelude::{
         DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
-        DoctorGroupActionCommand, DoctorGroupBuilder, DoctorGroupCachePath, MockExecutionProvider,
-        ModelMetadataBuilder, ModelRoot, ModelRootBuilder, OutputCaptureBuilder,
+        DoctorGroupActionCommand, DoctorGroupActionFixBuilder, DoctorGroupBuilder,
+        DoctorGroupCachePath, MockExecutionProvider, ModelMetadataBuilder, ModelRoot,
+        ModelRootBuilder, OutputCaptureBuilder,
     };
     use std::collections::BTreeMap;
     use std::path::PathBuf;
@@ -349,7 +350,12 @@ mod tests {
                     .build()
                     .unwrap(),
             )
-            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
             .build()
             .unwrap()
     }
@@ -366,7 +372,12 @@ mod tests {
                     .build()
                     .unwrap(),
             )
-            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
             .build()
             .unwrap()
     }

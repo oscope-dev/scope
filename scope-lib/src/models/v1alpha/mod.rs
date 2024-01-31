@@ -67,7 +67,7 @@ pub fn parse_v1_alpha1(root: &ModelRoot<Value>) -> Result<ParsedConfig> {
     Ok(parsed)
 }
 
-fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
+pub(crate) fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
     let mut parts: VecDeque<_> = exec.split(' ').map(|x| x.to_string()).collect();
     let mut command = parts.pop_front().unwrap();
 

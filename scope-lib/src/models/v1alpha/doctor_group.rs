@@ -1,5 +1,4 @@
 use crate::models::prelude::*;
-use crate::models::v1alpha::extract_command_path;
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -21,6 +20,10 @@ pub struct DoctorCheckSpec {
 pub struct DoctorFixSpec {
     #[serde(default)]
     pub commands: Vec<String>,
+    #[serde(default)]
+    pub help_text: Option<String>,
+    #[serde(default)]
+    pub help_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -50,29 +53,31 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
 
     let mut actions: Vec<_> = Default::default();
     for (count, spec_action) in parsed.actions.into_iter().enumerate() {
+        let help_text = spec_action
+            .fix
+            .as_ref()
+            .and_then(|x| x.help_text.as_ref().map(|st| st.trim().to_string()).clone());
+        let help_url = spec_action.fix.as_ref().and_then(|x| x.help_url.clone());
+        let fix_command = spec_action.fix.as_ref().map(|commands| {
+            DoctorGroupActionCommand::from((containing_dir, commands.commands.clone()))
+        });
+
         actions.push(DoctorGroupAction {
             name: spec_action.name.unwrap_or_else(|| format!("{}", count + 1)),
             required: spec_action.required,
             description: spec_action
                 .description
                 .unwrap_or_else(|| "default".to_string()),
-            fix: spec_action.fix.map(|commands| DoctorGroupActionCommand {
-                commands: commands
-                    .commands
-                    .iter()
-                    .map(|s| extract_command_path(containing_dir, s))
-                    .collect(),
-            }),
+            fix: DoctorGroupActionFix {
+                command: fix_command,
+                help_text,
+                help_url,
+            },
             check: DoctorGroupActionCheck {
                 command: spec_action
                     .check
                     .commands
-                    .map(|commands| DoctorGroupActionCommand {
-                        commands: commands
-                            .iter()
-                            .map(|s| extract_command_path(containing_dir, s))
-                            .collect(),
-                    }),
+                    .map(|commands| DoctorGroupActionCommand::from((containing_dir, commands))),
                 files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
                     paths,
                     base_path: containing_dir.parent().unwrap().to_path_buf(),
@@ -92,6 +97,7 @@ mod tests {
     use crate::models::parse_models_from_string;
     use crate::models::prelude::{
         DoctorGroup, DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand,
+        DoctorGroupActionFix,
     };
     use crate::prelude::DoctorGroupCachePath;
     use std::path::Path;
@@ -111,9 +117,15 @@ mod tests {
                         name: "1".to_string(),
                         required: false,
                         description: "foo1".to_string(),
-                        fix: Some(DoctorGroupActionCommand::from(vec![
-                            "/foo/bar/.scope/fix1.sh"
-                        ])),
+                        fix: DoctorGroupActionFix {
+                            command: Some(DoctorGroupActionCommand::from(vec![
+                                "/foo/bar/.scope/fix1.sh"
+                            ])),
+                            help_text: Some(
+                                "There is a good way to fix this, maybe...".to_string()
+                            ),
+                            help_url: Some("https://go.example.com/fixit".to_string()),
+                        },
                         check: DoctorGroupActionCheck {
                             command: Some(DoctorGroupActionCommand::from(vec![
                                 "/foo/bar/.scope/foo1.sh"
@@ -128,7 +140,11 @@ mod tests {
                         name: "2".to_string(),
                         required: true,
                         description: "foo2".to_string(),
-                        fix: None,
+                        fix: DoctorGroupActionFix {
+                            command: None,
+                            help_text: None,
+                            help_url: None,
+                        },
                         check: DoctorGroupActionCheck {
                             command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
                             files: Some(DoctorGroupCachePath::from(("/foo/bar", vec!["*/*.txt"])))
