@@ -14,6 +14,9 @@ spec:
       fix:
         commands:
           - ./fix1.sh
+        helpText: |
+          There is a good way to fix this, maybe...
+        helpUrl: https://go.example.com/fixit
       required: false
     - description: foo2
       check:

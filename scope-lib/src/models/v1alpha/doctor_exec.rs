@@ -1,4 +1,4 @@
-use crate::models::v1alpha::extract_command_path;
+use crate::models::{prelude::DoctorGroupActionFix, v1alpha::extract_command_path};
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,11 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorGroup> {
             name: "1".to_string(),
             required: true,
             description: parsed.description.clone(),
-            fix: fix_exec,
+            fix: DoctorGroupActionFix {
+                command: fix_exec,
+                help_text: None,
+                help_url: None,
+            },
             check: DoctorGroupActionCheck {
                 command: Some(DoctorGroupActionCommand {
                     commands: vec![check_path],

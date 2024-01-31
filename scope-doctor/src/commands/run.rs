@@ -116,6 +116,15 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 }
             }
 
+            if action_result.is_failure() {
+                if let Some(help_text) = &action.fix.help_text {
+                    error!(target: "user", group = model.name(), name = action.name, "Action Help: {}", help_text);
+                }
+                if let Some(help_url) = &action.fix.help_url {
+                    error!(target: "user", group = model.name(), name = action.name, "For more help, please visit {}", help_url);
+                }
+            }
+
             match action_result {
                 ActionRunResult::CheckSucceeded
                 | ActionRunResult::CheckFailedFixSucceedVerifySucceed => {}

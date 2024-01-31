@@ -3,7 +3,6 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
-use crate::check::ActionRunResult::CheckFailedFixSucceedVerifySucceed;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use educe::Educe;
@@ -63,6 +62,20 @@ pub enum ActionRunResult {
     CheckFailedFixFailedStop,
 }
 
+impl ActionRunResult {
+    pub(crate) fn is_failure(&self) -> bool {
+        match self {
+            ActionRunResult::CheckSucceeded => false,
+            ActionRunResult::CheckFailedFixSucceedVerifySucceed => false,
+            ActionRunResult::CheckFailedFixFailed => true,
+            ActionRunResult::CheckFailedFixSucceedVerifyFailed => true,
+            ActionRunResult::CheckFailedNoRunFix => true,
+            ActionRunResult::CheckFailedNoFixProvided => true,
+            ActionRunResult::CheckFailedFixFailedStop => true,
+        }
+    }
+}
+
 #[derive(Educe, Builder)]
 #[educe(Debug)]
 #[builder(setter(into))]
@@ -108,7 +121,7 @@ impl DoctorActionRun {
 
         self.update_caches().await;
 
-        Ok(CheckFailedFixSucceedVerifySucceed)
+        Ok(ActionRunResult::CheckFailedFixSucceedVerifySucceed)
     }
 
     async fn update_caches(&self) {
@@ -132,7 +145,7 @@ impl DoctorActionRun {
 
     async fn run_fixes(&self) -> Result<i32, RuntimeError> {
         let mut highest_exit_code = -1;
-        if let Some(action_command) = &self.action.fix {
+        if let Some(action_command) = &self.action.fix.command {
             for command in &action_command.commands {
                 let result = self.run_single_fix(command).await?;
                 highest_exit_code = max(highest_exit_code, result);
@@ -330,8 +343,9 @@ mod tests {
     use anyhow::{anyhow, Result};
     use scope_lib::prelude::{
         DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
-        DoctorGroupActionCommand, DoctorGroupBuilder, DoctorGroupCachePath, MockExecutionProvider,
-        ModelMetadataBuilder, ModelRoot, ModelRootBuilder, OutputCaptureBuilder,
+        DoctorGroupActionCommand, DoctorGroupActionFixBuilder, DoctorGroupBuilder,
+        DoctorGroupCachePath, MockExecutionProvider, ModelMetadataBuilder, ModelRoot,
+        ModelRootBuilder, OutputCaptureBuilder,
     };
     use std::collections::BTreeMap;
     use std::path::PathBuf;
@@ -349,7 +363,12 @@ mod tests {
                     .build()
                     .unwrap(),
             )
-            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
             .build()
             .unwrap()
     }
@@ -366,7 +385,12 @@ mod tests {
                     .build()
                     .unwrap(),
             )
-            .fix(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
             .build()
             .unwrap()
     }

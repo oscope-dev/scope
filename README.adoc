@@ -1,4 +1,4 @@
-= Scope (Oscilliscope)
+= Scope
 :toc:
 :exampleDir: examples
 
@@ -9,6 +9,8 @@ There are two tools engineers will use directly, `scope doctor` and `scope repor
 
 `scope report` is used to report local execution error.
 This is primarily used to generate a bug report, and upload it somewhere so that the responders have all the required into to respond.
+
+For full documentation, please visit https://ethankhall.github.io/scope[our website].
 
 == Commands
 
@@ -38,170 +40,6 @@ It also allows the engineer to upload a bug report immediately.
 IMPORTANT: `scope` will redact anything it finds as "sensitive".
 This allows you to fetch env-vars, and no leak GH API tokens for example.
 
-== Config
-
-All `scope` config files look like Kubernetes yaml, requiring:
-
-- `apiVersion`
-- `kind`
-- `metadata`
-- `spec`
-
-Config files live inside a `.scope` directory, and `scope` will search for this directory walking up the file tree.
-A user can also add a specific file or folder with arguments or environment variables.
-
-[cols="1,2"]
-|===
-| Field
-| Description
-
-a| `metadata`
-a| Required field providing "metadata" about the resource.
-[cols="1,2"]
-!===
-! Field
-! Description
-
-a! `name`
-a! (required) Name of the resource, must be unique within the `kind`
-
-a! `labels`
-a! A map of `string:string` that can be used by user.
-
-a! `annotations`
-a! A map of `string:string` that can be used by user. Scope will set some specific annotations.
-
-!===
-
-a| `kind`
-a| The type of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
-
-Current supported options are: `ScopeDoctorCheck`, `ScopeReportLocation`, `ScopeKnownError`.
-
-a| `apiVersion`
-a| The version of resource that's defined. The `kind` and `apiVersion` define what options the `spec` field accepts.
-
-The only supported value at the moment is `scope.github.com/v1alpha`.
-
-a| `spec`
-| A data structure that changes based on `apiVersion` and `kind`.
-
-|===
-
-
-=== `ScopeDoctorCheck`
-
-Used to diagnose errors with an engineers environment. Used when running `scope doctor`.
-
-**Example**
-
-[source,yaml]
-....
-apiVersion: scope.github.com/v1alpha
-kind: ScopeDoctorCheck
-metadata:
-  name: path-exists
-spec:
-  exec:
-    target: scripts/does-path-env-exist.sh
-  description: Check your shell for basic functionality
-  help: You're shell does not have a path env. Reload your shell.
-....
-
-From the example, when the check runs it will execute `scripts/does-path-env-exist.sh` which is defined relative to the file containing the check.
-
-If the process exits non-0, the help text will be shown to the user.
-
-=== `ScopeKnownError`
-
-When using `scope-intercept` or `scope report`, providing a KnownError file will allow scope to tell the user about known errors.
-This is useful for example if the owning team knows that the output will contain a message and the user should check for something before continuing.
-A common example is a dependency is missing, the node modules might need to be cleaned.
-
-**Example**
-
-[source,yaml]
-....
-apiVersion: scope.github.com/v1alpha
-kind: ScopeKnownError
-metadata:
-  name: error-exists
-spec:
-  description: Check if the word error is in the logs
-  pattern: error
-  help: The command had an error, try reading the logs around there to find out what happened.
-....
-
-[cols="1,2"]
-|===
-| Field
-| Description
-
-a| `.spec.description`
-| A short description of the error, for `scope config`
-
-a| `.spec.pattern`
-| A regex pattern to search all output for (standard error and standard out)
-
-a| `.spec.help`
-| The text that will be shown to a user when the pattern matches
-|===
-
-=== `ScopeReportLocation`
-
-When using `scope-intercept` or `scope report`, a user is able to upload the error for sharing.
-`ScopeReportLocation` defines where to upload, and any additional commands that should be and output included in the report.
-
-In order to use GitHub Issue as the destination, you MUST have the env var `GH_TOKEN` set to a valid https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens[Personal Access Token].
-If you do not, scope cannot publish the report.
-
-If your users won't always be logged into GitHub, we recommend using RustyPaste as an alternative.
-
-**Example**
-
-[source,yaml]
-....
-apiVersion: scope.github.com/v1alpha
-kind: ScopeReportLocation
-metadata:
-  name: report
-spec:
-  additionalData:
-    username: id -u
-    ruby: which ruby
-    node: which node
-    nodeVersion: node -v
-  destination:
-    githubIssue:
-      owner: ethankhall
-      repo: dummy-repo
-....
-
-[cols="1,2"]
-|===
-| Field
-| Description
-
-a| `.spec.additionalData`
-| A map of `name` to `command`. Scope will run the command and capture the output as part of the report.
-
-a| `.spec.destination`
-a| Currently, supports GitHub Issues and https://github.com/orhun/rustypaste[`RustyPaste`] as a source.
-Additional options will be added in the future.
-
-a| `.spec.destination.githubIssue.owner`
-a| (required) GitHub owner part of the slug. (ie. `ethankhall`)
-
-a| `.spec.destination.githubIssue.owner`
-a| (required) GitHub repo name (ie. `scope`)
-
-a| `.spec.destination.githubIssue.tags`
-a| List of tags to add to the issue.
-
-a| `.spec.destination.rustyPaste.url`
-a| URL to upload the report to.
-|===
-
-=== Special Thanks
+== Special Thanks
 
 We took our redaction string from https://github.com/sirwart/ripsecrets[sirwart/ripsecrets].
