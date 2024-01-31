@@ -3,7 +3,6 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
-use crate::check::ActionRunResult::CheckFailedFixSucceedVerifySucceed;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use educe::Educe;
@@ -63,6 +62,20 @@ pub enum ActionRunResult {
     CheckFailedFixFailedStop,
 }
 
+impl ActionRunResult {
+    pub(crate) fn is_failure(&self) -> bool {
+        match self {
+            ActionRunResult::CheckSucceeded => false,
+            ActionRunResult::CheckFailedFixSucceedVerifySucceed => false,
+            ActionRunResult::CheckFailedFixFailed => true,
+            ActionRunResult::CheckFailedFixSucceedVerifyFailed => true,
+            ActionRunResult::CheckFailedNoRunFix => true,
+            ActionRunResult::CheckFailedNoFixProvided => true,
+            ActionRunResult::CheckFailedFixFailedStop => true,
+        }
+    }
+}
+
 #[derive(Educe, Builder)]
 #[educe(Debug)]
 #[builder(setter(into))]
@@ -108,7 +121,7 @@ impl DoctorActionRun {
 
         self.update_caches().await;
 
-        Ok(CheckFailedFixSucceedVerifySucceed)
+        Ok(ActionRunResult::CheckFailedFixSucceedVerifySucceed)
     }
 
     async fn update_caches(&self) {

@@ -27,6 +27,8 @@ spec:
       fix:
         commands:
           - ./scripts/fix-node-version.sh
+        helpText: Running into errors reach out in #foo-help
+        helpUrl: https://go.example.com/get-help
       required: false
     - description: Install packages
       check:
@@ -67,4 +69,6 @@ To target a script relative to the group it must start with `.`, and giving a re
 - `.spec.action[].check.paths` A list of globs to check for a change.
 - `.spec.action[].check.commands` A list of commands to execute, using the exit code to determine if changes are needed.
 - `.spec.action[].fix.commands` A list of commands to execute, attempting to resolve issues detected by the action.
+- `.spec.action[].fix.helpText` Text to display to the user if this action fails.
+- `.spec.action[].fix.helpUrl` A URL to provide to the user in case of an error in this action.
 - `.spec.description` is a useful description of the setup, used when listing what's available.
