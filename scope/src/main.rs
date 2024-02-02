@@ -17,7 +17,7 @@ use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::Path;
-use tracing::{debug, error, info};
+use tracing::{debug, enabled, error, info, Level};
 
 /// (Oscilli)scope
 ///
@@ -72,10 +72,14 @@ async fn main() {
     dotenv::dotenv().ok();
     let opts = Cli::parse();
 
-    let _guard = opts
+    let (_guard, file_location) = opts
         .logging
         .configure_logging(&opts.config.get_run_id(), "root");
     let error_code = run_subcommand(opts).await;
+
+    if error_code != 0 || enabled!(Level::DEBUG) {
+        info!(target: "user", "More detailed logs at {}", file_location);
+    }
 
     std::process::exit(error_code);
 }
