@@ -5,7 +5,7 @@ use scope_lib::prelude::{
     ReportBuilder, ScopeModel,
 };
 use std::env;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, enabled, error, info, warn, Level};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
 /// and let the user know.
@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     let opts = Cli::parse();
 
-    let _guard = opts
+    let (_guard, file_location) = opts
         .logging
         .with_new_default(tracing::level_filters::LevelFilter::WARN)
         .configure_logging(&opts.config_options.get_run_id(), "intercept");
@@ -50,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
         error!(target: "user", "Fatal error {:?}", e);
         1
     });
+
+    if exit_code != 0 || enabled!(Level::DEBUG) {
+        info!(target: "user", "More detailed logs at {}", file_location);
+    }
 
     std::process::exit(exit_code);
 }

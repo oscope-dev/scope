@@ -2,11 +2,10 @@ use clap::{ArgGroup, Parser};
 use std::fs::File;
 use std::path::PathBuf;
 
-use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
-    fmt::format::{Format, JsonFields, PrettyFields},
+    fmt::format::{Format, PrettyFields},
     layer::SubscriberExt,
     Registry,
 };
@@ -58,7 +57,7 @@ impl LoggingOpts {
         &self,
         run_id: &str,
         prefix: &str,
-    ) -> tracing_appender::non_blocking::WorkerGuard {
+    ) -> (tracing_appender::non_blocking::WorkerGuard, String) {
         let file_name = format!("scope-{}-{}.log", prefix, run_id);
         let full_file_name = format!("/tmp/scope/{}", file_name);
         std::fs::create_dir_all("/tmp/scope").expect("to be able to create tmp dir");
@@ -69,8 +68,7 @@ impl LoggingOpts {
         );
 
         let file_output = tracing_subscriber::fmt::layer()
-            .event_format(Format::default().json().flatten_event(true))
-            .fmt_fields(JsonFields::new())
+            .event_format(Format::default().pretty())
             .with_writer(non_blocking);
 
         let console_output = tracing_subscriber::fmt::layer()
@@ -93,8 +91,6 @@ impl LoggingOpts {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        info!(target: "user", "More detailed logs at {}", full_file_name);
-
-        guard
+        (guard, full_file_name)
     }
 }
