@@ -156,7 +156,7 @@ pub fn compute_group_order(
     let end = graph.add_node("desired");
     let mut node_graph: BTreeMap<String, NodeIndex> = BTreeMap::new();
     for name in groups.keys() {
-        node_graph.insert(name.to_string(), graph.add_node(&name));
+        node_graph.insert(name.to_string(), graph.add_node(name));
     }
 
     for (name, model) in groups {
@@ -164,7 +164,7 @@ pub fn compute_group_order(
         let mut needs_start = true;
         for dep in &model.spec.requires {
             if let Some(other) = node_graph.get(dep) {
-                graph.add_edge(other.clone(), this.clone(), 1);
+                graph.add_edge(*other, *this, 1);
                 needs_start = false;
             } else {
                 warn!(target: "user", "{} needs {} but no such dependency found, ignoring dependency", name, dep);
@@ -172,13 +172,13 @@ pub fn compute_group_order(
         }
 
         if needs_start {
-            graph.add_edge(start, this.clone(), 1);
+            graph.add_edge(start, *this, 1);
         }
     }
 
     for name in &desired_groups {
         if let Some(this) = node_graph.get(name) {
-            graph.add_edge(this.clone(), end, 1);
+            graph.add_edge(*this, end, 1);
         }
     }
 
@@ -196,7 +196,7 @@ pub fn compute_group_order(
             if node == &start || node == &end {
                 continue;
             }
-            let name = graph.node_weight(node.clone()).unwrap().to_string();
+            let name = graph.node_weight(*node).unwrap().to_string();
             named_path.push(name)
         }
         all_paths.push(named_path);
