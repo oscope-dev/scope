@@ -35,7 +35,7 @@ jobs:
       - name: Upload Linux
         uses: actions/upload-artifact@v4
         with:
-          name: release-linux
+          name: artifacts-linux-pkgs
           path: |
             target/upload/scope-${{ inputs.version }}-1.aarch64.rpm
             target/upload/scope-${{ inputs.version }}-1.aarch64.rpm.sha256
