@@ -10,6 +10,12 @@ This is primarily used to generate a bug report, and upload it somewhere so that
 
 For full documentation, please visit [our website](https://ethankhall.github.io/scope).
 
+## Install
+
+Review the [latest release](https://github.com/ethankhall/scope/releases/latest) to find the install command.
+
+To install manually, download the correct archive for your platform from [github release](https://github.com/ethankhall/scope/releases/latest), extract it, and place the binaries on the `PATH`.
+
 ## Commands
 
 ### `scope doctor`
