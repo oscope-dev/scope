@@ -1,3 +1,4 @@
+use std::cmp::max;
 use crate::models::{ModelRoot, ScopeModel};
 use colored::Colorize;
 use std::path::Path;
@@ -43,7 +44,7 @@ where
     T: HelpMetadata,
 {
     let max_name_length = config.iter().map(|x| x.name().len()).max().unwrap_or(20);
-    let max_name_length = max_name_length + 2;
+    let max_name_length = max(max_name_length, 20) + 2;
 
     info!(target: "user", "{:max_name_length$}{:60}{}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
     for check in config {
