@@ -17,7 +17,7 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 # Publish jobs to run in CI
-pr-run-mode = "publish"
+pr-run-mode = "upload"
 
 [[workspace.metadata.dist.extra-artifacts]]
 artifacts = ["dist-manifest-schema.json"]
