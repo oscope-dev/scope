@@ -7,19 +7,17 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use scope_doctor::prelude::*;
 use scope_lib::prelude::{
-    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, ModelRoot, OutputCapture,
-    OutputDestination, ScopeModel,
+    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
 };
 
 use scope_analyze::prelude::{analyze_root, AnalyzeArgs};
-use scope_lib::{HelpMetadata, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
+use scope_lib::{print_details, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::path::Path;
 use tracing::{debug, enabled, error, info, Level};
 
-/// (Oscilli)scope
+/// scope
 ///
 /// Scope is a tool to enable teams to manage local machine
 /// checks. An example would be a team that supports other
@@ -153,10 +151,8 @@ fn show_config(found_config: &FoundConfig) -> Result<()> {
     let mut extra_line = false;
     if !found_config.doctor_group.is_empty() {
         info!(target: "user", "Doctor Checks");
-        print_details(
-            &found_config.working_dir,
-            found_config.doctor_group.values().collect(),
-        );
+        let order = generate_doctor_list(found_config);
+        print_details(&found_config.working_dir, order);
         extra_line = true;
     }
 
@@ -212,24 +208,6 @@ fn print_commands(found_config: &FoundConfig) {
             let description = command_map.get(command_name.as_str()).unwrap();
             info!(target: "user", "{:^20} {:^60}", command_name.white().bold(), description);
         }
-    }
-}
-
-fn print_details<T>(working_dir: &Path, config: Vec<&ModelRoot<T>>)
-where
-    T: HelpMetadata,
-{
-    info!(target: "user", "{:^20}{:^60}{:^40}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
-    info!(target: "user", "{:^120}", str::repeat("-", 120));
-    for check in config {
-        let mut loc = check.file_path();
-        let diff_path = pathdiff::diff_paths(&loc, working_dir);
-        if let Some(diff) = diff_path {
-            loc = diff.display().to_string();
-        } else if loc.len() > 35 {
-            loc = format!("...{}", loc.split_off(loc.len() - 35));
-        }
-        info!(target: "user", "{:^20} {:^60} {:^40}", check.name().white().bold(), check.spec.description(), loc);
     }
 }
 

@@ -10,4 +10,5 @@ mod tests;
 pub mod prelude {
     pub use crate::cli::doctor_root;
     pub use crate::cli::DoctorArgs;
+    pub use crate::commands::generate_doctor_list;
 }
