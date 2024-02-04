@@ -29,8 +29,8 @@ jobs:
       - name: Create archive
         run: |
           VERSION="$(echo "$PLAN" | jq --compact-output '.releases | first | .app_version')"
-          tar -xvf target/distrib/scope-x86_64-unknown-linux-gnu.tar.xz -C target
-          tar -xvf target/distrib/scope-aarch64-unknown-linux-gnu.tar.xz -C target
+          tar -xvf target/distrib/dev-scope-x86_64-unknown-linux-gnu.tar.xz -C target
+          tar -xvf target/distrib/dev-scope-aarch64-unknown-linux-gnu.tar.xz -C target
           .github/bin/create-packages-linux.sh ${VERSION}
       - name: Upload Linux
         uses: actions/upload-artifact@v4
