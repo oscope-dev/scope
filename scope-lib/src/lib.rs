@@ -61,6 +61,6 @@ where
             loc = format!("...{}", loc.split_off(loc.len() - 35));
         }
 
-        info!(target: "user", "{:max_name_length$}{:40}{}", check.name().white().bold(), description, loc);
+        info!(target: "user", "{:max_name_length$}{:60}{}", check.name().white().bold(), description, loc);
     }
 }
