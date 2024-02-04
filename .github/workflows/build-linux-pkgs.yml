@@ -1,0 +1,47 @@
+name: Linux Packages
+
+on:
+  # Defining workflow_call means that this workflow can be called from
+  # your main workflow job
+  workflow_call:
+    # cargo-dist exposes the plan from the plan step, as a JSON string,
+    # to your job if it needs it
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  greeter:
+    runs-on: ubuntu-latest
+    # This is optional; it exposes the plan to your job as an environment variable
+    env:
+      PLAN: ${{ inputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+      - run: rustup update
+      - uses: Swatinem/rust-cache@v2
+      - name: Build artifacts
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          .github/bin/build-linux.sh
+      - name: Create archive
+        run: |
+          VERSION="$(echo "$PLAN" | jq --compact-output '.releases | first | .app_version')"
+          .github/bin/create-packages-linux.sh ${VERSION}
+      - name: Upload Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            target/upload/scope-${{ inputs.version }}-1.aarch64.rpm
+            target/upload/scope-${{ inputs.version }}-1.aarch64.rpm.sha256
+            target/upload/scope-${{ inputs.version }}-1.x86_64.rpm
+            target/upload/scope-${{ inputs.version }}-1.x86_64.rpm.sha256
+            target/upload/scope_${{ inputs.version }}_amd64.deb
+            target/upload/scope_${{ inputs.version }}_amd64.deb.sha256
+            target/upload/scope_${{ inputs.version }}_arm64.deb
+            target/upload/scope_${{ inputs.version }}_arm64.deb.sha256
+          if-no-files-found: error

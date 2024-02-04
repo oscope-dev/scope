@@ -24,7 +24,7 @@ use tracing::{debug, enabled, error, info, Level};
 /// engineers may want to verify that the engineer asking
 /// for support's machine is setup correctly.
 #[derive(Parser)]
-#[clap(author, version=env!("SCOPE_VERSION"), about)]
+#[clap(author, version, about)]
 struct Cli {
     #[clap(flatten)]
     logging: LoggingOpts,
@@ -213,13 +213,13 @@ fn print_commands(found_config: &FoundConfig) {
 
 async fn print_version(args: &VersionArgs) -> Result<i32> {
     if args.short {
-        println!("scope {}", env!("SCOPE_VERSION"));
+        println!("scope {}", env!("CARGO_PKG_VERSION"));
     } else {
-        info!(target: "user", "{:>16}: {:60}", "Version".white().bold(), env!("SCOPE_VERSION"));
-        info!(target: "user", "{:>16}: {:60}", "Build Timestamp".white().bold(), env!("VERGEN_BUILD_TIMESTAMP"));
-        info!(target: "user", "{:>16}: {:60}", "Describe".white().bold(), env!("VERGEN_GIT_DESCRIBE"));
-        info!(target: "user", "{:>16}: {:60}", "Commit SHA".white().bold(), env!("VERGEN_GIT_SHA"));
-        info!(target: "user", "{:>16}: {:60}", "Commit Date".white().bold(), env!("VERGEN_GIT_COMMIT_DATE"));
+        info!(target: "user", "{}: {:60}", "Version".white().bold(), env!("CARGO_PKG_VERSION"));
+        info!(target: "user", "{}: {:60}", "Build Timestamp".white().bold(), env!("VERGEN_BUILD_TIMESTAMP"));
+        info!(target: "user", "{}: {:60}", "Describe".white().bold(), env!("VERGEN_GIT_DESCRIBE"));
+        info!(target: "user", "{}: {:60}", "Commit SHA".white().bold(), env!("VERGEN_GIT_SHA"));
+        info!(target: "user", "{}: {:60}", "Commit Date".white().bold(), env!("VERGEN_GIT_COMMIT_DATE"));
     }
 
     Ok(0)
