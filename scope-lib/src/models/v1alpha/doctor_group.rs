@@ -44,6 +44,8 @@ fn doctor_group_action_required_default() -> bool {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DoctorGroupSpec {
+    #[serde(default)]
+    pub requires: Vec<String>,
     pub description: Option<String>,
     pub actions: Vec<DoctorGroupActionSpec>,
 }
@@ -89,6 +91,7 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
     Ok(DoctorGroup {
         description: parsed.description.unwrap_or_else(|| "default".to_string()),
         actions,
+        requires: parsed.requires,
     })
 }
 
@@ -111,6 +114,7 @@ mod tests {
         assert_eq!(
             configs[0].get_doctor_group().unwrap(),
             DoctorGroup {
+                requires: Default::default(),
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![
                     DoctorGroupAction {

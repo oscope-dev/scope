@@ -3,6 +3,9 @@ mod cli;
 mod commands;
 mod error;
 mod file_cache;
+mod runner;
+#[cfg(test)]
+mod tests;
 
 pub mod prelude {
     pub use crate::cli::doctor_root;

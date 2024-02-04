@@ -76,10 +76,16 @@ impl ActionRunResult {
     }
 }
 
+#[automock]
+#[async_trait::async_trait]
+pub trait DoctorActionRun {
+    async fn run_action(&self) -> Result<ActionRunResult>;
+}
+
 #[derive(Educe, Builder)]
 #[educe(Debug)]
 #[builder(setter(into))]
-pub struct DoctorActionRun {
+pub struct DefaultDoctorActionRun {
     pub model: ModelRoot<DoctorGroup>,
     pub action: DoctorGroupAction,
     pub working_dir: PathBuf,
@@ -91,9 +97,10 @@ pub struct DoctorActionRun {
     pub glob_walker: Arc<dyn GlobWalker>,
 }
 
-impl DoctorActionRun {
+#[async_trait::async_trait]
+impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
-    pub async fn run_action(&self) -> Result<ActionRunResult> {
+    async fn run_action(&self) -> Result<ActionRunResult> {
         let check_status = self.evaluate_checks().await?;
         if check_status == CacheResults::FixNotRequired {
             return Ok(ActionRunResult::CheckSucceeded);
@@ -123,7 +130,9 @@ impl DoctorActionRun {
 
         Ok(ActionRunResult::CheckFailedFixSucceedVerifySucceed)
     }
+}
 
+impl DefaultDoctorActionRun {
     async fn update_caches(&self) {
         if let Some(cache_path) = &self.action.check.files {
             let result = self
@@ -337,9 +346,10 @@ impl GlobWalker for DefaultGlobWalker {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::check::{ActionRunResult, DoctorActionRun, MockGlobWalker, RuntimeError};
+pub(crate) mod tests {
+    use crate::check::{ActionRunResult, DefaultDoctorActionRun, MockGlobWalker, RuntimeError};
     use crate::file_cache::{FileCache, NoOpCache};
+    use crate::tests::build_root_model;
     use anyhow::{anyhow, Result};
     use scope_lib::prelude::{
         DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
@@ -351,7 +361,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    fn build_run_fail_fix_succeed_action() -> DoctorGroupAction {
+    pub fn build_run_fail_fix_succeed_action() -> DoctorGroupAction {
         DoctorGroupActionBuilder::default()
             .description("a test action")
             .name("action")
@@ -373,7 +383,7 @@ mod tests {
             .unwrap()
     }
 
-    fn build_file_fix_action() -> DoctorGroupAction {
+    pub fn build_file_fix_action() -> DoctorGroupAction {
         DoctorGroupActionBuilder::default()
             .description("a test action")
             .name("action")
@@ -395,30 +405,7 @@ mod tests {
             .unwrap()
     }
 
-    fn make_model(actions: Vec<DoctorGroupAction>) -> ModelRoot<DoctorGroup> {
-        let group = DoctorGroupBuilder::default()
-            .description("a description")
-            .actions(actions)
-            .build()
-            .unwrap();
-
-        ModelRootBuilder::default()
-            .api_version("fake")
-            .kind("fake-kind")
-            .metadata(
-                ModelMetadataBuilder::default()
-                    .name("fake-model")
-                    .annotations(BTreeMap::default())
-                    .labels(BTreeMap::default())
-                    .build()
-                    .unwrap(),
-            )
-            .spec(group)
-            .build()
-            .unwrap()
-    }
-
-    fn command_result(
+    pub fn command_result(
         mock: &mut MockExecutionProvider,
         command: &'static str,
         expected_results: Vec<i32>,
@@ -437,16 +424,16 @@ mod tests {
             });
     }
 
-    fn setup_test(
+    pub fn setup_test(
         actions: Vec<DoctorGroupAction>,
         exec_runner: MockExecutionProvider,
         glob_walker: MockGlobWalker,
-    ) -> DoctorActionRun {
-        let model = make_model(actions.clone());
+    ) -> DefaultDoctorActionRun {
+        let model = build_root_model(actions.clone());
         let path = PathBuf::from("/tmp/foo");
         let file_cache: Arc<dyn FileCache> = Arc::<NoOpCache>::default();
 
-        DoctorActionRun {
+        DefaultDoctorActionRun {
             model,
             action: actions[0].clone(),
             working_dir: path,

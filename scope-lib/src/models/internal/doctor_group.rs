@@ -110,6 +110,7 @@ where
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorGroup {
+    pub requires: Vec<String>,
     pub description: String,
     pub actions: Vec<DoctorGroupAction>,
 }
