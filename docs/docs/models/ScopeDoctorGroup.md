@@ -17,6 +17,9 @@ metadata:
   name: node
 spec:
   description: Check node is ready.
+  needs:
+    - python
+    - brew
   actions:
     - description: Node Version
       check:
@@ -65,6 +68,7 @@ To target a script relative to the group it must start with `.`, and giving a re
 ## Schema
 
 - `.spec.action` a series of steps to check and fix for the group.
+- `.spec.needs[]` an array of names required before this group can run.
 - `.spec.action[].required` default true, when true action failing check & fix will stop all execution. 
 - `.spec.action[].check.paths` A list of globs to check for a change.
 - `.spec.action[].check.commands` A list of commands to execute, using the exit code to determine if changes are needed.

@@ -4,6 +4,7 @@ metadata:
   name: foo
 spec:
   description: Check your shell for basic functionality
+  needs: []
   actions:
     - description: foo1
       check:

@@ -45,7 +45,7 @@ fn doctor_group_action_required_default() -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct DoctorGroupSpec {
     #[serde(default)]
-    pub requires: Vec<String>,
+    pub needs: Vec<String>,
     pub description: Option<String>,
     pub actions: Vec<DoctorGroupActionSpec>,
 }
@@ -91,7 +91,7 @@ pub(super) fn parse(containing_dir: &Path, value: &Value) -> Result<DoctorGroup>
     Ok(DoctorGroup {
         description: parsed.description.unwrap_or_else(|| "default".to_string()),
         actions,
-        requires: parsed.requires,
+        requires: parsed.needs,
     })
 }
 
