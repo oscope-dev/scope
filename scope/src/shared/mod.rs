@@ -33,6 +33,7 @@ pub mod prelude {
     pub use super::print_details;
     pub use super::report::ReportBuilder;
     pub use super::HelpMetadata;
+    pub use super::{CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 }
 
 pub(crate) fn convert_to_string(input: Vec<&str>) -> Vec<String> {

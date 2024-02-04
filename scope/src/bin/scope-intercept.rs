@@ -1,9 +1,6 @@
 use clap::Parser;
 use human_panic::setup_panic;
-use dev_scope::shared::prelude::{
-    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
-    ReportBuilder, ScopeModel,
-};
+use dev_scope::prelude::*;
 use std::env;
 use tracing::{debug, enabled, error, info, warn, Level};
 

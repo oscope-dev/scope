@@ -5,14 +5,7 @@ use colored::Colorize;
 use human_panic::setup_panic;
 use lazy_static::lazy_static;
 use regex::Regex;
-use dev_scope::doctor::prelude::*;
-use dev_scope::shared::prelude::{
-    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
-};
-
-use dev_scope::analyze::prelude::{analyze_root, AnalyzeArgs};
-use dev_scope::report::prelude::{report_root, ReportArgs};
-use dev_scope::shared::{print_details, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
+use dev_scope::prelude::*;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use tracing::{debug, enabled, error, info, Level};
