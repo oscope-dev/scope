@@ -9,7 +9,7 @@ keywords = ["local-dev"]
 categories = ["command-line-utilities", "development-tools::debugging", "development-tools::build-utils"]
 description = "A tool to help diagnose errors, setup machines, and report bugs to authors."
 documentation = "https://ethankhall.github.io/scope/"
-readme = "../README.adoc"
+readme = "../README.md"
 publish = true
 
 [package.metadata.dist]
