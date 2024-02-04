@@ -41,6 +41,7 @@ pub(super) fn parse(base_path: &Path, value: &Value) -> Result<DoctorGroup> {
     });
 
     Ok(DoctorGroup {
+        requires: Default::default(),
         actions: vec![DoctorGroupAction {
             name: "1".to_string(),
             required: true,
@@ -109,6 +110,7 @@ spec:
         assert_eq!(
             configs[0].get_doctor_group().unwrap(),
             DoctorGroup {
+                requires: Default::default(),
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
                     "1",
@@ -122,6 +124,7 @@ spec:
         assert_eq!(
             configs[1].get_doctor_group().unwrap(),
             DoctorGroup {
+                requires: Default::default(),
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
                     "1",
@@ -135,6 +138,7 @@ spec:
         assert_eq!(
             configs[2].get_doctor_group().unwrap(),
             DoctorGroup {
+                requires: Default::default(),
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![DoctorGroupAction::make_from(
                     "1",

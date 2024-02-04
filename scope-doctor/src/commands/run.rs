@@ -1,16 +1,14 @@
-use crate::check::{ActionRunResult, DefaultGlobWalker, DoctorActionRun};
+use crate::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
-use colored::*;
-use scope_lib::prelude::{
-    DefaultExecutionProvider, DoctorGroup, FoundConfig, ModelRoot, ScopeModel,
-};
-use std::collections::BTreeMap;
+use scope_lib::prelude::{DefaultExecutionProvider, FoundConfig, ScopeModel};
+use std::collections::{BTreeMap, BTreeSet};
 
+use crate::runner::{compute_group_order, RunGroups};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -48,108 +46,55 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
-    let mut check_map: BTreeMap<String, ModelRoot<DoctorGroup>> = Default::default();
+    let mut groups = BTreeMap::new();
+    let mut desired_groups = BTreeSet::new();
+
+    let file_cache: Arc<dyn FileCache> = get_cache(args);
+    let exec_runner = Arc::new(DefaultExecutionProvider::default());
+    let glob_walker = Arc::new(DefaultGlobWalker::default());
+
     for check in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
             None => true,
             Some(names) => names.contains(&check.name().to_string()),
         };
 
-        if should_group_run {
-            if let Some(old) = check_map.insert(check.full_name(), check.clone()) {
-                warn!(target: "user", "Check {} has multiple definitions, only the last will be processed.", old.name().bold());
-            }
-        }
-    }
+        let mut action_runs = Vec::new();
 
-    let cache: Arc<dyn FileCache> = get_cache(args);
-
-    let checks_to_run: Vec<_> = check_map.values().collect();
-
-    let mut should_pass = true;
-    let mut skip_remaining = false;
-    let exec_runner = Arc::new(DefaultExecutionProvider::default());
-    let glob_walker = Arc::new(DefaultGlobWalker::default());
-
-    for model in checks_to_run {
-        debug!(target: "user", "Running check {}", model.name());
-
-        if skip_remaining {
-            warn!(target: "user", "Check `{}` was skipped.", model.name().bold());
-            continue;
-        }
-
-        for action in &model.spec.actions {
-            let run = DoctorActionRun {
-                model: model.clone(),
+        for action in &check.spec.actions {
+            let run = DefaultDoctorActionRun {
+                model: check.clone(),
                 action: action.clone(),
                 working_dir: found_config.working_dir.clone(),
-                file_cache: cache.clone(),
+                file_cache: file_cache.clone(),
                 run_fix: args.fix.unwrap_or(true),
                 exec_runner: exec_runner.clone(),
                 glob_walker: glob_walker.clone(),
             };
 
-            let action_result = run.run_action().await?;
+            action_runs.push(run);
+        }
 
-            match action_result {
-                ActionRunResult::CheckSucceeded => {
-                    info!(target: "user", group = model.name(), name = action.name, "Check was successful");
-                }
-                ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
-                    info!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix was successful");
-                }
-                ActionRunResult::CheckFailedFixFailed => {
-                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {}", "failed".red().bold());
-                }
-                ActionRunResult::CheckFailedFixSucceedVerifyFailed => {
-                    error!(target: "user", group = model.name(), name = action.name, "Check initially failed, fix ran, verification {}", "failed".red().bold());
-                }
-                ActionRunResult::CheckFailedNoRunFix => {
-                    info!(target: "user", group = model.name(), name = action.name, "Check failed, fix was not run");
-                }
-                ActionRunResult::CheckFailedNoFixProvided => {
-                    error!(target: "user", group = model.name(), name = action.name, "Check failed, no fix provided");
-                }
-                ActionRunResult::CheckFailedFixFailedStop => {
-                    error!(target: "user", group = model.name(), name = action.name, "Check failed, fix ran and {} and aborted", "failed".red().bold());
-                }
-            }
+        groups.insert(check.name().to_string(), action_runs);
 
-            if action_result.is_failure() {
-                if let Some(help_text) = &action.fix.help_text {
-                    error!(target: "user", group = model.name(), name = action.name, "Action Help: {}", help_text);
-                }
-                if let Some(help_url) = &action.fix.help_url {
-                    error!(target: "user", group = model.name(), name = action.name, "For more help, please visit {}", help_url);
-                }
-            }
-
-            match action_result {
-                ActionRunResult::CheckSucceeded
-                | ActionRunResult::CheckFailedFixSucceedVerifySucceed => {}
-                ActionRunResult::CheckFailedFixFailedStop => {
-                    should_pass = false;
-                    skip_remaining = true;
-                }
-                _ => {
-                    if action.required {
-                        skip_remaining = true;
-                    }
-                    should_pass = false;
-                }
-            }
+        if should_group_run {
+            desired_groups.insert(check.name().to_string());
         }
     }
 
-    if let Err(e) = cache.persist().await {
+    let all_paths = compute_group_order(&found_config.doctor_group, desired_groups);
+
+    let run_groups = RunGroups {
+        group_actions: groups,
+        all_paths,
+    };
+
+    let exit_code = run_groups.execute().await?;
+
+    if let Err(e) = file_cache.persist().await {
         info!("Unable to store cache {:?}", e);
         warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
-    if should_pass {
-        Ok(0)
-    } else {
-        Ok(1)
-    }
+    Ok(exit_code)
 }

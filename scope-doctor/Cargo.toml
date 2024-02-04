@@ -19,6 +19,7 @@ tokio = { version = "1", features = ["full"] }
 mockall = "0.12.1"
 educe = "0.5.11"
 derive_builder = "0.13.0"
+petgraph = "0.6.4"
 
 scope-lib = { path = "../scope-lib" }
 

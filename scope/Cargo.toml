@@ -17,7 +17,6 @@ scope-report = { path = "../scope-report" }
 scope-analyze = { path = "../scope-analyze" }
 scope-lib = { path = "../scope-lib" }
 colored = "2.0.0"
-pathdiff = "0.2.1"
 which = { version = "5.0", features = ["regex"] }
 regex = "1.9.6"
 lazy_static = "1.4.0"
