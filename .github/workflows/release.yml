@@ -15,8 +15,6 @@ name: Release
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 # This task will run whenever you push a git tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -313,12 +311,3 @@ jobs:
           body: ${{ fromJson(needs.host.outputs.val).announcement_github_body }}
           prerelease: ${{ fromJson(needs.host.outputs.val).announcement_is_prerelease }}
           artifacts: "artifacts/*"
-
-  custom-gh-page:
-    needs:
-      - plan
-      - announce
-    uses: ./.github/workflows/gh-page.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
