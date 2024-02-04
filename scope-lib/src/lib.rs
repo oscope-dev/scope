@@ -1,6 +1,6 @@
-use std::cmp::max;
 use crate::models::{ModelRoot, ScopeModel};
 use colored::Colorize;
+use std::cmp::max;
 use std::path::Path;
 use tracing::info;
 
