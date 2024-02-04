@@ -71,7 +71,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         path: &path,
         env_vars: Default::default(),
     })
-    .await?;
+        .await?;
 
     let mut accepted_exit_codes = vec![0];
     accepted_exit_codes.extend(opts.successful_exit);

@@ -1,5 +1,5 @@
 [workspace]
-members = ["scope", "scope-doctor", "scope-report", "scope-intercept", "scope-lib", "scope-analyze"]
+members = ["scope", "scope-doctor", "scope-report", "scope-lib", "scope-analyze"]
 resolver = "2"
 
 # Config for 'cargo dist'

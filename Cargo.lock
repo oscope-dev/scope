@@ -1750,6 +1750,7 @@ dependencies = [
  "dotenv",
  "escargot",
  "human-panic",
+ "inquire",
  "lazy_static",
  "predicates",
  "regex",
@@ -1794,21 +1795,6 @@ dependencies = [
  "serde_json",
  "sha256",
  "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "scope-intercept"
-version = "2024.2.3"
-dependencies = [
- "anyhow",
- "clap",
- "dotenv",
- "human-panic",
- "inquire",
- "scope-lib",
  "thiserror",
  "tokio",
  "tracing",

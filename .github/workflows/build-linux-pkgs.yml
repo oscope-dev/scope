@@ -19,14 +19,13 @@ jobs:
       PLAN: ${{ inputs.plan }}
     steps:
       - uses: actions/checkout@v4
+      # Fetch artifacts from scratch-storage
+      - name: Fetch artifacts
+        uses: actions/download-artifact@v4
         with:
-          fetch-tags: true
-      - run: rustup update
-      - uses: Swatinem/rust-cache@v2
-      - name: Build artifacts
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-          .github/bin/build-linux.sh
+          pattern: artifacts-*-linux-gnu
+          path: target/distrib/
+          merge-multiple: true
       - name: Create archive
         run: |
           VERSION="$(echo "$PLAN" | jq --compact-output '.releases | first | .app_version')"
