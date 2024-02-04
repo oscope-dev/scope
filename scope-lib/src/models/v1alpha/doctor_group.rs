@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(
             configs[0].get_doctor_group().unwrap(),
             DoctorGroup {
-                requires: Default::default(),
+                requires: vec!["bar".to_string()],
                 description: "Check your shell for basic functionality".to_string(),
                 actions: vec![
                     DoctorGroupAction {
