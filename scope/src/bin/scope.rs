@@ -2,17 +2,10 @@ use anyhow::Result;
 use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use dev_scope::prelude::*;
 use human_panic::setup_panic;
 use lazy_static::lazy_static;
 use regex::Regex;
-use scope_doctor::prelude::*;
-use scope_lib::prelude::{
-    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
-};
-
-use scope_analyze::prelude::{analyze_root, AnalyzeArgs};
-use scope_lib::{print_details, CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
-use scope_report::prelude::{report_root, ReportArgs};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use tracing::{debug, enabled, error, info, Level};

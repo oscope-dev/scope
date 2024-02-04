@@ -1,9 +1,6 @@
 use clap::Parser;
+use dev_scope::prelude::*;
 use human_panic::setup_panic;
-use scope_lib::prelude::{
-    CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
-    ReportBuilder, ScopeModel,
-};
 use std::env;
 use tracing::{debug, enabled, error, info, warn, Level};
 
