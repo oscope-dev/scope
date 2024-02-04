@@ -50,7 +50,7 @@ impl CacheResults {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum ActionRunResult {
     CheckSucceeded,
@@ -78,8 +78,12 @@ impl ActionRunResult {
 
 #[automock]
 #[async_trait::async_trait]
-pub trait DoctorActionRun {
+pub trait DoctorActionRun: Send + Sync {
     async fn run_action(&self) -> Result<ActionRunResult>;
+    fn required(&self) -> bool;
+    fn name(&self) -> String;
+    fn help_text(&self) -> Option<String>;
+    fn help_url(&self) -> Option<String>;
 }
 
 #[derive(Educe, Builder)]
@@ -129,6 +133,22 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         self.update_caches().await;
 
         Ok(ActionRunResult::CheckFailedFixSucceedVerifySucceed)
+    }
+
+    fn required(&self) -> bool {
+        self.action.required
+    }
+
+    fn name(&self) -> String {
+        self.action.name.to_string()
+    }
+
+    fn help_text(&self) -> Option<String> {
+        self.action.fix.help_text.clone()
+    }
+
+    fn help_url(&self) -> Option<String> {
+        self.action.fix.help_url.clone()
     }
 }
 
@@ -277,7 +297,7 @@ impl DefaultDoctorActionRun {
 
 #[automock]
 #[async_trait]
-pub trait GlobWalker {
+pub trait GlobWalker: Send + Sync {
     async fn have_globs_changed(
         &self,
         base_dir: &Path,
@@ -347,17 +367,13 @@ impl GlobWalker for DefaultGlobWalker {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::check::{ActionRunResult, DefaultDoctorActionRun, MockGlobWalker, RuntimeError};
+    use crate::check::{
+        ActionRunResult, DefaultDoctorActionRun, DoctorActionRun, MockGlobWalker, RuntimeError,
+    };
     use crate::file_cache::{FileCache, NoOpCache};
     use crate::tests::build_root_model;
     use anyhow::{anyhow, Result};
-    use scope_lib::prelude::{
-        DoctorGroup, DoctorGroupAction, DoctorGroupActionBuilder, DoctorGroupActionCheckBuilder,
-        DoctorGroupActionCommand, DoctorGroupActionFixBuilder, DoctorGroupBuilder,
-        DoctorGroupCachePath, MockExecutionProvider, ModelMetadataBuilder, ModelRoot,
-        ModelRootBuilder, OutputCaptureBuilder,
-    };
-    use std::collections::BTreeMap;
+    use scope_lib::prelude::*;
     use std::path::PathBuf;
     use std::sync::Arc;
 

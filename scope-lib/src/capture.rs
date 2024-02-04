@@ -71,7 +71,7 @@ pub enum CaptureError {
 
 #[automock]
 #[async_trait]
-pub trait ExecutionProvider {
+pub trait ExecutionProvider: Send + Sync {
     async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError>;
 }
 

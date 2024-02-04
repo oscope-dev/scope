@@ -1,17 +1,14 @@
-use crate::check::{ActionRunResult, DefaultGlobWalker, DefaultDoctorActionRun};
+use crate::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use anyhow::Result;
 use clap::Parser;
-use colored::*;
-use scope_lib::prelude::{
-    DefaultExecutionProvider, DoctorGroup, FoundConfig, ModelRoot, ScopeModel,
-};
+use scope_lib::prelude::{DefaultExecutionProvider, FoundConfig, ScopeModel};
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::runner::{compute_group_order, RunGroups};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
-use crate::runner::RunGroups;
+use tracing::{info, warn};
 
 #[derive(Debug, Parser)]
 pub struct DoctorRunArgs {
@@ -49,7 +46,12 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
+    let mut groups = BTreeMap::new();
     let mut desired_groups = BTreeSet::new();
+
+    let file_cache: Arc<dyn FileCache> = get_cache(args);
+    let exec_runner = Arc::new(DefaultExecutionProvider::default());
+    let glob_walker = Arc::new(DefaultGlobWalker::default());
 
     for check in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
@@ -57,24 +59,42 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             Some(names) => names.contains(&check.name().to_string()),
         };
 
+        let mut action_runs = Vec::new();
+
+        for action in &check.spec.actions {
+            let run = DefaultDoctorActionRun {
+                model: check.clone(),
+                action: action.clone(),
+                working_dir: found_config.working_dir.clone(),
+                file_cache: file_cache.clone(),
+                run_fix: args.fix.unwrap_or(true),
+                exec_runner: exec_runner.clone(),
+                glob_walker: glob_walker.clone(),
+            };
+
+            action_runs.push(run);
+        }
+
+        groups.insert(check.name().to_string(), action_runs);
+
         if should_group_run {
             desired_groups.insert(check.name().to_string());
         }
     }
 
-    let cache: Arc<dyn FileCache> = get_cache(args);
-    let exec_runner = Arc::new(DefaultExecutionProvider::default());
-    let glob_walker = Arc::new(DefaultGlobWalker::default());
+    let all_paths = compute_group_order(&found_config.doctor_group, desired_groups);
 
     let run_groups = RunGroups {
-        groups: found_config.doctor_group.clone(),
-        desired_groups,
-        file_cache: cache,
-        working_dir: found_config.working_dir.clone(),
-        run_fixes: args.fix.unwrap_or(true),
-        exec_runner,
-        glob_walker,
+        group_actions: groups,
+        all_paths,
     };
 
-    Ok(run_groups.execute().await?)
+    let exit_code = run_groups.execute().await?;
+
+    if let Err(e) = file_cache.persist().await {
+        info!("Unable to store cache {:?}", e);
+        warn!(target: "user", "Unable to update cache, re-runs may redo work");
+    }
+
+    Ok(exit_code)
 }
