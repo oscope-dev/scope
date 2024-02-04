@@ -12,7 +12,7 @@ on:
         type: string
 
 jobs:
-  greeter:
+  linux-pkg:
     runs-on: ubuntu-latest
     # This is optional; it exposes the plan to your job as an environment variable
     env:
