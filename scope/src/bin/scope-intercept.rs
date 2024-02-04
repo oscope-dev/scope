@@ -1,6 +1,6 @@
 use clap::Parser;
-use human_panic::setup_panic;
 use dev_scope::prelude::*;
+use human_panic::setup_panic;
 use std::env;
 use tracing::{debug, enabled, error, info, warn, Level};
 

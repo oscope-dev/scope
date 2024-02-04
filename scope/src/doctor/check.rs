@@ -372,8 +372,8 @@ pub(crate) mod tests {
     };
     use crate::doctor::file_cache::{FileCache, NoOpCache};
     use crate::doctor::tests::build_root_model;
-    use anyhow::{anyhow, Result};
     use crate::shared::prelude::*;
+    use anyhow::{anyhow, Result};
     use std::path::PathBuf;
     use std::sync::Arc;
 
