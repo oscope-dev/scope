@@ -3,7 +3,7 @@ on:
     branches:
       - main
 
-name: Release
+name: Main Build
 
 jobs:
   check:
