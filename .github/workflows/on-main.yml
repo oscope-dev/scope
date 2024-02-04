@@ -6,32 +6,7 @@ on:
 name: Release
 
 jobs:
-  filter:
-    runs-on: ubuntu-latest
-    outputs:
-      docs: ${{ steps.filter.outputs.docs }}
-      artifacts: ${{ steps.filter.outputs.artifacts }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            artifacts:
-              - '**/*.rs'
-              - 'Cargo.*'
-              - '**/Cargo.*'
-              - 'Cross.toml'
-              - '.github/bin/*'
-              - '.github/workflows/*'
-            docs:
-              - 'docs/**'
-              - '.github/workflows/*'
   check:
-    needs: [ filter ]
-    if: ${{ needs.filter.outputs.artifacts == 'true' }}
     name: Check
     runs-on: ubuntu-latest
     steps:
@@ -53,40 +28,3 @@ jobs:
       - name: cargo clippy
         run: cargo clippy -- -D warnings
 
-  make-versions:
-    needs:
-      - check
-    runs-on: ubuntu-latest
-    outputs:
-      snapshot-version: ${{ steps.version.outputs.snapshot-version }}
-      release-version: ${{ steps.version.outputs.release-version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: create pre-release
-        id: version
-        env:
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: |
-          set -euxo pipefail
-          SNAPSHOT_VERSION="$(env TZ=UTC date +"%Y.%-m.0-$(git rev-parse --short HEAD)")"
-          RELEASE_VERSION="$(env TZ=UTC date +"%Y.%-m.$(git rev-list --count origin/main --since "$(TZ=UTC date +'%+4Y-%m-01T00:00:00-00:00')")")"
-          
-          echo "snapshot-version=$SNAPSHOT_VERSION" >> $GITHUB_OUTPUT
-          echo "release-version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-
-  create-release:
-    needs: make-versions
-    uses: ./.github/workflows/create-release.yml
-    with:
-      version: ${{ needs.make-versions.outputs.release-version }}
-      release-options: ""
-      environment: "release"
-    secrets: inherit
-
-  docs:
-    if: ${{ needs.filter.outputs.docs == 'true' }}
-    needs:
-      - filter
-    uses: ./.github/workflows/gh-page.yml

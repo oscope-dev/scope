@@ -1,3 +1,33 @@
 [workspace]
-members = ["scope", "scope-doctor", "scope-report", "scope-intercept", "scope-lib", "scope-analyze"]
+members = ["scope", "scope-doctor", "scope-report", "scope-lib", "scope-analyze"]
 resolver = "2"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.9.0"
+# CI backends to support
+ci = ["github"]
+# The installers to generate for each app
+installers = ["shell", "homebrew"]
+# A GitHub repo to push Homebrew formulas to
+tap = "ethankhall/homebrew-formulas"
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+# Global artifacts jobs to run in CI
+global-artifacts-jobs = ["./build-linux-pkgs"]
+# Publish jobs to run in CI
+publish-jobs = ["homebrew"]
+# Publish jobs to run in CI
+pr-run-mode = "plan"
+# update docs
+post-announce-jobs = ["./gh-page"]
+
+[workspace.metadata.dist.github-custom-runners]
+aarch64-unknown-linux-gnu = "buildjet-8vcpu-ubuntu-2204-arm"
+aarch64-unknown-linux-musl = "buildjet-8vcpu-ubuntu-2204-arm"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

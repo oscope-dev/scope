@@ -54,12 +54,6 @@ jobs:
       - name: cargo clippy
         run: cargo clippy -- -D warnings
 
-  build-artifacts:
-    uses: ./.github/workflows/build-artifacts.yml
-    needs: [ tests ]
-    with:
-      version: "0.0.1-SNAPSHOT"
-
   build-docs:
     needs: [ filter ]
     if: ${{ needs.filter.outputs.docs == 'true' }}
@@ -69,7 +63,6 @@ jobs:
     if: always()
     needs:
       - build-docs
-      - build-artifacts
       - tests
     runs-on: ubuntu-latest
     steps:

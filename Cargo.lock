@@ -1740,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "scope"
-version = "0.1.0"
+version = "2024.2.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1750,6 +1750,7 @@ dependencies = [
  "dotenv",
  "escargot",
  "human-panic",
+ "inquire",
  "lazy_static",
  "predicates",
  "regex",
@@ -1766,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "scope-analyze"
-version = "0.1.0"
+version = "2024.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1778,7 +1779,7 @@ dependencies = [
 
 [[package]]
 name = "scope-doctor"
-version = "0.1.0"
+version = "2024.2.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1800,23 +1801,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "scope-intercept"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "dotenv",
- "human-panic",
- "inquire",
- "scope-lib",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "scope-lib"
-version = "0.1.0"
+version = "2024.2.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1850,7 +1836,7 @@ dependencies = [
 
 [[package]]
 name = "scope-report"
-version = "0.1.0"
+version = "2024.2.3"
 dependencies = [
  "anyhow",
  "clap",

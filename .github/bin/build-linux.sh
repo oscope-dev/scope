@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-export VERSION="${1:-'0.1.1-SNAPSHOT'}"
-
 cross build --target aarch64-unknown-linux-gnu --release
 cross build --target x86_64-unknown-linux-gnu --release
 
