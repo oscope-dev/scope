@@ -15,7 +15,7 @@ fn setup_working_dir() -> TempDir {
 #[test]
 fn test_list_reports_all_config() {
     let working_dir = setup_working_dir();
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_list_reports_all_config")
@@ -42,7 +42,7 @@ fn test_list_reports_all_config() {
 #[test]
 fn test_doctor_list() {
     let working_dir = setup_working_dir();
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_doctor_list")
@@ -64,7 +64,7 @@ fn test_doctor_list() {
 fn test_sub_command_works() {
     let working_dir = setup_working_dir();
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_sub_command_works")
@@ -80,7 +80,7 @@ fn test_sub_command_works() {
 fn test_run_check_path_exists() {
     let working_dir = setup_working_dir();
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_check_path_exists")
@@ -94,7 +94,7 @@ fn test_run_check_path_exists() {
         "Check initially failed, fix was successful, group: \"path-exists\", name: \"1\"",
     ));
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_check_path_exists_2")
@@ -119,7 +119,7 @@ fn test_run_setup() {
         .write_str("initial cache")
         .unwrap();
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_setup_1")
@@ -140,7 +140,7 @@ fn test_run_setup() {
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_setup_2")
@@ -162,7 +162,7 @@ fn test_run_setup() {
         .child("foo/requirements.txt")
         .write_str("cache buster")
         .unwrap();
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_setup_3")
@@ -189,7 +189,7 @@ fn test_run_group_1() {
         .write_str("initial cache")
         .unwrap();
 
-    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+    let mut cmd = Command::cargo_bin("scope").unwrap();
     let result = cmd
         .current_dir(working_dir.path())
         .env("SCOPE_RUN_ID", "test_run_group_1")

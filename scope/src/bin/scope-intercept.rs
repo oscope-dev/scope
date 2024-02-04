@@ -1,6 +1,6 @@
 use clap::Parser;
 use human_panic::setup_panic;
-use scope_lib::prelude::{
+use dev_scope::shared::prelude::{
     CaptureOpts, ConfigOptions, FoundConfig, LoggingOpts, OutputCapture, OutputDestination,
     ReportBuilder, ScopeModel,
 };
