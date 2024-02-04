@@ -20,6 +20,8 @@ global-artifacts-jobs = ["./build-linux-pkgs"]
 publish-jobs = ["homebrew"]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
+# publish to homebrew
+publish-prereleases = true
 
 [workspace.metadata.dist.github-custom-runners]
 aarch64-unknown-linux-gnu = "buildjet-8vcpu-ubuntu-2204-arm"
