@@ -1,6 +1,4 @@
-= Scope
-:toc:
-:exampleDir: examples
+# Scope
 
 `scope` is a tool that allows developer experience teams to provide tooling for engineers.
 There are two tools engineers will use directly, `scope doctor` and `scope report`.
@@ -10,17 +8,17 @@ There are two tools engineers will use directly, `scope doctor` and `scope repor
 `scope report` is used to report local execution error.
 This is primarily used to generate a bug report, and upload it somewhere so that the responders have all the required into to respond.
 
-For full documentation, please visit https://ethankhall.github.io/scope[our website].
+For full documentation, please visit [our website](https://ethankhall.github.io/scope).
 
-== Commands
+## Commands
 
-=== `scope doctor`
+### `scope doctor`
 
 Environments are hard to maintain and can fall out of sync with exceptions quickly.
 `scope doctor` is a way to codify what a working environment means and tell the user how to fix it.
 The aim is to reduce the need for engineers to ask others to fix their environment and distribute what "working" means to everyone.
 
-=== `scope report`
+### `scope report`
 
 Sometimes you need to report an error to others.
 Often the responding team wants the output that failed, and some other useful debugging information.
@@ -30,9 +28,9 @@ By using `scope report some-command.sh`, scope will capture all the output with 
 IMPORTANT: `scope` will redact anything it finds as "sensitive".
 This allows you to fetch env-vars, and no leak GH API tokens for example.
 
-=== `scope-intercept`
+### `scope-intercept`
 
-`scope-intercept` is a https://en.wikipedia.org/wiki/Shebang_(Unix)[shebang] replacement for `env`.
+`scope-intercept` is a [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix)) replacement for `env`.
 Behind the scene `env -S` is run to execute the script, however `scope-intercept` will watch all the output and then check for KnownErrors.
 This allows the engineer to see, in real time, suggestions for fixing errors.
 It also allows the engineer to upload a bug report immediately.
@@ -40,6 +38,6 @@ It also allows the engineer to upload a bug report immediately.
 IMPORTANT: `scope` will redact anything it finds as "sensitive".
 This allows you to fetch env-vars, and no leak GH API tokens for example.
 
-== Special Thanks
+## Special Thanks
 
-We took our redaction string from https://github.com/sirwart/ripsecrets[sirwart/ripsecrets].
+We took our redaction string from [sirwart/ripsecrets](https://github.com/sirwart/ripsecrets).
