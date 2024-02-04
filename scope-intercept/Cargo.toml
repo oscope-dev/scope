@@ -2,6 +2,7 @@
 name = "scope-intercept"
 version = "0.1.0"
 edition = "2021"
+repository =  "https://github.com/ethankhall/scope"
 
 [dependencies]
 clap = { version = "4.4", features = ["derive", "env"]}
