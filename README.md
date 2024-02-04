@@ -12,6 +12,12 @@ For full documentation, please visit [our website](https://ethankhall.github.io/
 
 ## Install
 
+**Homebrew**
+
+```shell
+brew install ethankhall/homebrew-formulas/dev-scope
+```
+
 **Install Script**
 
 Review the [latest release](https://github.com/ethankhall/scope/releases/latest) to find the install command.
