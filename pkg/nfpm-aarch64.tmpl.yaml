@@ -10,7 +10,7 @@ version_schema: none
 homepage: "https://ethankhall.github.io/scope"
 license: "BSD 3-Clause"
 contents:
-- src: ./scope-aarch64-unknown-linux-gnu/scope
+- src: ./dev-scope-aarch64-unknown-linux-gnu/scope
   dst: /usr/local/bin/scope
-- src: ./scope-aarch64-unknown-linux-gnu/scope-intercept
+- src: ./dev-scope-aarch64-unknown-linux-gnu/scope-intercept
   dst: /usr/local/bin/scope-intercept
