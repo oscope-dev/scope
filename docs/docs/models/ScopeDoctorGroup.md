@@ -22,6 +22,7 @@ spec:
     - brew
   actions:
     - description: Node Version
+      name: node-version
       check:
         paths:
           - '.npmrc'
@@ -34,6 +35,7 @@ spec:
         helpUrl: https://go.example.com/get-help
       required: false
     - description: Install packages
+      name: yarn
       check:
         paths:
           - 'package.json'
@@ -69,6 +71,7 @@ To target a script relative to the group it must start with `.`, and giving a re
 
 - `.spec.action` a series of steps to check and fix for the group.
 - `.spec.needs[]` an array of names required before this group can run.
+- `.spec.action[].name` a short name to refer to the action
 - `.spec.action[].required` default true, when true action failing check & fix will stop all execution. 
 - `.spec.action[].check.paths` A list of globs to check for a change.
 - `.spec.action[].check.commands` A list of commands to execute, using the exit code to determine if changes are needed.
