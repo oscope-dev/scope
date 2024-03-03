@@ -1,12 +1,14 @@
 use crate::shared::HelpMetadata;
 use derivative::Derivative;
-use regex::Regex;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaKnownError};
+use dev_scope_model::ScopeModel;
+use regex::Regex;
 
 #[derive(Derivative)]
 #[derivative(PartialEq)]
 #[derive(Debug, Clone)]
 pub struct KnownError {
+    pub full_name: String,
     pub metadata: ModelMetadata,
     pub description: String,
     pub pattern: String,
@@ -16,12 +18,19 @@ pub struct KnownError {
 }
 
 impl HelpMetadata for KnownError {
-    fn description(&self) -> &str {
-        &self.description
+    fn description(&self) -> String {
+        self.description.to_string()
+    }
+    fn name(&self) -> String {
+        self.metadata.name.to_string()
     }
 
-    fn name(&self) -> &str {
-        &self.metadata.name
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        self.full_name.to_string()
     }
 }
 
@@ -31,6 +40,7 @@ impl TryFrom<V1AlphaKnownError> for KnownError {
     fn try_from(value: V1AlphaKnownError) -> Result<Self, Self::Error> {
         let regex = Regex::new(&value.spec.pattern)?;
         Ok(KnownError {
+            full_name: value.full_name(),
             metadata: value.metadata,
             pattern: value.spec.pattern,
             regex,
@@ -44,6 +54,7 @@ impl TryFrom<V1AlphaKnownError> for KnownError {
 mod tests {
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::KnownError;
+    use dev_scope_model::prelude::ModelMetadata;
     use regex::Regex;
     use std::path::Path;
 
@@ -61,11 +72,12 @@ spec:
         let path = Path::new("/foo/bar/file.yaml");
         let configs = parse_models_from_string(path, text).unwrap();
         assert_eq!(1, configs.len());
-        assert_eq!(configs[0].get_known_error_spec().unwrap(), KnownError {
-            description: "Check if the word error is in the logs".to_string(),
-            help_text: "The command had an error, try reading the logs around there to find out what happened.".to_string(),
-            pattern: "error".to_string(),
-            regex: Regex::new("error").unwrap()
-        });
+        let model = configs[0].get_known_error_spec().unwrap();
+
+        assert_eq!("error-exists", model.metadata.name);
+        assert_eq!("ScopeKnownError/error-exists", model.full_name);
+        assert_eq!("Check if the word error is in the logs", model.description);
+        assert_eq!("The command had an error, try reading the logs around there to find out what happened.", model.help_text);
+        assert_eq!("error", model.pattern);
     }
 }

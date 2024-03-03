@@ -1,8 +1,9 @@
 use crate::core::ModelMetadata;
-use crate::v1alpha::prelude::{ReportLocationKind, V1AlphaReportLocation};
+
 use crate::v1alpha::V1AlphaApiVersion;
 use derive_builder::Builder;
-use schemars::gen::SchemaGenerator;
+
+use crate::InternalScopeModel;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -33,11 +34,11 @@ pub struct V1AlphaReportDefinition {
 
 impl crate::ScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
     fn api_version(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_api_version()
+        Self::int_api_version()
     }
 
     fn kind(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_kind()
+        Self::int_kind()
     }
 
     fn metadata(&self) -> &ModelMetadata {
@@ -49,7 +50,7 @@ impl crate::ScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
     }
 }
 
-impl crate::InternalScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
+impl InternalScopeModel<ReportDefinitionSpec, V1AlphaReportDefinition> for V1AlphaReportDefinition {
     fn int_api_version() -> String {
         V1AlphaApiVersion::ScopeV1Alpha.to_string()
     }

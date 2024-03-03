@@ -1,13 +1,13 @@
+use crate::prelude::HelpMetadata;
 use crate::shared::models::prelude::{
     DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
-
 };
-use crate::shared::{
-    RUN_ID_ENV_VAR,
-};
+use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
+use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
+use dev_scope_model::ScopeModel;
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
@@ -18,8 +18,6 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
-use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
-use dev_scope_model::ScopeModel;
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -188,6 +186,7 @@ impl FoundConfig {
         self.report_definition
             .clone()
             .unwrap_or_else(|| ReportDefinition {
+                full_name: "ReportDefinition/generated".to_string(),
                 metadata: ModelMetadata::new("generated"),
                 template: "== Error report for {{ command }}.".to_string(),
                 additional_data: Default::default(),
@@ -209,17 +208,17 @@ impl FoundConfig {
                 if self.report_definition.is_none() {
                     self.report_definition.replace(report_definition);
                 } else {
-                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.file_path());
+                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.metadata().file_path());
                 }
             }
         }
     }
 }
 
-fn insert_if_absent<T>(map: &mut BTreeMap<String, ModelRoot<T>>, entry: ModelRoot<T>) {
+fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
     let name = entry.name();
-    if map.contains_key(name) {
-        warn!(target: "user", "A {} with duplicate name found, dropping {} in {}", entry.kind().to_string().bold(), entry.name().bold(), entry.file_path());
+    if map.contains_key(&name) {
+        warn!(target: "user", "Duplicate {} found, dropping {} in {}", entry.full_name().to_string().bold(), entry.name().bold(), entry.metadata().file_path());
     } else {
         map.insert(name.to_string(), entry);
     }
@@ -257,17 +256,12 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
 
     match serde_yaml::from_value::<ModelRoot<Value>>(value) {
         Ok(mut value) => {
-            value.metadata.annotations.file_path = Some(
-                file_path.display().to_string(),
-            );
+            value.metadata.annotations.file_path = Some(file_path.display().to_string());
 
-            value.metadata.annotations.file_dir = Some(
-                file_path.parent().unwrap().display().to_string(),
-            );
+            value.metadata.annotations.file_dir =
+                Some(file_path.parent().unwrap().display().to_string());
 
-            value.metadata.annotations.bin_path(
-                build_exec_path(file_path),
-            );
+            value.metadata.annotations.bin_path = Some(build_exec_path(file_path));
             Some(value)
         }
         Err(e) => {

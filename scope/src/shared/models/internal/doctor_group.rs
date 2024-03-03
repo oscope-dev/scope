@@ -1,9 +1,9 @@
-use crate::shared::{HelpMetadata};
+use crate::shared::models::internal::extract_command_path;
+use crate::shared::HelpMetadata;
 use derive_builder::Builder;
-use std::path::{Path, PathBuf};
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use dev_scope_model::ScopeModel;
-use crate::shared::models::internal::extract_command_path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
@@ -113,6 +113,7 @@ where
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorGroup {
+    pub full_name: String,
     pub metadata: ModelMetadata,
     pub requires: Vec<String>,
     pub description: String,
@@ -120,23 +121,32 @@ pub struct DoctorGroup {
 }
 
 impl HelpMetadata for DoctorGroup {
-    fn description(&self) -> &str {
-        &self.description
+    fn description(&self) -> String {
+        self.description.to_string()
     }
 
-    fn name(&self) -> &str {
-        &self.metadata.name
+    fn name(&self) -> String {
+        self.metadata.name.to_string()
+    }
+
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        self.full_name.to_string()
     }
 }
 
 impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
-
     type Error = anyhow::Error;
 
     fn try_from(model: V1AlphaDoctorGroup) -> Result<Self, Self::Error> {
-        let containing_dir = Path::new(&model.containing_dir());
+        let binding = model.containing_dir();
+        let containing_dir = Path::new(&binding);
         let mut actions: Vec<_> = Default::default();
-        for (count, spec_action) in model.spec.actions.into_iter().enumerate() {
+        for (count, spec_action) in model.spec.actions.iter().enumerate() {
+            let spec_action = spec_action.clone();
             let help_text = spec_action
                 .fix
                 .as_ref()
@@ -161,7 +171,7 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
                     command: spec_action
                         .check
                         .commands
-                        .map(|commands| DoctorGroupActionCommand::from((&containing_dir, commands))),
+                        .map(|commands| DoctorGroupActionCommand::from((containing_dir, commands))),
                     files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
                         paths,
                         base_path: containing_dir.parent().unwrap().to_path_buf(),
@@ -171,8 +181,12 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
         }
 
         Ok(DoctorGroup {
+            full_name: model.full_name(),
             metadata: model.metadata,
-            description: model.spec.description.unwrap_or_else(|| "default".to_string()),
+            description: model
+                .spec
+                .description
+                .unwrap_or_else(|| "default".to_string()),
             actions,
             requires: model.spec.needs,
         })
@@ -187,60 +201,71 @@ mod tests {
         DoctorGroupActionFix,
     };
     use crate::shared::prelude::DoctorGroupCachePath;
+    use dev_scope_model::prelude::{
+        ModelMetadata, ModelMetadataAnnotations, ModelMetadataAnnotationsBuilder,
+        ModelMetadataBuilder,
+    };
+    use predicates::prelude::*;
     use std::path::Path;
-    use dev_scope_model::prelude::ModelMetadata;
 
     #[test]
     fn parse_group_1() {
-        let text = include_str!("examples/group-1.yaml");
+        let test_file = format!("{}/examples/group-1.yaml", env!("CARGO_MANIFEST_DIR"));
+        let text = std::fs::read_to_string(test_file).unwrap();
         let path = Path::new("/foo/bar/.scope/file.yaml");
-        let configs = parse_models_from_string(path, text).unwrap();
+        let configs = parse_models_from_string(path, &text).unwrap();
         assert_eq!(1, configs.len());
+
+        let dg = configs[0].get_doctor_group().unwrap();
+        assert_eq!("foo", dg.metadata.name);
         assert_eq!(
-            configs[0].get_doctor_group().unwrap(),
-            DoctorGroup {
-                metadata: ModelMetadata::new("group-1"),
-                requires: vec!["bar".to_string()],
-                description: "Check your shell for basic functionality".to_string(),
-                actions: vec![
-                    DoctorGroupAction {
-                        name: "1".to_string(),
-                        required: false,
-                        description: "foo1".to_string(),
-                        fix: DoctorGroupActionFix {
-                            command: Some(DoctorGroupActionCommand::from(vec![
-                                "/foo/bar/.scope/fix1.sh"
-                            ])),
-                            help_text: Some(
-                                "There is a good way to fix this, maybe...".to_string()
-                            ),
-                            help_url: Some("https://go.example.com/fixit".to_string()),
-                        },
-                        check: DoctorGroupActionCheck {
-                            command: Some(DoctorGroupActionCommand::from(vec![
-                                "/foo/bar/.scope/foo1.sh"
-                            ])),
-                            files: Some(DoctorGroupCachePath::from((
-                                "/foo/bar",
-                                vec!["flig/bar/**/*"]
-                            )))
-                        }
-                    },
-                    DoctorGroupAction {
-                        name: "2".to_string(),
-                        required: true,
-                        description: "foo2".to_string(),
-                        fix: DoctorGroupActionFix {
-                            command: None,
-                            help_text: None,
-                            help_url: None,
-                        },
-                        check: DoctorGroupActionCheck {
-                            command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
-                            files: Some(DoctorGroupCachePath::from(("/foo/bar", vec!["*/*.txt"])))
-                        }
-                    }
-                ]
+            "/foo/bar/.scope/file.yaml",
+            dg.metadata.annotations.file_path.unwrap()
+        );
+        assert_eq!("/foo/bar/.scope", dg.metadata.annotations.file_dir.unwrap());
+        assert_eq!("ScopeDoctorGroup/foo", dg.full_name);
+        assert_eq!(vec!["bar"], dg.requires);
+        assert_eq!("Check your shell for basic functionality", dg.description);
+
+        assert_eq!(
+            dg.actions[0],
+            DoctorGroupAction {
+                name: "1".to_string(),
+                required: false,
+                description: "foo1".to_string(),
+                fix: DoctorGroupActionFix {
+                    command: Some(DoctorGroupActionCommand::from(vec![
+                        "/foo/bar/.scope/fix1.sh"
+                    ])),
+                    help_text: Some("There is a good way to fix this, maybe...".to_string()),
+                    help_url: Some("https://go.example.com/fixit".to_string()),
+                },
+                check: DoctorGroupActionCheck {
+                    command: Some(DoctorGroupActionCommand::from(vec![
+                        "/foo/bar/.scope/foo1.sh"
+                    ])),
+                    files: Some(DoctorGroupCachePath::from((
+                        "/foo/bar",
+                        vec!["flig/bar/**/*"]
+                    )))
+                }
+            }
+        );
+        assert_eq!(
+            dg.actions[1],
+            DoctorGroupAction {
+                name: "2".to_string(),
+                required: true,
+                description: "foo2".to_string(),
+                fix: DoctorGroupActionFix {
+                    command: None,
+                    help_text: None,
+                    help_url: None,
+                },
+                check: DoctorGroupActionCheck {
+                    command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
+                    files: Some(DoctorGroupCachePath::from(("/foo/bar", vec!["*/*.txt"])))
+                }
             }
         );
     }

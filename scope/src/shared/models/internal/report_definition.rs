@@ -1,11 +1,32 @@
-use std::collections::BTreeMap;
+use crate::prelude::{HelpMetadata, KnownError};
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportDefinition};
+use dev_scope_model::ScopeModel;
+use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReportDefinition {
+    pub full_name: String,
     pub metadata: ModelMetadata,
     pub additional_data: BTreeMap<String, String>,
     pub template: String,
+}
+
+impl HelpMetadata for ReportDefinition {
+    fn description(&self) -> String {
+        format!("Create a template of an error for {}", self.metadata.name)
+    }
+
+    fn name(&self) -> String {
+        self.metadata.name.to_string()
+    }
+
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        self.full_name.to_string()
+    }
 }
 
 impl TryFrom<V1AlphaReportDefinition> for ReportDefinition {
@@ -13,6 +34,7 @@ impl TryFrom<V1AlphaReportDefinition> for ReportDefinition {
 
     fn try_from(value: V1AlphaReportDefinition) -> Result<Self, Self::Error> {
         Ok(ReportDefinition {
+            full_name: value.full_name(),
             metadata: value.metadata,
             template: value.spec.template.trim().to_string(),
             additional_data: value.spec.additional_data,
@@ -22,8 +44,10 @@ impl TryFrom<V1AlphaReportDefinition> for ReportDefinition {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::ReportDefinition;
+    use dev_scope_model::prelude::ModelMetadata;
     use std::path::Path;
 
     #[test]
@@ -44,13 +68,14 @@ spec:
         let path = Path::new("/foo/bar/file.yaml");
         let configs = parse_models_from_string(path, text).unwrap();
         assert_eq!(1, configs.len());
+        let model = configs[0].get_report_def_spec().unwrap();
 
-        assert_eq!(
-            configs[0].get_report_def_spec().unwrap(),
-            ReportDefinition {
-                template: "hello bob".to_string(),
-                additional_data: [("env".to_string(), "env".to_string())].into()
-            }
-        );
+        assert_eq!("ScopeReportDefinition/report", model.full_name);
+        assert_eq!("report", model.metadata.name());
+        assert_eq!("/foo/bar/file.yaml", model.metadata.annotations.file_path.unwrap());
+        assert_eq!("hello bob", model.template);
+
+        let additional_data: BTreeMap<String, String> = [("env".to_string(), "env".to_string())].into();
+        assert_eq!(additional_data, model.additional_data);
     }
 }

@@ -1,6 +1,6 @@
 use super::capture::{CaptureOpts, OutputCapture};
 use super::config_load::FoundConfig;
-use super::models::prelude::{ReportUploadLocationDestination, ScopeModel};
+use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};

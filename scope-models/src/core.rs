@@ -1,4 +1,3 @@
-use crate::prelude::DoctorGroupSpec;
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -28,23 +27,27 @@ impl ModelMetadata {
     pub fn file_path(&self) -> String {
         match &self.annotations.file_path {
             Some(v) => v.to_string(),
-            None => "unknown".to_string()
+            None => "unknown".to_string(),
         }
     }
 
     pub fn containing_dir(&self) -> String {
         match &self.annotations.file_dir {
             Some(v) => v.to_string(),
-            None => "unknown".to_string()
+            None => "unknown".to_string(),
         }
     }
 
     pub fn exec_path(&self) -> String {
         match &self.annotations.bin_path {
             Some(v) => {
-                format!("{}:{}", v.to_string(), std::env::var("PATH").unwrap_or_else(|_| "".to_string()))
-            },
-            None => std::env::var("PATH").unwrap_or_else(|_| "".to_string())
+                format!(
+                    "{}:{}",
+                    v,
+                    std::env::var("PATH").unwrap_or_else(|_| "".to_string())
+                )
+            }
+            None => std::env::var("PATH").unwrap_or_else(|_| "".to_string()),
         }
     }
 

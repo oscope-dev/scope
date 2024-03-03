@@ -1,7 +1,8 @@
-use crate::core::ModelMetadata;
-use schemars::gen::{SchemaGenerator, SchemaSettings};
+use crate::core::{ModelMetadata, ModelRoot};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 mod core;
 mod v1alpha;
@@ -35,17 +36,29 @@ pub trait ScopeModel<S> {
     }
 }
 
-pub trait InternalScopeModel<S>:
+pub trait InternalScopeModel<S, R>:
     JsonSchema + Serialize + for<'a> Deserialize<'a> + ScopeModel<S>
+where
+    R: for<'a> Deserialize<'a>,
 {
     fn int_api_version() -> String;
     fn int_kind() -> String;
+    fn known_type(input: &ModelRoot<Value>) -> anyhow::Result<Option<R>> {
+        if Self::int_api_version().to_lowercase() == input.api_version.to_lowercase()
+            && Self::int_kind().to_lowercase() == input.kind.to_lowercase()
+        {
+            let value = serde_json::to_value(input)?;
+            return Ok(Some(serde_json::from_value::<R>(value)?));
+        }
+        Ok(None)
+    }
+
     #[cfg(test)]
     fn examples() -> Vec<String>;
 
     #[cfg(test)]
     fn create_and_validate(
-        schema_gen: &mut SchemaGenerator,
+        schema_gen: &mut schemars::gen::SchemaGenerator,
         out_dir: &str,
         merged_schema: &str,
     ) -> anyhow::Result<()> {
@@ -65,15 +78,15 @@ pub trait InternalScopeModel<S>:
 
         for example in Self::examples() {
             validate_schema::<Self>(&schema_json, &example)?;
-            validate_schema::<Self>(&merged_schema, &example)?;
+            validate_schema::<Self>(merged_schema, &example)?;
         }
         Ok(())
     }
 }
 
 #[cfg(test)]
-pub fn make_schema_generator() -> SchemaGenerator {
-    let settings = SchemaSettings::draft2019_09().with(|s| {
+pub fn make_schema_generator() -> schemars::gen::SchemaGenerator {
+    let settings = schemars::gen::SchemaSettings::draft2019_09().with(|s| {
         s.option_nullable = true;
     });
     settings.into_generator()
@@ -100,9 +113,9 @@ where
     if let Err(err_iter) = compiled_schema.validate(&parsed_json) {
         println!("{}", serde_json::to_string_pretty(&parsed_json).unwrap());
         for e in err_iter {
-            println!("error: {}", e.to_string());
+            println!("error: {}", e);
         }
-        assert!(false);
+        unreachable!();
     };
 
     Ok(())
@@ -112,7 +125,7 @@ where
 mod schema_gen {
     use crate::v1alpha::prelude::*;
     use crate::InternalScopeModel;
-    use derive_builder::Builder;
+
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
 

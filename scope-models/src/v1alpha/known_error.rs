@@ -1,5 +1,6 @@
 use crate::core::ModelMetadata;
 use crate::v1alpha::V1AlphaApiVersion;
+use crate::InternalScopeModel;
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -30,11 +31,11 @@ pub struct V1AlphaKnownError {
 
 impl crate::ScopeModel<KnownErrorSpec> for V1AlphaKnownError {
     fn api_version(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_api_version()
+        Self::int_api_version()
     }
 
     fn kind(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_kind()
+        Self::int_kind()
     }
 
     fn metadata(&self) -> &ModelMetadata {
@@ -46,7 +47,7 @@ impl crate::ScopeModel<KnownErrorSpec> for V1AlphaKnownError {
     }
 }
 
-impl crate::InternalScopeModel<KnownErrorSpec> for V1AlphaKnownError {
+impl InternalScopeModel<KnownErrorSpec, V1AlphaKnownError> for V1AlphaKnownError {
     fn int_api_version() -> String {
         V1AlphaApiVersion::ScopeV1Alpha.to_string()
     }

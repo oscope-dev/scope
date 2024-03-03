@@ -1,7 +1,14 @@
+use crate::shared::prelude::*;
+use anyhow::anyhow;
+use dev_scope_model::prelude::{
+    ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError, V1AlphaReportDefinition,
+    V1AlphaReportLocation,
+};
+use dev_scope_model::InternalScopeModel;
+use path_clean::PathClean;
+use serde_yaml::Value;
 use std::collections::VecDeque;
 use std::path::Path;
-use crate::shared::prelude::*;
-use serde_yaml::Value;
 
 mod doctor_group;
 mod known_error;
@@ -19,38 +26,38 @@ pub mod prelude {
 
 #[derive(Debug, PartialEq)]
 pub enum ParsedConfig {
-    KnownError(ModelRoot<KnownError>),
-    ReportUpload(ModelRoot<ReportUploadLocation>),
-    ReportDefinition(ModelRoot<ReportDefinition>),
-    DoctorGroup(ModelRoot<DoctorGroup>),
+    KnownError(KnownError),
+    ReportUpload(ReportUploadLocation),
+    ReportDefinition(ReportDefinition),
+    DoctorGroup(DoctorGroup),
 }
 
 #[cfg(test)]
 impl ParsedConfig {
     pub fn get_report_upload_spec(&self) -> Option<ReportUploadLocation> {
         match self {
-            ParsedConfig::ReportUpload(root) => Some(root.spec.clone()),
+            ParsedConfig::ReportUpload(root) => Some(root.clone()),
             _ => None,
         }
     }
 
     pub fn get_report_def_spec(&self) -> Option<ReportDefinition> {
         match self {
-            ParsedConfig::ReportDefinition(root) => Some(root.spec.clone()),
+            ParsedConfig::ReportDefinition(root) => Some(root.clone()),
             _ => None,
         }
     }
 
     pub fn get_known_error_spec(&self) -> Option<KnownError> {
         match self {
-            ParsedConfig::KnownError(root) => Some(root.spec.clone()),
+            ParsedConfig::KnownError(root) => Some(root.clone()),
             _ => None,
         }
     }
 
     pub fn get_doctor_group(&self) -> Option<DoctorGroup> {
         match self {
-            ParsedConfig::DoctorGroup(root) => Some(root.spec.clone()),
+            ParsedConfig::DoctorGroup(root) => Some(root.clone()),
             _ => None,
         }
     }
@@ -60,7 +67,23 @@ impl TryFrom<ModelRoot<Value>> for ParsedConfig {
     type Error = anyhow::Error;
 
     fn try_from(value: ModelRoot<Value>) -> Result<Self, Self::Error> {
-        ParsedConfig::try_from(&value)
+        if let Ok(Some(known)) = V1AlphaDoctorGroup::known_type(&value) {
+            return Ok(ParsedConfig::DoctorGroup(DoctorGroup::try_from(known)?));
+        }
+        if let Ok(Some(known)) = V1AlphaKnownError::known_type(&value) {
+            return Ok(ParsedConfig::KnownError(KnownError::try_from(known)?));
+        }
+        if let Ok(Some(known)) = V1AlphaReportLocation::known_type(&value) {
+            return Ok(ParsedConfig::ReportUpload(ReportUploadLocation::try_from(
+                known,
+            )?));
+        }
+        if let Ok(Some(known)) = V1AlphaReportDefinition::known_type(&value) {
+            return Ok(ParsedConfig::ReportDefinition(ReportDefinition::try_from(
+                known,
+            )?));
+        }
+        Err(anyhow!("Error was know a known type"))
     }
 }
 
@@ -87,12 +110,12 @@ fn test_extract_command_path() {
     let base_path = Path::new("/foo/bar");
     assert_eq!(
         "/foo/bar/scripts/foo.sh",
-        crate::shared::models::v1alpha::extract_command_path(base_path, "./scripts/foo.sh")
+        extract_command_path(base_path, "./scripts/foo.sh")
     );
     assert_eq!(
         "/scripts/foo.sh",
-        crate::shared::models::v1alpha::extract_command_path(base_path, "/scripts/foo.sh")
+        extract_command_path(base_path, "/scripts/foo.sh")
     );
-    assert_eq!("foo", crate::shared::models::v1alpha::extract_command_path(base_path, "foo"));
-    assert_eq!("foo bar", crate::shared::models::v1alpha::extract_command_path(base_path, "foo bar"));
+    assert_eq!("foo", extract_command_path(base_path, "foo"));
+    assert_eq!("foo bar", extract_command_path(base_path, "foo bar"));
 }

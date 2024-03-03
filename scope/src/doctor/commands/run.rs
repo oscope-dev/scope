@@ -1,6 +1,6 @@
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
-use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig, ScopeModel};
+use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 use anyhow::Result;
 use clap::Parser;
 use std::collections::{BTreeMap, BTreeSet};

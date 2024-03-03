@@ -1,6 +1,7 @@
 use crate::core::ModelMetadata;
-use crate::v1alpha::known_error::{KnownErrorKind, V1AlphaKnownError};
+
 use crate::v1alpha::V1AlphaApiVersion;
+use crate::InternalScopeModel;
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -67,11 +68,11 @@ pub struct V1AlphaDoctorGroup {
 
 impl crate::ScopeModel<DoctorGroupSpec> for V1AlphaDoctorGroup {
     fn api_version(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_api_version()
+        Self::int_api_version()
     }
 
     fn kind(&self) -> String {
-        <Self as crate::InternalScopeModel<_>>::int_kind()
+        Self::int_kind()
     }
 
     fn metadata(&self) -> &ModelMetadata {
@@ -83,7 +84,7 @@ impl crate::ScopeModel<DoctorGroupSpec> for V1AlphaDoctorGroup {
     }
 }
 
-impl crate::InternalScopeModel<DoctorGroupSpec> for V1AlphaDoctorGroup {
+impl InternalScopeModel<DoctorGroupSpec, V1AlphaDoctorGroup> for V1AlphaDoctorGroup {
     fn int_api_version() -> String {
         V1AlphaApiVersion::ScopeV1Alpha.to_string()
     }

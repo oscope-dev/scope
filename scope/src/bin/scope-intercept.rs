@@ -88,9 +88,9 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
 
     for known_error in found_config.known_error.values() {
         debug!("Checking known error {}", known_error.name());
-        if known_error.spec.regex.is_match(&command_output) {
+        if known_error.regex.is_match(&command_output) {
             info!(target: "always", "Known error '{}' found", known_error.name());
-            info!(target: "always", "\t==> {}", known_error.spec.help_text);
+            info!(target: "always", "\t==> {}", known_error.help_text);
         }
     }
 

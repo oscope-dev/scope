@@ -1,5 +1,5 @@
 use super::check::{ActionRunResult, DoctorActionRun};
-use crate::shared::prelude::{DoctorGroup};
+use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
 use colored::Colorize;
 use petgraph::algo::all_simple_paths;

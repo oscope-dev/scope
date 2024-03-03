@@ -1,9 +1,9 @@
 use colored::Colorize;
+use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
+use dev_scope_model::ScopeModel;
 use std::cmp::max;
 use std::path::Path;
 use tracing::info;
-use dev_scope_model::prelude::ModelRoot;
-use dev_scope_model::ScopeModel;
 
 mod capture;
 mod config_load;
@@ -17,8 +17,10 @@ pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
 pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
 
 pub trait HelpMetadata {
-    fn description(&self) -> &str;
-    fn name(&self) -> &str;
+    fn description(&self) -> String;
+    fn name(&self) -> String;
+    fn metadata(&self) -> &ModelMetadata;
+    fn full_name(&self) -> String;
 }
 
 pub mod prelude {
@@ -54,7 +56,7 @@ where
             description = format!("{}...", description);
         }
 
-        let mut loc = check.file_path();
+        let mut loc = check.metadata().file_path();
         let diff_path = pathdiff::diff_paths(&loc, working_dir);
         if let Some(diff) = diff_path {
             loc = diff.display().to_string();
