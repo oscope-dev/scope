@@ -1,0 +1,20 @@
+[package]
+name = "dev-scope-model"
+version = "2024.2.6"
+edition = "2021"
+
+[package.metadata.dist]
+dist = true
+
+[dependencies]
+anyhow = "1.0.57"
+thiserror = "1.0.30"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+schemars = "0.8"
+derive_builder = "0.20"
+strum = { version = "0.26", features = ["derive"] }
+
+[dev-dependencies]
+jsonschema = "0.17"

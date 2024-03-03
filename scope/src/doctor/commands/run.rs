@@ -56,12 +56,12 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     for check in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
             None => true,
-            Some(names) => names.contains(&check.name().to_string()),
+            Some(names) => names.contains(&check.metadata.name().to_string()),
         };
 
         let mut action_runs = Vec::new();
 
-        for action in &check.spec.actions {
+        for action in &check.actions {
             let run = DefaultDoctorActionRun {
                 model: check.clone(),
                 action: action.clone(),
@@ -75,10 +75,10 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             action_runs.push(run);
         }
 
-        groups.insert(check.name().to_string(), action_runs);
+        groups.insert(check.metadata.name().to_string(), action_runs);
 
         if should_group_run {
-            desired_groups.insert(check.name().to_string());
+            desired_groups.insert(check.metadata.name().to_string());
         }
     }
 

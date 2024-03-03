@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportDefinition
+metadata:
+  name: template
+spec:
+  additionalData:
+    username: id -u
+    ruby: which ruby
+    node: which node
+    nodeVersion: node -v
+  template: |
+    # There was an error!
+    
+    When running `{{ command }}` scope ran into an error

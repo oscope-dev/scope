@@ -1,0 +1,28 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: foo
+spec:
+  description: Check your shell for basic functionality
+  needs:
+    - bar
+  actions:
+    - description: foo1
+      check:
+        paths:
+          - 'flig/bar/**/*'
+        commands:
+          - ./foo1.sh
+      fix:
+        commands:
+          - ./fix1.sh
+        helpText: |
+          There is a good way to fix this, maybe...
+        helpUrl: https://go.example.com/fixit
+      required: false
+    - description: foo2
+      check:
+        paths:
+          - '*/*.txt'
+        commands:
+          - sleep infinity

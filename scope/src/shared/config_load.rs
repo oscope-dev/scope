@@ -1,9 +1,9 @@
 use crate::shared::models::prelude::{
-    DoctorGroup, KnownError, ModelRoot, ParsedConfig, ReportDefinition, ReportUploadLocation,
-    ScopeModel,
+    DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
+
 };
 use crate::shared::{
-    FILE_DIR_ANNOTATION, FILE_EXEC_PATH_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR,
+    RUN_ID_ENV_VAR,
 };
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
@@ -18,6 +18,8 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, warn};
+use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
+use dev_scope_model::ScopeModel;
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -106,10 +108,10 @@ impl ConfigOptions {
 pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub raw_config: Vec<ModelRoot<Value>>,
-    pub doctor_group: BTreeMap<String, ModelRoot<DoctorGroup>>,
-    pub known_error: BTreeMap<String, ModelRoot<KnownError>>,
-    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocation>>,
-    pub report_definition: Option<ModelRoot<ReportDefinition>>,
+    pub doctor_group: BTreeMap<String, DoctorGroup>,
+    pub known_error: BTreeMap<String, KnownError>,
+    pub report_upload: BTreeMap<String, ReportUploadLocation>,
+    pub report_definition: Option<ReportDefinition>,
     pub config_path: Vec<PathBuf>,
     pub bin_path: String,
     pub run_id: String,
@@ -184,10 +186,9 @@ impl FoundConfig {
 
     pub fn get_report_definition(&self) -> ReportDefinition {
         self.report_definition
-            .as_ref()
-            .map(|x| x.spec.clone())
             .clone()
             .unwrap_or_else(|| ReportDefinition {
+                metadata: ModelMetadata::new("generated"),
                 template: "== Error report for {{ command }}.".to_string(),
                 additional_data: Default::default(),
             })
@@ -256,18 +257,15 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
 
     match serde_yaml::from_value::<ModelRoot<Value>>(value) {
         Ok(mut value) => {
-            value.metadata.annotations.insert(
-                FILE_PATH_ANNOTATION.to_string(),
+            value.metadata.annotations.file_path = Some(
                 file_path.display().to_string(),
             );
 
-            value.metadata.annotations.insert(
-                FILE_DIR_ANNOTATION.to_string(),
+            value.metadata.annotations.file_dir = Some(
                 file_path.parent().unwrap().display().to_string(),
             );
 
-            value.metadata.annotations.insert(
-                FILE_EXEC_PATH_ANNOTATION.to_string(),
+            value.metadata.annotations.bin_path(
                 build_exec_path(file_path),
             );
             Some(value)

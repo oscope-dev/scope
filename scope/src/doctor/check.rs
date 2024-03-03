@@ -5,7 +5,7 @@ use std::cmp::max;
 
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
-    DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
+    DoctorGroupCachePath, ExecutionProvider, OutputDestination,
 };
 use async_trait::async_trait;
 use derive_builder::Builder;
@@ -90,7 +90,7 @@ pub trait DoctorActionRun: Send + Sync {
 #[educe(Debug)]
 #[builder(setter(into))]
 pub struct DefaultDoctorActionRun {
-    pub model: ModelRoot<DoctorGroup>,
+    pub model: DoctorGroup,
     pub action: DoctorGroupAction,
     pub working_dir: PathBuf,
     pub file_cache: Arc<dyn FileCache>,
@@ -160,7 +160,7 @@ impl DefaultDoctorActionRun {
                 .update_cache(
                     &cache_path.base_path,
                     &cache_path.paths,
-                    self.model.name(),
+                    &self.model.metadata.name(),
                     self.file_cache.clone(),
                 )
                 .await;
@@ -238,7 +238,7 @@ impl DefaultDoctorActionRun {
             .have_globs_changed(
                 &paths.base_path,
                 &paths.paths,
-                self.model.name(),
+                &self.model.metadata.name(),
                 self.file_cache.clone(),
             )
             .await?;

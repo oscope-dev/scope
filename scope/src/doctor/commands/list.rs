@@ -1,5 +1,5 @@
 use crate::doctor::runner::compute_group_order;
-use crate::shared::prelude::{DoctorGroup, FoundConfig, ModelRoot};
+use crate::shared::prelude::{DoctorGroup, FoundConfig};
 use crate::shared::print_details;
 use anyhow::Result;
 use clap::Args;
@@ -16,7 +16,7 @@ pub async fn doctor_list(found_config: &FoundConfig, _args: &DoctorListArgs) -> 
     Ok(())
 }
 
-pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<&ModelRoot<DoctorGroup>> {
+pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<&DoctorGroup> {
     let all_keys = BTreeSet::from_iter(found_config.doctor_group.keys().map(|x| x.to_string()));
     let all_paths = compute_group_order(&found_config.doctor_group, all_keys);
 

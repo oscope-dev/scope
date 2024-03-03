@@ -23,6 +23,7 @@ name = "scope"
 name = "scope-intercept"
 
 [dependencies]
+dev-scope-model = { path = "../scope-models" }
 clap = { version = "4.4.11", features = ["derive", "env"]}
 human-panic = "1.0.3"
 anyhow = "1.0.57"

@@ -1,0 +1,9 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportLocation
+metadata:
+  name: github
+spec:
+  destination:
+    githubIssue:
+      owner: ethankhall
+      repo: dummy-repo

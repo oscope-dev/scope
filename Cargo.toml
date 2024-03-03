@@ -1,5 +1,5 @@
 [workspace]
-members = ["scope"]
+members = ["scope", "scope-models"]
 resolver = "2"
 
 # Config for 'cargo dist'

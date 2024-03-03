@@ -81,8 +81,8 @@ impl<'a> ReportBuilder<'a> {
         let report = self.make_report_test();
 
         for dest in self.config.report_upload.values() {
-            if let Err(e) = &dest.spec.destination.upload(&report).await {
-                warn!(target: "user", "Unable to upload to {}: {}", dest.name(), e);
+            if let Err(e) = &dest.destination.upload(&report).await {
+                warn!(target: "user", "Unable to upload to {}: {}", dest.metadata.name(), e);
             }
         }
 

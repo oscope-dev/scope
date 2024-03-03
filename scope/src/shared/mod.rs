@@ -1,8 +1,9 @@
-use self::models::{ModelRoot, ScopeModel};
 use colored::Colorize;
 use std::cmp::max;
 use std::path::Path;
 use tracing::info;
+use dev_scope_model::prelude::ModelRoot;
+use dev_scope_model::ScopeModel;
 
 mod capture;
 mod config_load;
@@ -12,14 +13,12 @@ mod models;
 mod redact;
 mod report;
 
-pub const FILE_PATH_ANNOTATION: &str = "scope.github.com/file-path";
-pub const FILE_DIR_ANNOTATION: &str = "scope.github.com/file-dir";
-pub const FILE_EXEC_PATH_ANNOTATION: &str = "scope.github.com/bin-path";
 pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
 pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
 
 pub trait HelpMetadata {
     fn description(&self) -> &str;
+    fn name(&self) -> &str;
 }
 
 pub mod prelude {
@@ -40,7 +39,7 @@ pub(crate) fn convert_to_string(input: Vec<&str>) -> Vec<String> {
     input.iter().map(|x| x.to_string()).collect()
 }
 
-pub fn print_details<T>(working_dir: &Path, config: Vec<&ModelRoot<T>>)
+pub fn print_details<T>(working_dir: &Path, config: Vec<&T>)
 where
     T: HelpMetadata,
 {
@@ -49,7 +48,7 @@ where
 
     info!(target: "user", "{:max_name_length$}{:60}{}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
     for check in config {
-        let mut description = check.spec.description().to_string();
+        let mut description = check.description().to_string();
         if description.len() > 55 {
             description.truncate(55);
             description = format!("{}...", description);

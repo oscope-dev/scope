@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+use std::path::Path;
 use crate::shared::prelude::*;
 use serde_yaml::Value;
 
@@ -60,4 +62,37 @@ impl TryFrom<ModelRoot<Value>> for ParsedConfig {
     fn try_from(value: ModelRoot<Value>) -> Result<Self, Self::Error> {
         ParsedConfig::try_from(&value)
     }
+}
+
+pub(crate) fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
+    let mut parts: VecDeque<_> = exec.split(' ').map(|x| x.to_string()).collect();
+    let mut command = parts.pop_front().unwrap();
+
+    if command.starts_with('.') {
+        let full_command = parent_dir.join(command).clean().display().to_string();
+        command = full_command;
+    }
+
+    parts.push_front(command);
+
+    parts
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn test_extract_command_path() {
+    let base_path = Path::new("/foo/bar");
+    assert_eq!(
+        "/foo/bar/scripts/foo.sh",
+        crate::shared::models::v1alpha::extract_command_path(base_path, "./scripts/foo.sh")
+    );
+    assert_eq!(
+        "/scripts/foo.sh",
+        crate::shared::models::v1alpha::extract_command_path(base_path, "/scripts/foo.sh")
+    );
+    assert_eq!("foo", crate::shared::models::v1alpha::extract_command_path(base_path, "foo"));
+    assert_eq!("foo bar", crate::shared::models::v1alpha::extract_command_path(base_path, "foo bar"));
 }

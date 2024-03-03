@@ -1,0 +1,64 @@
+use crate::core::ModelMetadata;
+use crate::v1alpha::prelude::{ReportLocationKind, V1AlphaReportLocation};
+use crate::v1alpha::V1AlphaApiVersion;
+use derive_builder::Builder;
+use schemars::gen::SchemaGenerator;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportDefinitionSpec {
+    #[serde(default)]
+    pub additional_data: BTreeMap<String, String>,
+    pub template: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, JsonSchema)]
+pub enum ReportDefinitionKind {
+    #[strum(serialize = "ScopeReportDefinition")]
+    ScopeReportDefinition,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
+#[builder(setter(into))]
+#[serde(rename_all = "camelCase")]
+pub struct V1AlphaReportDefinition {
+    pub api_version: V1AlphaApiVersion,
+    pub kind: ReportDefinitionKind,
+    pub metadata: ModelMetadata,
+    pub spec: ReportDefinitionSpec,
+}
+
+impl crate::ScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
+    fn api_version(&self) -> String {
+        <Self as crate::InternalScopeModel<_>>::int_api_version()
+    }
+
+    fn kind(&self) -> String {
+        <Self as crate::InternalScopeModel<_>>::int_kind()
+    }
+
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn spec(&self) -> &ReportDefinitionSpec {
+        &self.spec
+    }
+}
+
+impl crate::InternalScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
+    fn int_api_version() -> String {
+        V1AlphaApiVersion::ScopeV1Alpha.to_string()
+    }
+
+    fn int_kind() -> String {
+        ReportDefinitionKind::ScopeReportDefinition.to_string()
+    }
+    #[cfg(test)]
+    fn examples() -> Vec<String> {
+        vec!["v1alpha/ReportDefinition.yaml".to_string()]
+    }
+}
