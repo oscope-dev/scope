@@ -1,4 +1,4 @@
-use crate::prelude::{HelpMetadata, KnownError};
+use crate::prelude::HelpMetadata;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportDefinition};
 use dev_scope_model::ScopeModel;
 use std::collections::BTreeMap;
@@ -44,10 +44,9 @@ impl TryFrom<V1AlphaReportDefinition> for ReportDefinition {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use crate::shared::models::parse_models_from_string;
-    use crate::shared::models::prelude::ReportDefinition;
-    use dev_scope_model::prelude::ModelMetadata;
+    use std::collections::BTreeMap;
+
     use std::path::Path;
 
     #[test]
@@ -72,10 +71,14 @@ spec:
 
         assert_eq!("ScopeReportDefinition/report", model.full_name);
         assert_eq!("report", model.metadata.name());
-        assert_eq!("/foo/bar/file.yaml", model.metadata.annotations.file_path.unwrap());
+        assert_eq!(
+            "/foo/bar/file.yaml",
+            model.metadata.annotations.file_path.unwrap()
+        );
         assert_eq!("hello bob", model.template);
 
-        let additional_data: BTreeMap<String, String> = [("env".to_string(), "env".to_string())].into();
+        let additional_data: BTreeMap<String, String> =
+            [("env".to_string(), "env".to_string())].into();
         assert_eq!(additional_data, model.additional_data);
     }
 }

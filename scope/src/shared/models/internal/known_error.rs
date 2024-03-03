@@ -53,9 +53,7 @@ impl TryFrom<V1AlphaKnownError> for KnownError {
 #[cfg(test)]
 mod tests {
     use crate::shared::models::parse_models_from_string;
-    use crate::shared::models::prelude::KnownError;
-    use dev_scope_model::prelude::ModelMetadata;
-    use regex::Regex;
+
     use std::path::Path;
 
     #[test]

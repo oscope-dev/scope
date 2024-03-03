@@ -1,4 +1,4 @@
-use crate::prelude::{HelpMetadata, ReportDefinition};
+use crate::prelude::HelpMetadata;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportLocation};
 use dev_scope_model::ScopeModel;
 

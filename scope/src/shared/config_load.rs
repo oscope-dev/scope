@@ -7,7 +7,6 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
-use dev_scope_model::ScopeModel;
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;

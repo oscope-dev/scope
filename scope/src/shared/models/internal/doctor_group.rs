@@ -197,15 +197,10 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
 mod tests {
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::{
-        DoctorGroup, DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand,
-        DoctorGroupActionFix,
+        DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand, DoctorGroupActionFix,
     };
     use crate::shared::prelude::DoctorGroupCachePath;
-    use dev_scope_model::prelude::{
-        ModelMetadata, ModelMetadataAnnotations, ModelMetadataAnnotationsBuilder,
-        ModelMetadataBuilder,
-    };
-    use predicates::prelude::*;
+
     use std::path::Path;
 
     #[test]

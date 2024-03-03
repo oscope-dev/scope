@@ -1,6 +1,5 @@
 use colored::Colorize;
-use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
-use dev_scope_model::ScopeModel;
+use dev_scope_model::prelude::ModelMetadata;
 use std::cmp::max;
 use std::path::Path;
 use tracing::info;
