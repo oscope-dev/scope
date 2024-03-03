@@ -1,8 +1,7 @@
 use crate::shared::models::internal::extract_command_path;
-use crate::shared::HelpMetadata;
 use derive_builder::Builder;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaDoctorGroup};
-use dev_scope_model::ScopeModel;
+use dev_scope_model::{HelpMetadata, ScopeModel};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -116,19 +115,10 @@ pub struct DoctorGroup {
     pub full_name: String,
     pub metadata: ModelMetadata,
     pub requires: Vec<String>,
-    pub description: String,
     pub actions: Vec<DoctorGroupAction>,
 }
 
 impl HelpMetadata for DoctorGroup {
-    fn description(&self) -> String {
-        self.description.to_string()
-    }
-
-    fn name(&self) -> String {
-        self.metadata.name.to_string()
-    }
-
     fn metadata(&self) -> &ModelMetadata {
         &self.metadata
     }
@@ -183,10 +173,6 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
         Ok(DoctorGroup {
             full_name: model.full_name(),
             metadata: model.metadata,
-            description: model
-                .spec
-                .description
-                .unwrap_or_else(|| "default".to_string()),
             actions,
             requires: model.spec.needs,
         })
@@ -220,7 +206,6 @@ mod tests {
         assert_eq!("/foo/bar/.scope", dg.metadata.annotations.file_dir.unwrap());
         assert_eq!("ScopeDoctorGroup/foo", dg.full_name);
         assert_eq!(vec!["bar"], dg.requires);
-        assert_eq!("Check your shell for basic functionality", dg.description);
 
         assert_eq!(
             dg.actions[0],

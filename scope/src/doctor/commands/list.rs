@@ -11,12 +11,12 @@ pub struct DoctorListArgs {}
 
 pub async fn doctor_list(found_config: &FoundConfig, _args: &DoctorListArgs) -> Result<()> {
     info!(target: "user", "Available checks that will run");
-    let order = generate_doctor_list(found_config);
-    print_details(&found_config.working_dir, order);
+    let order = generate_doctor_list(found_config).clone();
+    print_details(&found_config.working_dir, &order);
     Ok(())
 }
 
-pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<&DoctorGroup> {
+pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<DoctorGroup> {
     let all_keys = BTreeSet::from_iter(found_config.doctor_group.keys().map(|x| x.to_string()));
     let all_paths = compute_group_order(&found_config.doctor_group, all_keys);
 
@@ -31,6 +31,6 @@ pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<&DoctorGroup> {
 
     group_order
         .iter()
-        .map(|name| found_config.doctor_group.get(name).unwrap())
+        .map(|name| found_config.doctor_group.get(name).unwrap().clone())
         .collect()
 }

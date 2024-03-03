@@ -1,6 +1,5 @@
-use crate::prelude::HelpMetadata;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportLocation};
-use dev_scope_model::ScopeModel;
+use dev_scope_model::HelpMetadata;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReportUploadLocationDestination {
@@ -21,14 +20,6 @@ pub struct ReportUploadLocation {
 }
 
 impl HelpMetadata for ReportUploadLocation {
-    fn description(&self) -> String {
-        format!("Upload resource {}", self.metadata.name)
-    }
-
-    fn name(&self) -> String {
-        self.metadata.name.to_string()
-    }
-
     fn metadata(&self) -> &ModelMetadata {
         &self.metadata
     }

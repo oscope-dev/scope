@@ -2,7 +2,7 @@ use crate::core::ModelMetadata;
 use crate::v1alpha::V1AlphaApiVersion;
 use derive_builder::Builder;
 
-use crate::InternalScopeModel;
+use crate::{HelpMetadata, InternalScopeModel, ScopeModel};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -46,17 +46,23 @@ pub struct V1AlphaReportLocation {
     pub spec: ReportLocationSpec,
 }
 
-impl crate::ScopeModel<ReportLocationSpec> for V1AlphaReportLocation {
+impl HelpMetadata for V1AlphaReportLocation {
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind(), self.name())
+    }
+}
+
+impl ScopeModel<ReportLocationSpec> for V1AlphaReportLocation {
     fn api_version(&self) -> String {
         V1AlphaReportLocation::int_api_version()
     }
 
     fn kind(&self) -> String {
         V1AlphaReportLocation::int_kind()
-    }
-
-    fn metadata(&self) -> &ModelMetadata {
-        &self.metadata
     }
 
     fn spec(&self) -> &ReportLocationSpec {

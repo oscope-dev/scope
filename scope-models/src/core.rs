@@ -1,3 +1,4 @@
+use crate::{HelpMetadata, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,10 @@ pub struct ModelMetadataAnnotations {
 impl ModelMetadata {
     pub fn name(&self) -> String {
         self.name.to_string()
+    }
+
+    pub fn description(&self) -> String {
+        self.description.to_string()
     }
 
     pub fn file_path(&self) -> String {
@@ -63,10 +68,16 @@ impl ModelMetadata {
 #[builder(setter(into))]
 pub struct ModelMetadata {
     pub name: String,
+    #[serde(default = "default_description")]
+    pub description: String,
     #[serde(default)]
     pub annotations: ModelMetadataAnnotations,
     #[serde(default)]
     pub labels: BTreeMap<String, String>,
+}
+
+fn default_description() -> String {
+    "Description not provided".to_string()
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Builder)]
@@ -79,17 +90,23 @@ pub struct ModelRoot<V> {
     pub spec: V,
 }
 
-impl<S> crate::ScopeModel<S> for ModelRoot<S> {
+impl<S> HelpMetadata for ModelRoot<S> {
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind, self.name())
+    }
+}
+
+impl<S> ScopeModel<S> for ModelRoot<S> {
     fn api_version(&self) -> String {
         self.api_version.to_string()
     }
 
     fn kind(&self) -> String {
         self.kind.to_string()
-    }
-
-    fn metadata(&self) -> &ModelMetadata {
-        &self.metadata
     }
 
     fn spec(&self) -> &S {

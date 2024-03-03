@@ -2,8 +2,8 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
   name: group-1
-spec:
   description: Check your shell for basic functionality
+spec:
   actions:
     - description: foo1
       check:

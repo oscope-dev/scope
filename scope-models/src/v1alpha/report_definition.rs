@@ -3,7 +3,7 @@ use crate::core::ModelMetadata;
 use crate::v1alpha::V1AlphaApiVersion;
 use derive_builder::Builder;
 
-use crate::InternalScopeModel;
+use crate::{HelpMetadata, InternalScopeModel, ScopeModel};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -32,17 +32,23 @@ pub struct V1AlphaReportDefinition {
     pub spec: ReportDefinitionSpec,
 }
 
-impl crate::ScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
+impl HelpMetadata for V1AlphaReportDefinition {
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind(), self.name())
+    }
+}
+
+impl ScopeModel<ReportDefinitionSpec> for V1AlphaReportDefinition {
     fn api_version(&self) -> String {
         Self::int_api_version()
     }
 
     fn kind(&self) -> String {
         Self::int_kind()
-    }
-
-    fn metadata(&self) -> &ModelMetadata {
-        &self.metadata
     }
 
     fn spec(&self) -> &ReportDefinitionSpec {

@@ -1,6 +1,6 @@
 use crate::core::ModelMetadata;
 use crate::v1alpha::V1AlphaApiVersion;
-use crate::InternalScopeModel;
+use crate::{HelpMetadata, InternalScopeModel, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KnownErrorSpec {
-    pub description: String,
     pub help: String,
     pub pattern: String,
 }
@@ -29,17 +28,23 @@ pub struct V1AlphaKnownError {
     pub spec: KnownErrorSpec,
 }
 
-impl crate::ScopeModel<KnownErrorSpec> for V1AlphaKnownError {
+impl HelpMetadata for V1AlphaKnownError {
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind(), self.name())
+    }
+}
+
+impl ScopeModel<KnownErrorSpec> for V1AlphaKnownError {
     fn api_version(&self) -> String {
         Self::int_api_version()
     }
 
     fn kind(&self) -> String {
         Self::int_kind()
-    }
-
-    fn metadata(&self) -> &ModelMetadata {
-        &self.metadata
     }
 
     fn spec(&self) -> &KnownErrorSpec {

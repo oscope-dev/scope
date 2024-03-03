@@ -10,14 +10,13 @@ mod v1alpha;
 pub mod prelude {
     pub use crate::core::*;
     pub use crate::v1alpha::prelude::*;
+    pub use crate::HelpMetadata;
     pub use crate::ScopeModel;
 }
 
-pub trait ScopeModel<S> {
-    fn api_version(&self) -> String;
-    fn kind(&self) -> String;
+pub trait HelpMetadata {
     fn metadata(&self) -> &ModelMetadata;
-    fn spec(&self) -> &S;
+    fn full_name(&self) -> String;
     fn name(&self) -> &str {
         &self.metadata().name
     }
@@ -27,13 +26,18 @@ pub trait ScopeModel<S> {
     fn containing_dir(&self) -> String {
         self.metadata().containing_dir()
     }
-
     fn exec_path(&self) -> String {
         self.metadata().exec_path()
     }
-    fn full_name(&self) -> String {
-        format!("{}/{}", self.kind(), self.name())
+    fn description(&self) -> String {
+        self.metadata().description()
     }
+}
+
+pub trait ScopeModel<S>: HelpMetadata {
+    fn api_version(&self) -> String;
+    fn kind(&self) -> String;
+    fn spec(&self) -> &S;
 }
 
 pub trait InternalScopeModel<S, R>:

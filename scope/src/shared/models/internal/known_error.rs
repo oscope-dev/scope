@@ -1,7 +1,6 @@
-use crate::shared::HelpMetadata;
 use derivative::Derivative;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaKnownError};
-use dev_scope_model::ScopeModel;
+use dev_scope_model::{HelpMetadata, ScopeModel};
 use regex::Regex;
 
 #[derive(Derivative)]
@@ -10,7 +9,6 @@ use regex::Regex;
 pub struct KnownError {
     pub full_name: String,
     pub metadata: ModelMetadata,
-    pub description: String,
     pub pattern: String,
     #[derivative(PartialEq = "ignore")]
     pub regex: Regex,
@@ -18,13 +16,6 @@ pub struct KnownError {
 }
 
 impl HelpMetadata for KnownError {
-    fn description(&self) -> String {
-        self.description.to_string()
-    }
-    fn name(&self) -> String {
-        self.metadata.name.to_string()
-    }
-
     fn metadata(&self) -> &ModelMetadata {
         &self.metadata
     }
@@ -45,7 +36,6 @@ impl TryFrom<V1AlphaKnownError> for KnownError {
             pattern: value.spec.pattern,
             regex,
             help_text: value.spec.help,
-            description: value.spec.description,
         })
     }
 }
@@ -74,7 +64,6 @@ spec:
 
         assert_eq!("error-exists", model.metadata.name);
         assert_eq!("ScopeKnownError/error-exists", model.full_name);
-        assert_eq!("Check if the word error is in the logs", model.description);
         assert_eq!("The command had an error, try reading the logs around there to find out what happened.", model.help_text);
         assert_eq!("error", model.pattern);
     }

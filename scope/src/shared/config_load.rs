@@ -1,4 +1,3 @@
-use crate::prelude::HelpMetadata;
 use crate::shared::models::prelude::{
     DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
 };
@@ -7,10 +6,12 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
+use dev_scope_model::{HelpMetadata, ScopeModel};
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
@@ -141,7 +142,8 @@ impl FoundConfig {
             .map(|x| x.join("bin").display().to_string())
             .join(":");
 
-        let raw_config = load_all_config(&config_path).await;
+        let mut raw_config = load_all_config(&config_path).await;
+        raw_config.sort_by_key(|x| x.full_name());
 
         let mut this = Self {
             working_dir,
@@ -215,7 +217,7 @@ impl FoundConfig {
 }
 
 fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
-    let name = entry.name();
+    let name = entry.name().to_string();
     if map.contains_key(&name) {
         warn!(target: "user", "Duplicate {} found, dropping {} in {}", entry.full_name().to_string().bold(), entry.name().bold(), entry.metadata().file_path());
     } else {

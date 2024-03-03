@@ -1,8 +1,8 @@
 use super::error::AnalyzeError;
-use crate::prelude::HelpMetadata;
 use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use dev_scope_model::HelpMetadata;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use tokio::fs::File;

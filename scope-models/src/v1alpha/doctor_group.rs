@@ -1,7 +1,7 @@
 use crate::core::ModelMetadata;
 
 use crate::v1alpha::V1AlphaApiVersion;
-use crate::InternalScopeModel;
+use crate::{HelpMetadata, InternalScopeModel, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,6 @@ fn doctor_group_action_required_default() -> bool {
 pub struct DoctorGroupSpec {
     #[serde(default)]
     pub needs: Vec<String>,
-    pub description: Option<String>,
     pub actions: Vec<DoctorGroupActionSpec>,
 }
 
@@ -66,17 +65,23 @@ pub struct V1AlphaDoctorGroup {
     pub spec: DoctorGroupSpec,
 }
 
-impl crate::ScopeModel<DoctorGroupSpec> for V1AlphaDoctorGroup {
+impl HelpMetadata for V1AlphaDoctorGroup {
+    fn metadata(&self) -> &ModelMetadata {
+        &self.metadata
+    }
+
+    fn full_name(&self) -> String {
+        format!("{}/{}", self.kind(), self.name())
+    }
+}
+
+impl ScopeModel<DoctorGroupSpec> for V1AlphaDoctorGroup {
     fn api_version(&self) -> String {
         Self::int_api_version()
     }
 
     fn kind(&self) -> String {
         Self::int_kind()
-    }
-
-    fn metadata(&self) -> &ModelMetadata {
-        &self.metadata
     }
 
     fn spec(&self) -> &DoctorGroupSpec {

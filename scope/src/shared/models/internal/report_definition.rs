@@ -1,6 +1,5 @@
-use crate::prelude::HelpMetadata;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportDefinition};
-use dev_scope_model::ScopeModel;
+use dev_scope_model::{HelpMetadata, ScopeModel};
 use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -12,14 +11,6 @@ pub struct ReportDefinition {
 }
 
 impl HelpMetadata for ReportDefinition {
-    fn description(&self) -> String {
-        format!("Create a template of an error for {}", self.metadata.name)
-    }
-
-    fn name(&self) -> String {
-        self.metadata.name.to_string()
-    }
-
     fn metadata(&self) -> &ModelMetadata {
         &self.metadata
     }

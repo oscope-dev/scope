@@ -2,6 +2,7 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorSetup
 metadata:
   name: setup
+  description: You need to run bin/setup
 spec:
   cache:
     paths:
@@ -9,4 +10,3 @@ spec:
   setup:
     exec:
       - ../bin/pip-install.sh
-  description: You need to run bin/setup

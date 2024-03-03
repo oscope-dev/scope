@@ -7,9 +7,9 @@ use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, OutputDestination,
 };
-use crate::shared::HelpMetadata;
 use async_trait::async_trait;
 use derive_builder::Builder;
+use dev_scope_model::HelpMetadata;
 use educe::Educe;
 use mockall::automock;
 use std::path::{Path, PathBuf};
