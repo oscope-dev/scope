@@ -47,6 +47,8 @@ const config: Config = {
       } satisfies Preset.Options,
     ],
   ],
+  // Allows use of @theme/JSONSchemaEditor or @theme/JSONSchemaViewer
+  themes: ["docusaurus-json-schema-plugin"],
 
   themeConfig: {
     colorMode: {

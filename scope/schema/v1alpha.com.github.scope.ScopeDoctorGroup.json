@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "V1AlphaDoctorGroup",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "$ref": "#/definitions/V1AlphaApiVersion"
+    },
+    "kind": {
+      "$ref": "#/definitions/DoctorGroupKind"
+    },
+    "metadata": {
+      "$ref": "#/definitions/ModelMetadata"
+    },
+    "spec": {
+      "$ref": "#/definitions/DoctorGroupSpec"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "DoctorCheckSpec": {
+      "type": "object",
+      "properties": {
+        "commands": {
+          "default": null,
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "nullable": true
+        },
+        "paths": {
+          "default": null,
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "nullable": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "DoctorFixSpec": {
+      "type": "object",
+      "properties": {
+        "commands": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "helpText": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "helpUrl": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "DoctorGroupActionSpec": {
+      "type": "object",
+      "required": [
+        "check"
+      ],
+      "properties": {
+        "check": {
+          "$ref": "#/definitions/DoctorCheckSpec"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DoctorFixSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "nullable": true
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "required": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DoctorGroupKind": {
+      "type": "string",
+      "enum": [
+        "ScopeDoctorGroup"
+      ]
+    },
+    "DoctorGroupSpec": {
+      "type": "object",
+      "required": [
+        "actions"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DoctorGroupActionSpec"
+          }
+        },
+        "needs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "KnownErrorKind": {
+      "type": "string",
+      "enum": [
+        "ScopeKnownError"
+      ]
+    },
+    "KnownErrorSpec": {
+      "type": "object",
+      "required": [
+        "help",
+        "pattern"
+      ],
+      "properties": {
+        "help": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelMetadata": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "annotations": {
+          "default": {
+            "scope.github.com/bin-path": null,
+            "scope.github.com/file-dir": null,
+            "scope.github.com/file-path": null
+          },
+          "$ref": "#/definitions/ModelMetadataAnnotations"
+        },
+        "description": {
+          "default": "Description not provided",
+          "type": "string"
+        },
+        "labels": {
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ModelMetadataAnnotations": {
+      "type": "object",
+      "properties": {
+        "scope.github.com/bin-path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "scope.github.com/file-dir": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "scope.github.com/file-path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        }
+      }
+    },
+    "ReportDefinitionKind": {
+      "type": "string",
+      "enum": [
+        "ScopeReportDefinition"
+      ]
+    },
+    "ReportDefinitionSpec": {
+      "type": "object",
+      "required": [
+        "template"
+      ],
+      "properties": {
+        "additionalData": {
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReportDestinationGithubIssueSpec": {
+      "type": "object",
+      "required": [
+        "owner",
+        "repo"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReportDestinationSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "rustyPaste"
+          ],
+          "properties": {
+            "rustyPaste": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "githubIssue"
+          ],
+          "properties": {
+            "githubIssue": {
+              "$ref": "#/definitions/ReportDestinationGithubIssueSpec"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReportLocationKind": {
+      "type": "string",
+      "enum": [
+        "ScopeReportLocation"
+      ]
+    },
+    "ReportLocationSpec": {
+      "type": "object",
+      "required": [
+        "destination"
+      ],
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/ReportDestinationSpec"
+        }
+      },
+      "additionalProperties": false
+    },
+    "V1AlphaApiVersion": {
+      "type": "string",
+      "enum": [
+        "scope.github.com/v1alpha"
+      ]
+    },
+    "V1AlphaDoctorGroup": {
+      "type": "object",
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "$ref": "#/definitions/V1AlphaApiVersion"
+        },
+        "kind": {
+          "$ref": "#/definitions/DoctorGroupKind"
+        },
+        "metadata": {
+          "$ref": "#/definitions/ModelMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/DoctorGroupSpec"
+        }
+      },
+      "additionalProperties": false
+    },
+    "V1AlphaKnownError": {
+      "type": "object",
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "$ref": "#/definitions/V1AlphaApiVersion"
+        },
+        "kind": {
+          "$ref": "#/definitions/KnownErrorKind"
+        },
+        "metadata": {
+          "$ref": "#/definitions/ModelMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/KnownErrorSpec"
+        }
+      },
+      "additionalProperties": false
+    },
+    "V1AlphaReportDefinition": {
+      "type": "object",
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "$ref": "#/definitions/V1AlphaApiVersion"
+        },
+        "kind": {
+          "$ref": "#/definitions/ReportDefinitionKind"
+        },
+        "metadata": {
+          "$ref": "#/definitions/ModelMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/ReportDefinitionSpec"
+        }
+      },
+      "additionalProperties": false
+    },
+    "V1AlphaReportLocation": {
+      "type": "object",
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "$ref": "#/definitions/V1AlphaApiVersion"
+        },
+        "kind": {
+          "$ref": "#/definitions/ReportLocationKind"
+        },
+        "metadata": {
+          "$ref": "#/definitions/ModelMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/ReportLocationSpec"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -165,7 +165,7 @@ mod schema_gen {
     #[test]
     fn create_and_validate_schemas() {
         let out_dir = format!("{}/schema", env!("CARGO_MANIFEST_DIR"));
-        std::fs::remove_dir_all(&out_dir).unwrap();
+        std::fs::remove_dir_all(&out_dir).ok();
         std::fs::create_dir_all(&out_dir).unwrap();
 
         let mut schema_gen = crate::models::make_schema_generator();

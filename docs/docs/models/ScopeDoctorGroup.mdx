@@ -1,3 +1,7 @@
+import CodeBlock from '@theme/CodeBlock';
+import Schema from "@site/static/schemas/mySuperSchema.json";
+import JSONSchemaViewer from "@theme/JSONSchemaViewer";
+
 ---
 sidebar_position: 1
 ---
@@ -46,6 +50,8 @@ spec:
         commands:
           - yarn install
 ```
+
+<JSONSchemaViewer schema={ Schema } />
 
 In the example above, there are two actions, the first ensures that node is operational.
 
