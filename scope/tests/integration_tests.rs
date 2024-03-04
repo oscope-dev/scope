@@ -157,7 +157,7 @@ fn test_run_setup() {
         .assert();
 
     result.success().stdout(predicate::str::contains(
-        "Check initially failed, fix was successful, group: \"setup\", name: \"1\"",
+        "Check was successful, group: \"setup\", name: \"1\"",
     ));
 
     working_dir

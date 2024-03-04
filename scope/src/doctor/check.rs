@@ -209,7 +209,7 @@ impl DefaultDoctorActionRun {
     async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
-            if !result.is_success() {
+            if result.is_success() {
                 return Ok(result);
             }
         }
