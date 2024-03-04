@@ -1,5 +1,5 @@
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportDefinition};
-use dev_scope_model::{HelpMetadata, ScopeModel};
+use dev_scope_model::HelpMetadata;
 use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]

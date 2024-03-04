@@ -1,5 +1,5 @@
 use colored::Colorize;
-use dev_scope_model::prelude::ModelMetadata;
+
 use dev_scope_model::HelpMetadata;
 use std::cmp::max;
 use std::path::Path;

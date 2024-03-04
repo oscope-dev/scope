@@ -1,5 +1,6 @@
 use clap::Parser;
 use dev_scope::prelude::*;
+use dev_scope_model::HelpMetadata;
 use human_panic::setup_panic;
 use std::env;
 use tracing::{debug, enabled, error, info, warn, Level};

@@ -1,6 +1,6 @@
 use derivative::Derivative;
 use dev_scope_model::prelude::{ModelMetadata, V1AlphaKnownError};
-use dev_scope_model::{HelpMetadata, ScopeModel};
+use dev_scope_model::HelpMetadata;
 use regex::Regex;
 
 #[derive(Derivative)]

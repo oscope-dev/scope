@@ -14,13 +14,13 @@ where
     let mut binding = ModelMetadataBuilder::default();
     let metadata_builder = binding
         .name("fake-name")
+        .description("a description")
         .annotations(ModelMetadataAnnotations::default())
         .labels(BTreeMap::default());
     let metadata = edit_meta(metadata_builder).build().unwrap();
 
     let mut binding = DoctorGroupBuilder::default();
     let group_builder = binding
-        .description("a description")
         .full_name("DoctorGroup/fake-name")
         .actions(actions)
         .metadata(metadata)

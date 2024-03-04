@@ -24,9 +24,11 @@ fn test_list_reports_all_config() {
 
     result
         .success()
-        .stdout(predicate::str::contains("Doctor Checks"))
-        .stdout(predicate::str::contains("path-exists"))
-        .stdout(predicate::str::contains("error-exists"))
+        .stdout(predicate::str::contains("ScopeDoctorCheck/path-exists"))
+        .stdout(predicate::str::contains("ScopeKnownError/error-exists"))
+        .stdout(predicate::str::contains("ScopeDoctorGroup/group-1"))
+        .stdout(predicate::str::contains("ScopeReportDefinition/template"))
+        .stdout(predicate::str::contains("ScopeReportLocation/github"))
         .stdout(predicate::str::contains(
             "Check if the word error is in the logs",
         ))
@@ -52,11 +54,10 @@ fn test_doctor_list() {
 
     result
         .success()
-        .stdout(predicate::str::contains("path-exists"))
+        .stdout(predicate::str::contains("ScopeDoctorGroup/group-1"))
         .stdout(predicate::str::contains(
             "Check your shell for basic functionality",
-        ))
-        .stdout(predicate::str::contains("setup"));
+        ));
     working_dir.close().unwrap();
 }
 
@@ -212,4 +213,27 @@ fn test_run_group_1() {
             "Check failed, no fix provided, group: \"group-1\", name: \"2\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
+}
+
+#[test]
+fn test_no_tasks_found() {
+    let working_dir = setup_working_dir();
+
+    let mut cmd = Command::cargo_bin("scope").unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_no_tasks_found")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=bogus-group")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .env("NO_COLOR", "1")
+        .assert();
+
+    result.success().stdout(predicate::str::contains(
+        "Could not find any tasks to execute",
+    ));
 }

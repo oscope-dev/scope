@@ -84,6 +84,10 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
     let all_paths = compute_group_order(&found_config.doctor_group, desired_groups);
 
+    if all_paths.is_empty() {
+        warn!(target: "user", "Could not find any tasks to execute");
+    }
+
     let run_groups = RunGroups {
         group_actions: groups,
         all_paths,

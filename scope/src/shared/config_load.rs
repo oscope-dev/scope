@@ -6,12 +6,12 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
-use dev_scope_model::{HelpMetadata, ScopeModel};
+use dev_scope_model::HelpMetadata;
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
-use std::borrow::Cow;
+
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
