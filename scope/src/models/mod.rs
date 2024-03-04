@@ -1,4 +1,4 @@
-use crate::core::{ModelMetadata, ModelRoot};
+use crate::models::core::{ModelMetadata, ModelRoot};
 use anyhow::anyhow;
 
 use schemars::JsonSchema;
@@ -10,10 +10,9 @@ mod core;
 mod v1alpha;
 
 pub mod prelude {
-    pub use crate::core::*;
-    pub use crate::v1alpha::prelude::*;
-    pub use crate::HelpMetadata;
-    pub use crate::ScopeModel;
+    pub use crate::models::core::*;
+    pub use crate::models::v1alpha::prelude::*;
+    pub use crate::models::{HelpMetadata, ScopeModel};
 }
 
 pub trait HelpMetadata {
@@ -148,8 +147,8 @@ where
 
 #[cfg(test)]
 mod schema_gen {
-    use crate::v1alpha::prelude::*;
-    use crate::InternalScopeModel;
+    use crate::models::v1alpha::prelude::*;
+    use crate::models::InternalScopeModel;
 
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
@@ -169,7 +168,7 @@ mod schema_gen {
         std::fs::remove_dir_all(&out_dir).unwrap();
         std::fs::create_dir_all(&out_dir).unwrap();
 
-        let mut schema_gen = crate::make_schema_generator();
+        let mut schema_gen = crate::models::make_schema_generator();
         let merged_schema = schema_gen.root_schema_for::<ScopeTypes>();
         let merged_schema_json = serde_json::to_string_pretty(&merged_schema).unwrap();
         std::fs::write(format!("{}/merged.json", out_dir), &merged_schema_json).unwrap();

@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use dev_scope_model::HelpMetadata;
+use crate::models::HelpMetadata;
 use std::cmp::max;
 use std::path::Path;
 use tracing::info;

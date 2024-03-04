@@ -1,5 +1,5 @@
-use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportLocation};
-use dev_scope_model::HelpMetadata;
+use crate::models::prelude::{ModelMetadata, V1AlphaReportLocation};
+use crate::models::HelpMetadata;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReportUploadLocationDestination {
@@ -34,12 +34,12 @@ impl TryFrom<V1AlphaReportLocation> for ReportUploadLocation {
 
     fn try_from(value: V1AlphaReportLocation) -> Result<Self, Self::Error> {
         let destination = match value.spec.destination {
-            dev_scope_model::prelude::ReportDestinationSpec::RustyPaste { ref url } => {
+            crate::models::prelude::ReportDestinationSpec::RustyPaste { ref url } => {
                 ReportUploadLocationDestination::RustyPaste {
                     url: url.to_string(),
                 }
             }
-            dev_scope_model::prelude::ReportDestinationSpec::GithubIssue(ref github_issue) => {
+            crate::models::prelude::ReportDestinationSpec::GithubIssue(ref github_issue) => {
                 ReportUploadLocationDestination::GithubIssue {
                     owner: github_issue.owner.to_string(),
                     repo: github_issue.repo.to_string(),

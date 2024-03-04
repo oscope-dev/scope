@@ -1,7 +1,7 @@
+use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
+use crate::models::HelpMetadata;
 use crate::shared::models::internal::extract_command_path;
 use derive_builder::Builder;
-use dev_scope_model::prelude::{ModelMetadata, V1AlphaDoctorGroup};
-use dev_scope_model::HelpMetadata;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone, Builder)]

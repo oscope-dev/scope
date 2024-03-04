@@ -1,5 +1,5 @@
-use dev_scope_model::prelude::{ModelMetadata, V1AlphaReportDefinition};
-use dev_scope_model::HelpMetadata;
+use crate::models::prelude::{ModelMetadata, V1AlphaReportDefinition};
+use crate::models::HelpMetadata;
 use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,4 +1,4 @@
-use crate::{HelpMetadata, ScopeModel};
+use crate::models::{HelpMetadata, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

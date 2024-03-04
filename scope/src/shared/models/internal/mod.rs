@@ -1,10 +1,10 @@
-use crate::shared::prelude::*;
-use anyhow::anyhow;
-use dev_scope_model::prelude::{
+use crate::models::prelude::{
     ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError, V1AlphaReportDefinition,
     V1AlphaReportLocation,
 };
-use dev_scope_model::InternalScopeModel;
+use crate::models::InternalScopeModel;
+use crate::shared::prelude::*;
+use anyhow::anyhow;
 use path_clean::PathClean;
 use serde_yaml::Value;
 use std::collections::VecDeque;

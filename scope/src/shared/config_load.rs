@@ -1,3 +1,5 @@
+use crate::models::prelude::{ModelMetadata, ModelRoot};
+use crate::models::HelpMetadata;
 use crate::shared::models::prelude::{
     DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
 };
@@ -5,8 +7,6 @@ use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
-use dev_scope_model::prelude::{ModelMetadata, ModelRoot};
-use dev_scope_model::HelpMetadata;
 use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;

@@ -1,9 +1,9 @@
-use crate::core::ModelMetadata;
+use crate::models::core::ModelMetadata;
 
-use crate::v1alpha::V1AlphaApiVersion;
+use crate::models::v1alpha::V1AlphaApiVersion;
 use derive_builder::Builder;
 
-use crate::{HelpMetadata, InternalScopeModel, ScopeModel};
+use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

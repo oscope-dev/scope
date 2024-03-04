@@ -3,13 +3,13 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
+use crate::models::HelpMetadata;
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, OutputDestination,
 };
 use async_trait::async_trait;
 use derive_builder::Builder;
-use dev_scope_model::HelpMetadata;
 use educe::Educe;
 use mockall::automock;
 use std::path::{Path, PathBuf};

@@ -521,7 +521,6 @@ dependencies = [
  "colored",
  "derivative",
  "derive_builder",
- "dev-scope-model",
  "directories",
  "dotenv",
  "educe",
@@ -556,22 +555,6 @@ dependencies = [
  "tracing-subscriber",
  "vergen",
  "which",
-]
-
-[[package]]
-name = "dev-scope-model"
-version = "2024.2.6"
-dependencies = [
- "anyhow",
- "derive_builder",
- "jsonschema",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml",
- "strum",
- "thiserror",
- "tracing",
 ]
 
 [[package]]

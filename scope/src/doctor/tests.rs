@@ -1,5 +1,5 @@
+use crate::models::prelude::{ModelMetadataAnnotations, ModelMetadataBuilder};
 use crate::shared::prelude::{DoctorGroup, DoctorGroupAction, DoctorGroupBuilder};
-use dev_scope_model::prelude::{ModelMetadataAnnotations, ModelMetadataBuilder};
 use std::collections::BTreeMap;
 
 pub fn make_root_model_additional<Meta, Group>(
