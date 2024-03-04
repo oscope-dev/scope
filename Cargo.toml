@@ -23,6 +23,18 @@ pr-run-mode = "plan"
 # publish to homebrew
 publish-prereleases = true
 
+[workspace.dependencies]
+anyhow = "1.0.57"
+thiserror = "1.0.30"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+schemars = "0.8"
+derive_builder = "0.20"
+strum = { version = "0.26", features = ["derive"] }
+jsonschema = "0.17"
+tracing = "0.1.34"
+
 [workspace.metadata.dist.github-custom-runners]
 aarch64-unknown-linux-gnu = "buildjet-8vcpu-ubuntu-2204-arm"
 aarch64-unknown-linux-musl = "buildjet-8vcpu-ubuntu-2204-arm"

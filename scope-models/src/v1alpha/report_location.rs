@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ReportDestinationGithubIssueSpec {
     pub owner: String,
     pub repo: String,
@@ -17,6 +18,7 @@ pub struct ReportDestinationGithubIssueSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub enum ReportDestinationSpec {
     RustyPaste { url: String },
     GithubIssue(ReportDestinationGithubIssueSpec),
@@ -24,6 +26,7 @@ pub enum ReportDestinationSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ReportLocationSpec {
     #[serde(with = "serde_yaml::with::singleton_map")]
     #[schemars(with = "ReportDestinationSpec")]
@@ -39,6 +42,7 @@ pub enum ReportLocationKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct V1AlphaReportLocation {
     pub api_version: V1AlphaApiVersion,
     pub kind: ReportLocationKind,

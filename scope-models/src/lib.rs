@@ -1,8 +1,10 @@
 use crate::core::{ModelMetadata, ModelRoot};
+use anyhow::anyhow;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
+use tracing::warn;
 
 mod core;
 mod v1alpha;
@@ -52,9 +54,29 @@ where
             && Self::int_kind().to_lowercase() == input.kind.to_lowercase()
         {
             let value = serde_json::to_value(input)?;
+            if let Err(e) = Self::validate_resource(&value) {
+                warn!(target: "user", "Resource {} didn't match the schema for {}. {}", input.name(), Self::int_kind(), e);
+            }
             return Ok(Some(serde_json::from_value::<R>(value)?));
         }
         Ok(None)
+    }
+
+    fn validate_resource(input: &serde_json::Value) -> anyhow::Result<()> {
+        let mut schema_gen = make_schema_generator();
+        let schema = schema_gen.root_schema_for::<Self>();
+        let schema_json = serde_json::to_value(&schema)?;
+        let compiled_schema = jsonschema::JSONSchema::compile(&schema_json)
+            .expect("internal json schema to be valid");
+        if let Err(err_iter) = compiled_schema.validate(input) {
+            let mut errors = Vec::new();
+            for err in err_iter {
+                errors.push(err.to_string());
+            }
+            return Err(anyhow!(errors.join("\n")));
+        };
+
+        Ok(())
     }
 
     #[cfg(test)]
@@ -88,8 +110,7 @@ where
     }
 }
 
-#[cfg(test)]
-pub fn make_schema_generator() -> schemars::gen::SchemaGenerator {
+pub(crate) fn make_schema_generator() -> schemars::gen::SchemaGenerator {
     let settings = schemars::gen::SchemaSettings::draft2019_09().with(|s| {
         s.option_nullable = true;
     });

@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct ReportDefinitionSpec {
     #[serde(default)]
     pub additional_data: BTreeMap<String, String>,
@@ -25,6 +26,7 @@ pub enum ReportDefinitionKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct V1AlphaReportDefinition {
     pub api_version: V1AlphaApiVersion,
     pub kind: ReportDefinitionKind,

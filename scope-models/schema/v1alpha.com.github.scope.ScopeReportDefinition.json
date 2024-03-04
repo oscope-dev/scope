@@ -22,6 +22,7 @@
       "$ref": "#/definitions/ReportDefinitionSpec"
     }
   },
+  "additionalProperties": false,
   "definitions": {
     "DoctorCheckSpec": {
       "type": "object",
@@ -48,7 +49,8 @@
           },
           "nullable": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "DoctorFixSpec": {
       "type": "object",
@@ -76,7 +78,8 @@
           ],
           "nullable": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "DoctorGroupActionSpec": {
       "type": "object",
@@ -116,7 +119,8 @@
           "default": true,
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "DoctorGroupKind": {
       "type": "string",
@@ -136,13 +140,6 @@
             "$ref": "#/definitions/DoctorGroupActionSpec"
           }
         },
-        "description": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "nullable": true
-        },
         "needs": {
           "default": [],
           "type": "array",
@@ -150,7 +147,8 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "KnownErrorKind": {
       "type": "string",
@@ -161,21 +159,18 @@
     "KnownErrorSpec": {
       "type": "object",
       "required": [
-        "description",
         "help",
         "pattern"
       ],
       "properties": {
-        "description": {
-          "type": "string"
-        },
         "help": {
           "type": "string"
         },
         "pattern": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "ModelMetadata": {
       "type": "object",
@@ -190,6 +185,10 @@
             "scope.github.com/file-path": null
           },
           "$ref": "#/definitions/ModelMetadataAnnotations"
+        },
+        "description": {
+          "default": "Description not provided",
+          "type": "string"
         },
         "labels": {
           "default": {},
@@ -251,7 +250,8 @@
         "template": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "ReportDestinationGithubIssueSpec": {
       "type": "object",
@@ -273,7 +273,8 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "ReportDestinationSpec": {
       "oneOf": [
@@ -292,7 +293,8 @@
                 "url": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -326,7 +328,8 @@
         "destination": {
           "$ref": "#/definitions/ReportDestinationSpec"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "V1AlphaApiVersion": {
       "type": "string",
@@ -355,7 +358,8 @@
         "spec": {
           "$ref": "#/definitions/DoctorGroupSpec"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "V1AlphaKnownError": {
       "type": "object",
@@ -378,7 +382,8 @@
         "spec": {
           "$ref": "#/definitions/KnownErrorSpec"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "V1AlphaReportDefinition": {
       "type": "object",
@@ -401,7 +406,8 @@
         "spec": {
           "$ref": "#/definitions/ReportDefinitionSpec"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "V1AlphaReportLocation": {
       "type": "object",
@@ -424,7 +430,8 @@
         "spec": {
           "$ref": "#/definitions/ReportLocationSpec"
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

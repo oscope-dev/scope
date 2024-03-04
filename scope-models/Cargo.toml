@@ -7,14 +7,15 @@ edition = "2021"
 dist = true
 
 [dependencies]
-anyhow = "1.0.57"
-thiserror = "1.0.30"
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
-serde_json = "1.0"
-schemars = "0.8"
-derive_builder = "0.20"
-strum = { version = "0.26", features = ["derive"] }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = {workspace = true}
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+derive_builder = { workspace = true }
+strum = {workspace = true}
+jsonschema = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-jsonschema = "0.17"

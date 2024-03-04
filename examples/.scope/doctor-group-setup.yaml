@@ -6,6 +6,7 @@ metadata:
 spec:
   actions:
   - check:
+      extra: not-defined
       paths:
         - '**/requirements.txt'
     fix:

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct KnownErrorSpec {
     pub help: String,
     pub pattern: String,
@@ -21,6 +22,7 @@ pub enum KnownErrorKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct V1AlphaKnownError {
     pub api_version: V1AlphaApiVersion,
     pub kind: KnownErrorKind,

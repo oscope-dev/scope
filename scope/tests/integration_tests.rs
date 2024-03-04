@@ -34,6 +34,7 @@ fn test_list_reports_all_config() {
         ))
         .stdout(predicate::str::contains("setup"))
         .stdout(predicate::str::contains(".scope/known-error.yaml"))
+        .stdout(predicate::str::contains("Resource setup didn't match the schema for ScopeDoctorGroup. Additional properties are not allowed ('extra' was unexpected)"))
         .stdout(
             predicate::str::is_match(r"bar\s+External sub-command, run `scope bar` for help")
                 .unwrap(),

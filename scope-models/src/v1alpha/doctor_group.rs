@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DoctorCheckSpec {
     #[serde(default)]
     pub paths: Option<Vec<String>>,
@@ -17,6 +18,7 @@ pub struct DoctorCheckSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DoctorFixSpec {
     #[serde(default)]
     pub commands: Vec<String>,
@@ -28,6 +30,7 @@ pub struct DoctorFixSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DoctorGroupActionSpec {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -43,6 +46,7 @@ fn doctor_group_action_required_default() -> bool {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct DoctorGroupSpec {
     #[serde(default)]
     pub needs: Vec<String>,
@@ -58,6 +62,7 @@ pub enum DoctorGroupKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
 pub struct V1AlphaDoctorGroup {
     pub api_version: V1AlphaApiVersion,
     pub kind: DoctorGroupKind,
