@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Doctor
 
-Doctor is used to fix a local environment. To fix a machine, you'll need to provide either [ScopeDoctorCheck](../models/ScopeDoctorCheck.md) or [ScopeDoctorSetup](../models/ScopeDoctorSetup.md) files. Multiple are supported and recommended.
+Doctor is used to fix a local environment. To fix a machine, you'll need to a [ScopeDoctorGroup](../models/ScopeDoctorGroup.mdx). Multiple are supported and recommended.
 
 **Help Text**
 
@@ -25,7 +25,7 @@ Commands:
 
 By default, any provided fix's will be run. If you don't want to run fixes add `--fix=false` to disable fixing issues.
 
-When using a [ScopeDoctorSetup](../models/ScopeDoctorSetup.md), the checksum of files are stored on disk. If you need to disable caching, add `--no-cache`.
+When using a [ScopeDoctorGroup](../models/ScopeDoctorGroup.mdx), the checksum of files are stored on disk. If you need to disable caching, add `--no-cache`.
 
 ```text
 Run checks against your machine, generating support output
