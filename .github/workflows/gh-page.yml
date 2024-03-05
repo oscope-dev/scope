@@ -42,7 +42,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref_type == 'tag' }}
     # Specify runner + deployment step
     runs-on: ubuntu-latest
     steps:
