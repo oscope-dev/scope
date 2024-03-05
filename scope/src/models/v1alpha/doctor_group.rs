@@ -17,7 +17,6 @@ pub struct DoctorCheckSpec {
     /// of the file change, the check will require a fix.
     pub paths: Option<Vec<String>>,
 
-
     #[serde(default)]
     /// A list of commands to execute to check the environment.
     pub commands: Option<Vec<String>>,

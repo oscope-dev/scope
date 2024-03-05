@@ -34,7 +34,7 @@ impl TryFrom<V1AlphaReportLocation> for ReportUploadLocation {
 
     fn try_from(value: V1AlphaReportLocation) -> Result<Self, Self::Error> {
         let destination = match value.spec.destination {
-            crate::models::prelude::ReportDestinationSpec::RustyPaste (ref def ) => {
+            crate::models::prelude::ReportDestinationSpec::RustyPaste(ref def) => {
                 ReportUploadLocationDestination::RustyPaste {
                     url: def.url.to_string(),
                 }
