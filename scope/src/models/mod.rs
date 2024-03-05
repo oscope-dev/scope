@@ -54,7 +54,7 @@ where
         {
             let value = serde_json::to_value(input)?;
             if let Err(e) = Self::validate_resource(&value) {
-                warn!(target: "user", "Resource {} didn't match the schema for {}. {}", input.name(), Self::int_kind(), e);
+                warn!(target: "user", "Resource '{}' didn't match the schema for {}. {}", input.full_name(), Self::int_kind(), e);
             }
             return Ok(Some(serde_json::from_value::<R>(value)?));
         }
