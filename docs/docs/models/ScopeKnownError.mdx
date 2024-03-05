@@ -1,0 +1,33 @@
+---
+sidebar_position: 2
+---
+
+import CodeBlock from '@theme/CodeBlock';
+import Schema from "../../static/schema/v1alpha.com.github.scope.ScopeKnownError.json";
+import JSONSchemaViewer from "@theme/JSONSchemaViewer";
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# ScopeKnownError
+
+```yaml
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: error-exists
+spec:
+  description: Check if the word error is in the logs
+  pattern: error
+  help: The command had an error, try reading the logs around there to find out what happened.
+```
+
+## Schema
+
+<Tabs>
+    <TabItem value="Viewer" label="Viewer" default>
+        <JSONSchemaViewer schema={Schema} />
+    </TabItem>
+    <TabItem value="JSON Schema" label='JSON Schema'>
+        <CodeBlock language="json-schema">{JSON.stringify(Schema, null, 2)}</CodeBlock>
+    </TabItem>
+</Tabs>

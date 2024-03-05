@@ -5,11 +5,15 @@ use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Definition of the known error
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct KnownErrorSpec {
+    /// Text that the user can use to fix the issue
     pub help: String,
+
+    /// A Regex used to determine if the line is an error.
     pub pattern: String,
 }
 
@@ -19,14 +23,22 @@ pub enum KnownErrorKind {
     ScopeKnownError,
 }
 
+/// Resource used to define a `ScopeKnownError`.
+/// A known error is a specific error that a user may run into.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct V1AlphaKnownError {
+    /// API version of the resource
     pub api_version: V1AlphaApiVersion,
+    /// The type of resource.
     pub kind: KnownErrorKind,
+    /// Standard set of options including name, description for the resource.
+    /// Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the
+    /// resources "closest" to the execution dir will take precedence.
     pub metadata: ModelMetadata,
+    /// Options for the resource.
     pub spec: KnownErrorSpec,
 }
 

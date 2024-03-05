@@ -41,4 +41,13 @@ Options:
 
 ## `list`
 
-Will print out all doctor checks available.
+Will print out all doctor checks available, in the order `run` will execute.
+
+```text
+ INFO Available checks that will run
+ INFO   Name                                           Description                                                 Path
+ INFO - ScopeDoctorGroup/setup                         You need to run bin/setup                                   .scope/doctor-group-setup.yaml
+ INFO - ScopeDoctorGroup/path-exists-fix-in-scope-dir  Check your shell for basic functionality                    .scope/doctor-group-in-scope-dir.yaml
+ INFO - ScopeDoctorGroup/path-exists                   Check your shell for basic functionality                    .scope/doctor-group-path-exists.yaml
+ INFO - ScopeDoctorGroup/group-1                       Check your shell for basic functionality                    .scope/doctor-group-1.yaml
+```

@@ -11,10 +11,15 @@ pub const FILE_EXEC_PATH_ANNOTATION: &str = "scope.github.com/bin-path";
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, Builder, JsonSchema)]
 pub struct ModelMetadataAnnotations {
     #[serde(rename = "scope.github.com/file-path")]
+    #[schemars(skip)]
+    /// File path for the resource, generated automatically.
     pub file_path: Option<String>,
     #[serde(rename = "scope.github.com/file-dir")]
+    #[schemars(skip)]
+    /// Directory containing the resource, generated automatically.
     pub file_dir: Option<String>,
     #[serde(rename = "scope.github.com/bin-path")]
+    /// When running commands, additional paths that should be paced at the _beginning_ of the `PATH`.
     pub bin_path: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, String>,
@@ -67,12 +72,21 @@ impl ModelMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, Builder, JsonSchema)]
 #[builder(setter(into))]
 pub struct ModelMetadata {
+    /// Name of the resource, needs to be unique across `kinds`. When two resources share a name,
+    /// the one "closest" to the current working directory will take precedence.
     pub name: String,
+
     #[serde(default = "default_description")]
+    /// Description of this resource, used when listing resources and helpful to inform users why
+    /// the resource exists.
     pub description: String,
+
     #[serde(default)]
+    /// Annotations attach arbitrary non-identifying metadata to objects.
     pub annotations: ModelMetadataAnnotations,
+
     #[serde(default)]
+    /// Key/value pairs, allows resources to be easily filtered from the CLI.
     pub labels: BTreeMap<String, String>,
 }
 

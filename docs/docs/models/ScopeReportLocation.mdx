@@ -1,6 +1,12 @@
 ---
-sidebar_position: 5
+sidebar_position: 4
 ---
+
+import CodeBlock from '@theme/CodeBlock';
+import Schema from "../../static/schema/v1alpha.com.github.scope.ScopeReportLocation.json";
+import JSONSchemaViewer from "@theme/JSONSchemaViewer";
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # ScopeReportLocation
 
@@ -38,3 +44,14 @@ spec:
     rustyPaste:
       url: http://localhost:8000
 ```
+
+### Schema
+
+<Tabs>
+    <TabItem value="Viewer" label="Viewer" default>
+        <JSONSchemaViewer schema={Schema} />
+    </TabItem>
+    <TabItem value="JSON Schema" label='JSON Schema'>
+        <CodeBlock language="json-schema">{JSON.stringify(Schema, null, 2)}</CodeBlock>
+    </TabItem>
+</Tabs>

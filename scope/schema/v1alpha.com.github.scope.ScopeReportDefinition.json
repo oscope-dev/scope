@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2019-09/schema",
   "title": "V1AlphaReportDefinition",
+  "description": "A `ScopeReportDefinition` tells scope how to collect details about the system when there is an issue they need to report.",
   "type": "object",
   "required": [
     "apiVersion",
@@ -10,24 +11,30 @@
   ],
   "properties": {
     "apiVersion": {
+      "description": "API version of the resource",
       "$ref": "#/definitions/V1AlphaApiVersion"
     },
     "kind": {
+      "description": "The type of resource.",
       "$ref": "#/definitions/ReportDefinitionKind"
     },
     "metadata": {
+      "description": "Standard set of options including name, description for the resource. Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the resources \"closest\" to the execution dir will take precedence.",
       "$ref": "#/definitions/ModelMetadata"
     },
     "spec": {
+      "description": "Options for the resource.",
       "$ref": "#/definitions/ReportDefinitionSpec"
     }
   },
   "additionalProperties": false,
   "definitions": {
     "DoctorCheckSpec": {
+      "description": "What needs to be checked before the action will run. All `paths` will be checked first, then `commands`. If a `path` has changed, the `command` will not run.",
       "type": "object",
       "properties": {
         "commands": {
+          "description": "A list of commands to execute to check the environment.",
           "default": null,
           "type": [
             "array",
@@ -39,6 +46,7 @@
           "nullable": true
         },
         "paths": {
+          "description": "A list of globs to check for changes. When the glob matches a new file, or the contents of the file change, the check will require a fix.",
           "default": null,
           "type": [
             "array",
@@ -53,9 +61,11 @@
       "additionalProperties": false
     },
     "DoctorFixSpec": {
+      "description": "Definition for fixing the environment.",
       "type": "object",
       "properties": {
         "commands": {
+          "description": "List of commands to run to fix the env.",
           "default": [],
           "type": "array",
           "items": {
@@ -63,6 +73,7 @@
           }
         },
         "helpText": {
+          "description": "Text to display when no command is provided / fails to fix the env.",
           "default": null,
           "type": [
             "string",
@@ -71,6 +82,7 @@
           "nullable": true
         },
         "helpUrl": {
+          "description": "Link to documentation to fix the issue.",
           "default": null,
           "type": [
             "string",
@@ -82,15 +94,18 @@
       "additionalProperties": false
     },
     "DoctorGroupActionSpec": {
+      "description": "An action is a single step used to check in a group. This is most commonly used to build a series of tasks for a system, like `ruby`, `python`, and databases.",
       "type": "object",
       "required": [
         "check"
       ],
       "properties": {
         "check": {
+          "description": "The `check` run before `fix` (if provided). A check is used to determine if the fix needs to be executed, or fail the action if no fix is provided. If a fix is specified, the check will re-execute to ensure that the fix applied correctly.",
           "$ref": "#/definitions/DoctorCheckSpec"
         },
         "description": {
+          "description": "A description of this specific action, used for information to the users.",
           "type": [
             "string",
             "null"
@@ -98,6 +113,7 @@
           "nullable": true
         },
         "fix": {
+          "description": "A fix defines how to fix the issue that a `check` is validating. When provided, will only run when the `check` \"fails\".",
           "anyOf": [
             {
               "$ref": "#/definitions/DoctorFixSpec"
@@ -109,6 +125,7 @@
           "nullable": true
         },
         "name": {
+          "description": "Name of the \"action\". When not provided, it will be the index of the action within the group. This is used when reporting status to the users.",
           "type": [
             "string",
             "null"
@@ -116,6 +133,7 @@
           "nullable": true
         },
         "required": {
+          "description": "If false, the action is allowed to fail and let other actions in the group execute. Defaults to `true`.",
           "default": true,
           "type": "boolean"
         }
@@ -129,18 +147,21 @@
       ]
     },
     "DoctorGroupSpec": {
+      "description": "Often used to describe how to fix a \"system\", like `ruby`, `python`, or databases. Able to depend on other \"system\".",
       "type": "object",
       "required": [
         "actions"
       ],
       "properties": {
         "actions": {
+          "description": "A series of steps to check and fix for the group.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DoctorGroupActionSpec"
           }
         },
         "needs": {
+          "description": "A list of `ScopeDoctorGroup` that are required for this group to execute. If not all finish successfully, this group will not execute.",
           "default": [],
           "type": "array",
           "items": {
@@ -157,6 +178,7 @@
       ]
     },
     "KnownErrorSpec": {
+      "description": "Definition of the known error",
       "type": "object",
       "required": [
         "help",
@@ -164,9 +186,11 @@
       ],
       "properties": {
         "help": {
+          "description": "Text that the user can use to fix the issue",
           "type": "string"
         },
         "pattern": {
+          "description": "A Regex used to determine if the line is an error.",
           "type": "string"
         }
       },
@@ -179,6 +203,7 @@
       ],
       "properties": {
         "annotations": {
+          "description": "Annotations attach arbitrary non-identifying metadata to objects.",
           "default": {
             "scope.github.com/bin-path": null,
             "scope.github.com/file-dir": null,
@@ -187,10 +212,12 @@
           "$ref": "#/definitions/ModelMetadataAnnotations"
         },
         "description": {
+          "description": "Description of this resource, used when listing resources and helpful to inform users why the resource exists.",
           "default": "Description not provided",
           "type": "string"
         },
         "labels": {
+          "description": "Key/value pairs, allows resources to be easily filtered from the CLI.",
           "default": {},
           "type": "object",
           "additionalProperties": {
@@ -198,6 +225,7 @@
           }
         },
         "name": {
+          "description": "Name of the resource, needs to be unique across `kinds`. When two resources share a name, the one \"closest\" to the current working directory will take precedence.",
           "type": "string"
         }
       }
@@ -206,20 +234,7 @@
       "type": "object",
       "properties": {
         "scope.github.com/bin-path": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "nullable": true
-        },
-        "scope.github.com/file-dir": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "nullable": true
-        },
-        "scope.github.com/file-path": {
+          "description": "When running commands, additional paths that should be paced at the _beginning_ of the `PATH`.",
           "type": [
             "string",
             "null"
@@ -235,12 +250,14 @@
       ]
     },
     "ReportDefinitionSpec": {
+      "description": "Definition of the Report Definition",
       "type": "object",
       "required": [
         "template"
       ],
       "properties": {
         "additionalData": {
+          "description": "defines additional data that needs to be pulled from the system when reporting a bug. `additionalData` is a map of `string:string`, the value is a command that should be run. When a report is built, the commands will be run and automatically included in the report.",
           "default": {},
           "type": "object",
           "additionalProperties": {
@@ -248,12 +265,14 @@
           }
         },
         "template": {
+          "description": "a Jinja2 style template, to be included. The text should be in Markdown format. Scope injects `command` as the command that was run.",
           "type": "string"
         }
       },
       "additionalProperties": false
     },
     "ReportDestinationGithubIssueSpec": {
+      "description": "How to load the report to GitHub Issue",
       "type": "object",
       "required": [
         "owner",
@@ -261,17 +280,34 @@
       ],
       "properties": {
         "owner": {
+          "description": "`owner` of the repository for the issue",
           "type": "string"
         },
         "repo": {
+          "description": "`repo` the name of the repo for the issue",
           "type": "string"
         },
         "tags": {
+          "description": "A list of tags to be added to the issue",
           "default": [],
           "type": "array",
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReportDestinationRustyPasteSpec": {
+      "description": "How to upload a report to RustyPaste",
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "description": "URL of RustyPaste",
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -285,16 +321,7 @@
           ],
           "properties": {
             "rustyPaste": {
-              "type": "object",
-              "required": [
-                "url"
-              ],
-              "properties": {
-                "url": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
+              "$ref": "#/definitions/ReportDestinationRustyPasteSpec"
             }
           },
           "additionalProperties": false
@@ -320,24 +347,33 @@
       ]
     },
     "ReportLocationSpec": {
+      "description": "Define where to upload the report to",
       "type": "object",
       "required": [
         "destination"
       ],
       "properties": {
         "destination": {
+          "description": "Destination the report should be uploaded to",
           "$ref": "#/definitions/ReportDestinationSpec"
         }
       },
       "additionalProperties": false
     },
     "V1AlphaApiVersion": {
-      "type": "string",
-      "enum": [
-        "scope.github.com/v1alpha"
+      "description": "Version of the Scope API",
+      "oneOf": [
+        {
+          "description": "Current latest version of the resources.",
+          "type": "string",
+          "enum": [
+            "scope.github.com/v1alpha"
+          ]
+        }
       ]
     },
     "V1AlphaDoctorGroup": {
+      "description": "Resource used to define a `ScopeDoctorGroup`.",
       "type": "object",
       "required": [
         "apiVersion",
@@ -347,21 +383,26 @@
       ],
       "properties": {
         "apiVersion": {
+          "description": "API version of the resource",
           "$ref": "#/definitions/V1AlphaApiVersion"
         },
         "kind": {
+          "description": "The type of resource.",
           "$ref": "#/definitions/DoctorGroupKind"
         },
         "metadata": {
+          "description": "Standard set of options including name, description for the resource. Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the resources \"closest\" to the execution dir will take precedence.",
           "$ref": "#/definitions/ModelMetadata"
         },
         "spec": {
+          "description": "Options for the resource.",
           "$ref": "#/definitions/DoctorGroupSpec"
         }
       },
       "additionalProperties": false
     },
     "V1AlphaKnownError": {
+      "description": "Resource used to define a `ScopeKnownError`. A known error is a specific error that a user may run into.",
       "type": "object",
       "required": [
         "apiVersion",
@@ -371,21 +412,26 @@
       ],
       "properties": {
         "apiVersion": {
+          "description": "API version of the resource",
           "$ref": "#/definitions/V1AlphaApiVersion"
         },
         "kind": {
+          "description": "The type of resource.",
           "$ref": "#/definitions/KnownErrorKind"
         },
         "metadata": {
+          "description": "Standard set of options including name, description for the resource. Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the resources \"closest\" to the execution dir will take precedence.",
           "$ref": "#/definitions/ModelMetadata"
         },
         "spec": {
+          "description": "Options for the resource.",
           "$ref": "#/definitions/KnownErrorSpec"
         }
       },
       "additionalProperties": false
     },
     "V1AlphaReportDefinition": {
+      "description": "A `ScopeReportDefinition` tells scope how to collect details about the system when there is an issue they need to report.",
       "type": "object",
       "required": [
         "apiVersion",
@@ -395,21 +441,26 @@
       ],
       "properties": {
         "apiVersion": {
+          "description": "API version of the resource",
           "$ref": "#/definitions/V1AlphaApiVersion"
         },
         "kind": {
+          "description": "The type of resource.",
           "$ref": "#/definitions/ReportDefinitionKind"
         },
         "metadata": {
+          "description": "Standard set of options including name, description for the resource. Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the resources \"closest\" to the execution dir will take precedence.",
           "$ref": "#/definitions/ModelMetadata"
         },
         "spec": {
+          "description": "Options for the resource.",
           "$ref": "#/definitions/ReportDefinitionSpec"
         }
       },
       "additionalProperties": false
     },
     "V1AlphaReportLocation": {
+      "description": "A `ScopeReportLocation` tells where to upload a report to.",
       "type": "object",
       "required": [
         "apiVersion",
@@ -419,15 +470,19 @@
       ],
       "properties": {
         "apiVersion": {
+          "description": "API version of the resource",
           "$ref": "#/definitions/V1AlphaApiVersion"
         },
         "kind": {
+          "description": "The type of resource.",
           "$ref": "#/definitions/ReportLocationKind"
         },
         "metadata": {
+          "description": "Standard set of options including name, description for the resource. Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the resources \"closest\" to the execution dir will take precedence.",
           "$ref": "#/definitions/ModelMetadata"
         },
         "spec": {
+          "description": "Options for the resource.",
           "$ref": "#/definitions/ReportLocationSpec"
         }
       },

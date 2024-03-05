@@ -10,9 +10,11 @@ mod report_location;
 #[derive(
     Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, EnumString, JsonSchema,
 )]
+/// Version of the Scope API
 pub enum V1AlphaApiVersion {
     #[serde(rename = "scope.github.com/v1alpha")]
     #[strum(serialize = "scope.github.com/v1alpha")]
+    /// Current latest version of the resources.
     ScopeV1Alpha,
 }
 

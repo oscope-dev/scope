@@ -8,12 +8,19 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Definition of the Report Definition
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct ReportDefinitionSpec {
     #[serde(default)]
+    /// defines additional data that needs to be pulled from the system when reporting a bug.
+    /// `additionalData` is a map of `string:string`, the value is a command that should be run.
+    /// When a report is built, the commands will be run and automatically included in the report.
     pub additional_data: BTreeMap<String, String>,
+
+    /// a Jinja2 style template, to be included. The text should be in Markdown format. Scope
+    /// injects `command` as the command that was run.
     pub template: String,
 }
 
@@ -23,14 +30,22 @@ pub enum ReportDefinitionKind {
     ScopeReportDefinition,
 }
 
+/// A `ScopeReportDefinition` tells scope how to collect details about the system when there
+/// is an issue they need to report.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Builder, JsonSchema)]
 #[builder(setter(into))]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct V1AlphaReportDefinition {
+    /// API version of the resource
     pub api_version: V1AlphaApiVersion,
+    /// The type of resource.
     pub kind: ReportDefinitionKind,
+    /// Standard set of options including name, description for the resource.
+    /// Together `kind` and `metadata.name` are required to be unique. If there are duplicate, the
+    /// resources "closest" to the execution dir will take precedence.
     pub metadata: ModelMetadata,
+    /// Options for the resource.
     pub spec: ReportDefinitionSpec,
 }
 
