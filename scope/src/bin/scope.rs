@@ -141,30 +141,10 @@ lazy_static! {
 }
 
 fn show_config(found_config: &FoundConfig) -> Result<()> {
-    let mut extra_line = false;
-    if !found_config.doctor_group.is_empty() {
-        info!(target: "user", "Doctor Checks");
-        let order = generate_doctor_list(found_config);
-        print_details(&found_config.working_dir, order);
-        extra_line = true;
-    }
+    info!(target: "user", "Found Resources");
+    print_details(&found_config.working_dir, &found_config.raw_config);
 
-    if !found_config.known_error.is_empty() {
-        if extra_line {
-            info!(target: "user", "");
-        }
-
-        info!(target: "user", "Known Errors");
-        print_details(
-            &found_config.working_dir,
-            found_config.known_error.values().collect(),
-        );
-        extra_line = true;
-    }
-
-    if extra_line {
-        info!(target: "user", "");
-    }
+    info!(target: "user", "");
     info!(target: "user", "Commands");
     print_commands(found_config);
     Ok(())
@@ -195,11 +175,10 @@ fn print_commands(found_config: &FoundConfig) {
         let mut command_names: Vec<_> = command_map.keys().collect();
         command_names.sort();
 
-        info!(target: "user", "{:^20}{:^60}", "Name".white().bold(), "Description".white().bold());
-        info!(target: "user", "{:^80}", str::repeat("-", 80));
+        info!(target: "user", "  {:20}{:60}", "Name".white().bold(), "Description".white().bold());
         for command_name in command_names {
             let description = command_map.get(command_name.as_str()).unwrap();
-            info!(target: "user", "{:^20} {:^60}", command_name.white().bold(), description);
+            info!(target: "user", "- {:20}{:60}", command_name, description);
         }
     }
 }

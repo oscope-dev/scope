@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: setup
+  description: You need to run bin/setup
+spec:
+  actions:
+  - check:
+      extra: not-defined
+      paths:
+        - '**/requirements.txt'
+    fix:
+      commands:
+        - ../bin/pip-install.sh

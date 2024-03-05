@@ -1,6 +1,6 @@
 use super::capture::{CaptureOpts, OutputCapture};
 use super::config_load::FoundConfig;
-use super::models::prelude::{ReportUploadLocationDestination, ScopeModel};
+use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};
@@ -81,8 +81,8 @@ impl<'a> ReportBuilder<'a> {
         let report = self.make_report_test();
 
         for dest in self.config.report_upload.values() {
-            if let Err(e) = &dest.spec.destination.upload(&report).await {
-                warn!(target: "user", "Unable to upload to {}: {}", dest.name(), e);
+            if let Err(e) = &dest.destination.upload(&report).await {
+                warn!(target: "user", "Unable to upload to {}: {}", dest.metadata.name(), e);
             }
         }
 

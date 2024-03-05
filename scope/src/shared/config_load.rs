@@ -1,10 +1,9 @@
+use crate::models::prelude::{ModelMetadata, ModelRoot};
+use crate::models::HelpMetadata;
 use crate::shared::models::prelude::{
-    DoctorGroup, KnownError, ModelRoot, ParsedConfig, ReportDefinition, ReportUploadLocation,
-    ScopeModel,
+    DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
 };
-use crate::shared::{
-    FILE_DIR_ANNOTATION, FILE_EXEC_PATH_ANNOTATION, FILE_PATH_ANNOTATION, RUN_ID_ENV_VAR,
-};
+use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
@@ -12,6 +11,7 @@ use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
+
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
@@ -106,10 +106,10 @@ impl ConfigOptions {
 pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub raw_config: Vec<ModelRoot<Value>>,
-    pub doctor_group: BTreeMap<String, ModelRoot<DoctorGroup>>,
-    pub known_error: BTreeMap<String, ModelRoot<KnownError>>,
-    pub report_upload: BTreeMap<String, ModelRoot<ReportUploadLocation>>,
-    pub report_definition: Option<ModelRoot<ReportDefinition>>,
+    pub doctor_group: BTreeMap<String, DoctorGroup>,
+    pub known_error: BTreeMap<String, KnownError>,
+    pub report_upload: BTreeMap<String, ReportUploadLocation>,
+    pub report_definition: Option<ReportDefinition>,
     pub config_path: Vec<PathBuf>,
     pub bin_path: String,
     pub run_id: String,
@@ -142,7 +142,8 @@ impl FoundConfig {
             .map(|x| x.join("bin").display().to_string())
             .join(":");
 
-        let raw_config = load_all_config(&config_path).await;
+        let mut raw_config = load_all_config(&config_path).await;
+        raw_config.sort_by_key(|x| x.full_name());
 
         let mut this = Self {
             working_dir,
@@ -184,10 +185,10 @@ impl FoundConfig {
 
     pub fn get_report_definition(&self) -> ReportDefinition {
         self.report_definition
-            .as_ref()
-            .map(|x| x.spec.clone())
             .clone()
             .unwrap_or_else(|| ReportDefinition {
+                full_name: "ReportDefinition/generated".to_string(),
+                metadata: ModelMetadata::new("generated"),
                 template: "== Error report for {{ command }}.".to_string(),
                 additional_data: Default::default(),
             })
@@ -208,17 +209,17 @@ impl FoundConfig {
                 if self.report_definition.is_none() {
                     self.report_definition.replace(report_definition);
                 } else {
-                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.file_path());
+                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.metadata().file_path());
                 }
             }
         }
     }
 }
 
-fn insert_if_absent<T>(map: &mut BTreeMap<String, ModelRoot<T>>, entry: ModelRoot<T>) {
-    let name = entry.name();
-    if map.contains_key(name) {
-        warn!(target: "user", "A {} with duplicate name found, dropping {} in {}", entry.kind().to_string().bold(), entry.name().bold(), entry.file_path());
+fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
+    let name = entry.name().to_string();
+    if map.contains_key(&name) {
+        warn!(target: "user", "Duplicate {} found, dropping {} in {}", entry.full_name().to_string().bold(), entry.name().bold(), entry.metadata().file_path());
     } else {
         map.insert(name.to_string(), entry);
     }
@@ -256,20 +257,12 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
 
     match serde_yaml::from_value::<ModelRoot<Value>>(value) {
         Ok(mut value) => {
-            value.metadata.annotations.insert(
-                FILE_PATH_ANNOTATION.to_string(),
-                file_path.display().to_string(),
-            );
+            value.metadata.annotations.file_path = Some(file_path.display().to_string());
 
-            value.metadata.annotations.insert(
-                FILE_DIR_ANNOTATION.to_string(),
-                file_path.parent().unwrap().display().to_string(),
-            );
+            value.metadata.annotations.file_dir =
+                Some(file_path.parent().unwrap().display().to_string());
 
-            value.metadata.annotations.insert(
-                FILE_EXEC_PATH_ANNOTATION.to_string(),
-                build_exec_path(file_path),
-            );
+            value.metadata.annotations.bin_path = Some(build_exec_path(file_path));
             Some(value)
         }
         Err(e) => {

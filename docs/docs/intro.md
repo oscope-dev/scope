@@ -8,7 +8,7 @@ Scope allows teams to define development config for engineers. Scope is a tool f
 
 The config falls into three major categories:
 - [Local setup](./commands/doctor.md)
-- [Error debugging locally](models/ScopeKnownError.md)
+- [Error debugging locally](models/ScopeKnownError.mdx)
 - [Generate great bug reports](./commands/report.md)
 
 ## Config

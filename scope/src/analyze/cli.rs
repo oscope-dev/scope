@@ -1,5 +1,6 @@
 use super::error::AnalyzeError;
-use crate::shared::prelude::{FoundConfig, ScopeModel};
+use crate::models::HelpMetadata;
+use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use std::collections::BTreeMap;
@@ -62,9 +63,9 @@ where
         let mut known_errors_to_remove = Vec::new();
         for (name, ke) in &known_errors {
             debug!("Checking known error {}", ke.name());
-            if ke.spec.regex.is_match(&line) {
+            if ke.regex.is_match(&line) {
                 warn!(target: "always", "Known error '{}' found on line {}", ke.name(), line_number);
-                info!(target: "always", "\t==> {}", ke.spec.help_text);
+                info!(target: "always", "\t==> {}", ke.help_text);
                 known_errors_to_remove.push(name.clone());
                 has_known_error = true;
             }

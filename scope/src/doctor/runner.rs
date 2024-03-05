@@ -1,5 +1,5 @@
 use super::check::{ActionRunResult, DoctorActionRun};
-use crate::shared::prelude::{DoctorGroup, ModelRoot};
+use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
 use colored::Colorize;
 use petgraph::algo::all_simple_paths;
@@ -147,7 +147,7 @@ where
 }
 
 pub fn compute_group_order(
-    groups: &BTreeMap<String, ModelRoot<DoctorGroup>>,
+    groups: &BTreeMap<String, DoctorGroup>,
     desired_groups: BTreeSet<String>,
 ) -> Vec<Vec<String>> {
     let mut graph = DiGraph::<&str, i32>::new();
@@ -162,7 +162,7 @@ pub fn compute_group_order(
     for (name, model) in groups {
         let this = node_graph.get(name).unwrap();
         let mut needs_start = true;
-        for dep in &model.spec.requires {
+        for dep in &model.requires {
             if let Some(other) = node_graph.get(dep) {
                 graph.add_edge(*other, *this, 1);
                 needs_start = false;
@@ -212,7 +212,7 @@ mod tests {
     use crate::doctor::check::tests::build_run_fail_fix_succeed_action;
     use crate::doctor::check::{ActionRunResult, MockDoctorActionRun};
     use crate::doctor::runner::{compute_group_order, RunGroups};
-    use crate::doctor::tests::{group_noop, make_root_model_additional, root_noop};
+    use crate::doctor::tests::{group_noop, make_root_model_additional};
     use anyhow::Result;
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -225,7 +225,6 @@ mod tests {
         let step_1 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_1"),
-            root_noop,
             group_noop,
         );
         groups.insert("step_1".to_string(), step_1);
@@ -233,7 +232,6 @@ mod tests {
         let step_2 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_2"),
-            root_noop,
             |group| group.requires(vec!["step_1".to_string()]),
         );
         groups.insert("step_2".to_string(), step_2);
@@ -252,7 +250,6 @@ mod tests {
         let step_1 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_1"),
-            root_noop,
             group_noop,
         );
         groups.insert("step_1".to_string(), step_1);
@@ -260,7 +257,6 @@ mod tests {
         let step_2 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_2"),
-            root_noop,
             |group| group.requires(vec!["step_1".to_string()]),
         );
         groups.insert("step_2".to_string(), step_2);
@@ -282,7 +278,6 @@ mod tests {
         let step_1 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_1"),
-            root_noop,
             group_noop,
         );
         groups.insert("step_1".to_string(), step_1);
@@ -290,7 +285,6 @@ mod tests {
         let step_2 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_2"),
-            root_noop,
             |group| group.requires(vec!["step_1".to_string()]),
         );
         groups.insert("step_2".to_string(), step_2);
@@ -298,7 +292,6 @@ mod tests {
         let step_3 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_3"),
-            root_noop,
             |group| group.requires(vec!["step_1".to_string()]),
         );
         groups.insert("step_3".to_string(), step_3);
@@ -323,7 +316,6 @@ mod tests {
         let step_1 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_1"),
-            root_noop,
             group_noop,
         );
         groups.insert("step_1".to_string(), step_1);
@@ -331,7 +323,6 @@ mod tests {
         let step_2 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_2"),
-            root_noop,
             |group| group.requires(vec!["step_1".to_string()]),
         );
         groups.insert("step_2".to_string(), step_2);
@@ -339,7 +330,6 @@ mod tests {
         let step_3 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_3"),
-            root_noop,
             group_noop,
         );
         groups.insert("step_3".to_string(), step_3);

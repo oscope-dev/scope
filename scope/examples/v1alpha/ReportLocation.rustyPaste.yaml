@@ -1,0 +1,8 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportLocation
+metadata:
+  name: report
+spec:
+  destination:
+    rustyPaste:
+      url: http://localhost:8000

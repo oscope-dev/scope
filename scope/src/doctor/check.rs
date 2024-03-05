@@ -3,9 +3,10 @@ use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
 
+use crate::models::HelpMetadata;
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
-    DoctorGroupCachePath, ExecutionProvider, ModelRoot, OutputDestination, ScopeModel,
+    DoctorGroupCachePath, ExecutionProvider, OutputDestination,
 };
 use async_trait::async_trait;
 use derive_builder::Builder;
@@ -90,7 +91,7 @@ pub trait DoctorActionRun: Send + Sync {
 #[educe(Debug)]
 #[builder(setter(into))]
 pub struct DefaultDoctorActionRun {
-    pub model: ModelRoot<DoctorGroup>,
+    pub model: DoctorGroup,
     pub action: DoctorGroupAction,
     pub working_dir: PathBuf,
     pub file_cache: Arc<dyn FileCache>,
@@ -160,7 +161,7 @@ impl DefaultDoctorActionRun {
                 .update_cache(
                     &cache_path.base_path,
                     &cache_path.paths,
-                    self.model.name(),
+                    &self.model.metadata.name(),
                     self.file_cache.clone(),
                 )
                 .await;
@@ -195,7 +196,7 @@ impl DefaultDoctorActionRun {
                 working_dir: &self.working_dir,
                 args: &args,
                 output_dest: OutputDestination::StandardOut,
-                path: &self.model.exec_path(),
+                path: &self.model.metadata.exec_path(),
                 env_vars: Default::default(),
             })
             .await?;
@@ -238,7 +239,7 @@ impl DefaultDoctorActionRun {
             .have_globs_changed(
                 &paths.base_path,
                 &paths.paths,
-                self.model.name(),
+                &self.model.metadata.name(),
                 self.file_cache.clone(),
             )
             .await?;
@@ -257,7 +258,11 @@ impl DefaultDoctorActionRun {
         let mut result: Option<CacheResults> = None;
         for command in &action_command.commands {
             let args = vec![command.clone()];
-            let path = format!("{}:{}", self.model.containing_dir(), self.model.exec_path());
+            let path = format!(
+                "{}:{}",
+                self.model.metadata().containing_dir(),
+                self.model.metadata().exec_path()
+            );
             let output = self
                 .exec_runner
                 .run_command(CaptureOpts {

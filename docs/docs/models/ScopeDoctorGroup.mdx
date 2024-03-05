@@ -2,6 +2,12 @@
 sidebar_position: 1
 ---
 
+import CodeBlock from '@theme/CodeBlock';
+import Schema from "../../static//schema/v1alpha.com.github.scope.ScopeDoctorGroup.json";
+import JSONSchemaViewer from "@theme/JSONSchemaViewer";
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # ScopeDoctorGroup
 
 A "group" is a set of operations that should be preformed as part of solving a problem.
@@ -69,13 +75,11 @@ To target a script relative to the group it must start with `.`, and giving a re
 
 ## Schema
 
-- `.spec.action` a series of steps to check and fix for the group.
-- `.spec.needs[]` an array of names required before this group can run.
-- `.spec.action[].name` a short name to refer to the action
-- `.spec.action[].required` default true, when true action failing check & fix will stop all execution. 
-- `.spec.action[].check.paths` A list of globs to check for a change.
-- `.spec.action[].check.commands` A list of commands to execute, using the exit code to determine if changes are needed.
-- `.spec.action[].fix.commands` A list of commands to execute, attempting to resolve issues detected by the action.
-- `.spec.action[].fix.helpText` Text to display to the user if this action fails.
-- `.spec.action[].fix.helpUrl` A URL to provide to the user in case of an error in this action.
-- `.spec.description` is a useful description of the setup, used when listing what's available.
+<Tabs>
+    <TabItem value="Viewer" label="Viewer" default>
+        <JSONSchemaViewer schema={Schema} />
+    </TabItem>
+    <TabItem value="JSON Schema" label='JSON Schema'>
+        <CodeBlock language="json-schema">{JSON.stringify(Schema, null, 2)}</CodeBlock>
+    </TabItem>
+</Tabs>

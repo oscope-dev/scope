@@ -46,6 +46,8 @@ jobs:
       ## Cargo test
       - name: cargo test
         run: cargo test
+      - name: check for changes
+        run: git diff --quiet && git diff --cached --quiet
       ## Cargo fmt
       - run: rustup component add rustfmt
       - name: cargo fmt

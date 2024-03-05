@@ -1,18 +1,14 @@
 apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
-  name: group-1
+  name: path-exists
   description: Check your shell for basic functionality
 spec:
   actions:
     - description: foo1
       check:
         commands:
-          - ./scripts/fail-first-call foo
+          - ./scripts/fail-first-call path-exists
       fix:
         commands:
-          - ../bin/pip-install.sh
-    - description: foo2
-      check:
-        paths:
-          - '**/requirements.txt'
+          - ../bin/truey

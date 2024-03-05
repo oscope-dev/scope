@@ -16,14 +16,29 @@ Additionally, there is `list` that will output all the found configuration.
 Here is an example output of `scope list` run from the `examples/` directory.
 
 ```text
-17:47:57  INFO Commands
-17:47:57  INFO         Name                                Description
-17:47:57  INFO --------------------------------------------------------------------------------
-17:47:57  INFO         bar                 External sub-command, run `scope bar` for help
-17:47:57  INFO        doctor                Run checks that will "checkup" your machine
-17:47:57  INFO         foo                 External sub-command, run `scope foo` for help
-17:47:57  INFO         list             List the found config files, and resources detected
-17:47:57  INFO        report          Generate a bug report based from a command that was ran
+ INFO Found Resources
+ INFO   Name                                           Description                                                 Path
+ INFO - ScopeDoctorCheck/path-exists-fix-in-scope-dir  Check your shell for basic functionality                    .scope/doctor-check-fix-in-scope.yaml
+ INFO - ScopeDoctorGroup/group-1                       Check your shell for basic functionality                    .scope/doctor-group-1.yaml
+ INFO - ScopeDoctorGroup/path-exists                   Check your shell for basic functionality                    .scope/doctor-group-path-exists.yaml
+ INFO - ScopeDoctorGroup/path-exists-fix-in-scope-dir  Check your shell for basic functionality                    .scope/doctor-group-in-scope-dir.yaml
+ INFO - ScopeDoctorGroup/setup                         You need to run bin/setup                                   .scope/doctor-group-setup.yaml
+ INFO - ScopeKnownError/error-exists                   Check if the word error is in the logs                      .scope/known-error.yaml
+ INFO - ScopeReportDefinition/template                 Description not provided                                    .scope/report.yaml
+ INFO - ScopeReportLocation/github                     Description not provided                                    .scope/report.yaml
+ INFO - ScopeReportLocation/report                     Description not provided                                    .scope/report.yaml
+ INFO
+ INFO Commands
+ INFO   Name                Description
+ INFO - analyze             Analyze logs, output, etc for known errors
+ INFO - bar                 External sub-command, run `scope bar` for help
+ INFO - doctor              Run checks that will "checkup" your machine
+ INFO - foo                 External sub-command, run `scope foo` for help
+ INFO - intercept           External sub-command, run `scope intercept` for help
+ INFO - list                List the found config files, and resources detected
+ INFO - report              Generate a bug report based from a command that was ran
+ INFO - version             Print version info and exit
+
 ```
 
 Under the `Commands` section, notice two additional commands:
