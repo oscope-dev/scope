@@ -137,6 +137,11 @@ impl FoundConfig {
         config_path: Vec<PathBuf>,
     ) -> Self {
         let default_path = std::env::var("PATH").unwrap_or_default();
+
+        let mut config_path = config_path.to_vec();
+        let exe_path = std::env::current_exe().unwrap_or_default().join("../etc/scope");
+        config_path.push(exe_path);
+
         let scope_path = config_path
             .iter()
             .map(|x| x.join("bin").display().to_string())
