@@ -32,6 +32,8 @@ Currently, the only supported `apiVersion` is `scope.github.com/v1alpha`. Using 
 
 Unlike Kubernetes, the `name` field can be any string, without any DNS related constraints.
 
+Additionally, scope will look for shared config in the directory `../etc/scope` relative to where the executable is located.
+
 ## CLI Options
 All commands support the following options
 
