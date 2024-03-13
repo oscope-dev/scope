@@ -1,6 +1,6 @@
 [package]
 name = "dev-scope"
-version = "2024.2.8"
+version = "2024.2.9"
 edition = "2021"
 default-run = "scope"
 repository =  "https://github.com/ethankhall/scope"
