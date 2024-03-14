@@ -15,7 +15,8 @@ jobs:
       - name: Get release tag
         id: version
         run: |
-          VERSION="$(echo "$PLAN" | jq --compact-output '.announcement_tag')"
+          VERSION="$(echo "$PLAN" | jq -r --compact-output '.announcement_tag')"
+          echo $VERSION
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
       - uses: facebook/dotslash-publish-release@v1
         # This is necessary because the action uses
