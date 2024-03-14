@@ -63,3 +63,4 @@ This allows you to fetch env-vars, and no leak GH API tokens for example.
 ## Special Thanks
 
 We took our redaction string from [sirwart/ripsecrets](https://github.com/sirwart/ripsecrets).
+
