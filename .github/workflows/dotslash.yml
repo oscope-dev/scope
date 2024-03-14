@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get release tag
+        id: version
         run: |
           VERSION="$(echo "$PLAN" | jq --compact-output '.announcement_tag')"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -27,4 +28,4 @@ jobs:
           # how your DotSlash file(s) should be generated.
           config: .github/workflows/dotslash-config.json
           # Tag for the release to to target.
-          tag: ${{ steps.vars.outputs.version }}
+          tag: ${{ steps.version.outputs.version }}
