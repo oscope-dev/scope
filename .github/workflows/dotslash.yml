@@ -2,6 +2,10 @@ name: Generate DotSlash files
 
 on:
   workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
 
 jobs:
   generate-dotslash-files:
