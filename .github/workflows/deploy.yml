@@ -25,3 +25,5 @@ jobs:
 
       - name: Release latest version
         run: cargo release --execute --no-confirm patch
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
