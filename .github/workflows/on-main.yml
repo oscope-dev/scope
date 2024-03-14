@@ -59,6 +59,6 @@ jobs:
           git config --global user.name "ethankhall-release-bot[bot]"
 
       - name: Release latest version
-        run: cargo release --execute --no-confirm --no-verify patch
+        run: cargo release --execute --no-confirm --no-verify --no-publish patch
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
