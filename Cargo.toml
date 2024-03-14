@@ -22,6 +22,7 @@ publish-jobs = ["homebrew"]
 pr-run-mode = "plan"
 # Whether to publish prereleases to package managers
 publish-prereleases = true
+# Post-announce jobs to run in CI
 post-announce-jobs = ["./dotslash"]
 
 [workspace.metadata.dist.github-custom-runners]
