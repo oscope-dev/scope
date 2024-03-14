@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "dev-scope"
-version = "2024.2.15"
+version = "2024.2.16"
 dependencies = [
  "anyhow",
  "assert_cmd",
