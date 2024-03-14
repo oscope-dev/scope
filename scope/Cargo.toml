@@ -15,6 +15,9 @@ publish = true
 [package.metadata.dist]
 dist = true
 
+[package.metadata.release]
+tag-prefix = ""
+
 # Example of customizing binaries in Cargo.toml.
 [[bin]]
 name = "scope"
