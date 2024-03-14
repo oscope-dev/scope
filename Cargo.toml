@@ -5,7 +5,7 @@ resolver = "2"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.9.0"
+cargo-dist-version = "0.11.1"
 # CI backends to support
 ci = ["github"]
 # The installers to generate for each app
@@ -20,7 +20,7 @@ global-artifacts-jobs = ["./build-linux-pkgs"]
 publish-jobs = ["homebrew"]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
-# publish to homebrew
+# Whether to publish prereleases to package managers
 publish-prereleases = true
 
 
