@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 2
+    groups: &groups
+      prod-dependencies:
+        applies-to: version-updates
+        patterns:
+          - "*"
+  - package-ecosystem: "cargo"
+    directory: "/scope"
+    schedule:
+     interval: "weekly"
+    open-pull-requests-limit: 5
+    groups: *groups

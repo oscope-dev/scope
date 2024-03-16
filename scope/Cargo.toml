@@ -26,44 +26,44 @@ name = "scope"
 name = "scope-intercept"
 
 [dependencies]
-clap = { version = "4.5.2", features = ["derive", "env"]}
-human-panic = "1.2.3"
-tokio = { version = "1", features = ["full"] }
-dotenv = "0.15.0"
-colored = "2.1.0"
-which = { version = "5.0", features = ["regex"] }
-regex = "1.9.6"
-lazy_static = "1.4.0"
-inquire = {  version = "0.6", features = ["editor"]}
-tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
-tracing-appender = "0.2.3"
-chrono = "0.4"
-nanoid = "0.4"
-directories = "5"
-derivative = "2"
-reqwest = { version = "0.11", features = ["multipart", "rustls-tls", "hyper-tls", "native-tls-vendored" ] }
-time = { version = "0.3", features = ["macros", "formatting", "local-offset"] }
-json = "0.12"
-minijinja = "1.0"
-itertools = { version = "0.12", features = [] }
-path-clean = "1.0.1"
-async-trait = "0.1.77"
-mockall = "0.12.1"
-pathdiff = "0.2.1"
-glob = "0.3"
-educe = "0.5.11"
-petgraph = "0.6.4"
-sha256 = "1.5.0"
-anyhow = "1.0.81"
-thiserror = "1.0.58"
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
-serde_json = "1.0"
-schemars = "0.8"
-derive_builder = "0.20"
-strum = { version = "0.26", features = ["derive"] }
-jsonschema = "0.17"
-tracing = "0.1.40"
+clap.workspace = true
+human-panic.workspace = true
+tokio.workspace = true
+dotenv.workspace = true
+colored.workspace = true
+which.workspace = true
+regex.workspace = true
+lazy_static.workspace = true
+inquire.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+chrono.workspace = true
+nanoid.workspace = true
+directories.workspace = true
+derivative.workspace = true
+reqwest.workspace = true
+time.workspace = true
+json.workspace = true
+minijinja.workspace = true
+itertools.workspace = true
+path-clean.workspace = true
+async-trait.workspace = true
+mockall.workspace = true
+pathdiff.workspace = true
+glob.workspace = true
+educe.workspace = true
+petgraph.workspace = true
+sha256.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+derive_builder.workspace = true
+strum.workspace = true
+jsonschema.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.14"
