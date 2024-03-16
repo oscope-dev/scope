@@ -5,7 +5,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 2
-    groups: &groups
+    groups:
       prod-dependencies:
         applies-to: version-updates
         patterns:
@@ -15,4 +15,8 @@ updates:
     schedule:
      interval: "weekly"
     open-pull-requests-limit: 5
-    groups: *groups
+    groups:
+      prod-dependencies:
+        applies-to: version-updates
+        patterns:
+          - "*"
