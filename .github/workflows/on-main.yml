@@ -9,7 +9,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    if: ${{ github.actor != 'ethankhall-release-bot[bot]' }}
+    if: ${{ github.actor != 'ethankhall-release-bot[bot]' && github.actor != 'dependabot[bot]' }}
     steps:
       - uses: actions/checkout@v4
       - run: rustup update
@@ -32,7 +32,6 @@ jobs:
   cut-release:
     needs:
       - check
-    if: ${{ github.actor != 'ethankhall-release-bot[bot]' }}
     runs-on: ubuntu-latest
     name: Cut and Release New Version
     steps:
