@@ -9,7 +9,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    if: ${{ github.actor != 'ethankhall-release-bot[bot]' && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.actor != 'ethankhall-release-bot[bot]' && github.event.commits[0].author.name != 'dependabot[bot]' }}
     steps:
       - uses: actions/checkout@v4
       - run: rustup update
