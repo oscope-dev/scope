@@ -9,7 +9,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    if: ${{ github.actor != 'ethankhall-release-bot[bot]' && github.event.commits[0].author.name != 'dependabot[bot]' }}
+    if: ${{ github.actor != 'oscope-release-bot[bot]' && github.event.commits[0].author.name != 'dependabot[bot]' }}
     steps:
       - uses: actions/checkout@v4
       - run: rustup update
@@ -54,8 +54,8 @@ jobs:
 
       - name: Setup user details
         run: |
-          git config --global user.email "ethankhall-release-bot[bot]@users.noreply.github.com"
-          git config --global user.name "ethankhall-release-bot[bot]"
+          git config --global user.email "oscope-release-bot[bot]@users.noreply.github.com"
+          git config --global user.name "oscope-release-bot[bot]"
 
       - name: Release latest version
         run: cargo release --execute --no-confirm --no-verify --no-publish patch

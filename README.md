@@ -8,19 +8,19 @@ There are two tools engineers will use directly, `scope doctor` and `scope repor
 `scope report` is used to report local execution error.
 This is primarily used to generate a bug report, and upload it somewhere so that the responders have all the required into to respond.
 
-For full documentation, please visit [our website](https://ethankhall.github.io/scope).
+For full documentation, please visit [our website](https://oscope-dev.github.io/scope/).
 
 ## Install
 
 **Homebrew**
 
 ```shell
-brew install ethankhall/homebrew-formulas/dev-scope
+brew install oscope-dev/homebrew-formulas/dev-scope
 ```
 
 **Install Script**
 
-Review the [latest release](https://github.com/ethankhall/scope/releases/latest) to find the install command.
+Review the [latest release](https://github.com/oscope-dev/scope/releases/latest) to find the install command.
 
 **Cargo**
 
@@ -30,7 +30,7 @@ cargo install dev-scope
 
 **Manually**
 
-To install manually, download the correct archive for your platform from [github release](https://github.com/ethankhall/scope/releases/latest), extract it, and place the binaries on the `PATH`.
+To install manually, download the correct archive for your platform from [github release](https://github.com/oscope-dev/scope/releases/latest), extract it, and place the binaries on the `PATH`.
 
 ## Commands
 
