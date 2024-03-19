@@ -3,12 +3,12 @@ name = "dev-scope"
 version = "2024.2.24"
 edition = "2021"
 default-run = "scope"
-repository =  "https://github.com/ethankhall/scope"
+repository =  "https://github.com/oscope-dev/scope"
 license = "BSD-3-Clause"
 keywords = ["local-dev"]
 categories = ["command-line-utilities", "development-tools::debugging", "development-tools::build-utils"]
 description = "A tool to help diagnose errors, setup machines, and report bugs to authors."
-documentation = "https://ethankhall.github.io/scope/"
+documentation = "https://oscope-dev.github.io/scope/"
 readme = "../README.md"
 publish = true
 
