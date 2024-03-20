@@ -6,7 +6,8 @@ use petgraph::algo::all_simple_paths;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, info_span, warn, Span};
+use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 #[derive(Debug, Default)]
 struct PathRunResult {
@@ -32,7 +33,14 @@ where
         let mut visited: BTreeSet<String> = BTreeSet::new();
         let mut did_succeed = true;
 
+        let header_span = info_span!("doctor run", "indicatif.pb_show" = true);
+        header_span.pb_set_length(self.all_paths.len() as u64);
+        header_span.pb_set_message("scope doctor run");
+
+        let _span = header_span.enter();
+
         for path in &self.all_paths {
+            Span::current().pb_inc(1);
             let mut full_path = Vec::new();
             for target_group in path {
                 if visited.contains(target_group) {
@@ -70,12 +78,18 @@ where
         for (group_name, actions) in path {
             debug!(target: "user", "Running check {}", group_name);
 
+            let group_span = info_span!("group", "indicatif.pb_show" = true);
+            group_span.pb_set_length(actions.len() as u64);
+            group_span.pb_set_message(&format!("group {}", group_name));
+            let _span = group_span.enter();
+
             if skip_remaining {
                 run_result.skipped_group.push(group_name.to_string());
             }
             let mut has_failure = false;
 
             for action in actions {
+                group_span.pb_inc(1);
                 if skip_remaining {
                     warn!(target: "user", "Check `{}` was skipped.", group_name.bold());
                     run_result.skipped_group.push(group_name.to_string());

@@ -4,6 +4,7 @@ use std::cmp;
 use std::cmp::max;
 
 use crate::models::HelpMetadata;
+use crate::prelude::progress_bar_without_pos;
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, OutputDestination,
@@ -15,7 +16,8 @@ use mockall::automock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, instrument};
+use tracing::{error, info, info_span, instrument};
+use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -109,6 +111,14 @@ pub struct DefaultDoctorActionRun {
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     async fn run_action(&self) -> Result<ActionRunResult> {
+        let action_span = info_span!("action", "indicatif.pb_show" = true);
+        action_span.pb_set_message(&format!(
+            "action {} - {}",
+            self.action.name, self.action.description
+        ));
+        action_span.pb_set_style(&progress_bar_without_pos());
+        let _span = action_span.enter();
+
         let check_status = self.evaluate_checks().await?;
         if check_status == CacheResults::FixNotRequired {
             return Ok(ActionRunResult::CheckSucceeded);

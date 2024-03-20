@@ -1,14 +1,34 @@
 use clap::{ArgGroup, Parser};
+use indicatif::ProgressStyle;
 use std::fs::File;
 use std::path::PathBuf;
 
 use tracing::level_filters::LevelFilter;
+use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
+use tracing_indicatif::IndicatifLayer;
+use tracing_subscriber::fmt::format::DefaultFields;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
     fmt::format::{Format, PrettyFields},
     layer::SubscriberExt,
     Registry,
 };
+
+pub fn default_progress_bar() -> ProgressStyle {
+    ProgressStyle::with_template(
+        "{span_child_prefix} {spinner:.green} {wide_msg} {pos:>7}/{len:7} [{elapsed_precise}]",
+    )
+    .unwrap()
+    .progress_chars("##-")
+}
+
+pub fn progress_bar_without_pos() -> ProgressStyle {
+    ProgressStyle::with_template(
+        "{span_child_prefix} {spinner:.green} {wide_msg} [{elapsed_precise}]",
+    )
+    .unwrap()
+    .progress_chars("##-")
+}
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("logging"))]
@@ -71,6 +91,12 @@ impl LoggingOpts {
             .event_format(Format::default().pretty())
             .with_writer(non_blocking);
 
+        let indicatif_layer = IndicatifLayer::new()
+            .with_span_field_formatter(hide_indicatif_span_fields(DefaultFields::new()))
+            .with_progress_style(default_progress_bar());
+        let stderr_writer = indicatif_layer.get_stderr_writer();
+
+        let level_filter = self.to_level_filter();
         let console_output = tracing_subscriber::fmt::layer()
             .event_format(
                 Format::default()
@@ -78,14 +104,17 @@ impl LoggingOpts {
                     .without_time()
                     .compact(),
             )
-            .fmt_fields(PrettyFields::new());
-
-        let level_filter = self.to_level_filter();
-        let subscriber = Registry::default()
-            .with(console_output.with_filter(filter_fn(move |metadata| {
+            .with_writer(stderr_writer)
+            .fmt_fields(PrettyFields::new())
+            .with_filter(filter_fn(move |metadata| {
                 metadata.target() == "user" && level_filter >= *metadata.level()
                     || metadata.target() == "always"
-            })))
+            }));
+
+        let subscriber = Registry::default()
+            .with(console_output)
+            .with(indicatif_layer.with_filter(IndicatifFilter::new(false)))
+            // .with(console)
             .with(file_output);
 
         tracing::subscriber::set_global_default(subscriber)
