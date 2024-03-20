@@ -19,7 +19,7 @@ global-artifacts-jobs = ["./build-linux-pkgs"]
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 # Publish jobs to run in CI
-pr-run-mode = "plan"
+pr-run-mode = "upload"
 # Whether to publish prereleases to package managers
 publish-prereleases = true
 # Post-announce jobs to run in CI
