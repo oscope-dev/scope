@@ -11,7 +11,7 @@ use directories::{BaseDirs, UserDirs};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
-use walkdir::WalkDir;
+use ignore::Walk;
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -317,7 +317,7 @@ fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {
 
     if path.is_dir() {
         let mut files = Vec::new();
-        for dir_entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        for dir_entry in Walk::new(path).into_iter().filter_map(|e| e.ok()) {
             if !dir_entry.path().is_file() {
                 continue;
             }

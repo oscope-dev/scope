@@ -73,4 +73,4 @@ derive_builder = "0.20"
 strum = { version = "0.26", features = ["derive"] }
 jsonschema = "0.17"
 tracing = "0.1.40"
-walkdir = "2.5.0"
+ignore = "0.4.22"
