@@ -147,11 +147,21 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
+  custom-build-linux-arm:
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' }}
+    uses: ./.github/workflows/build-linux-arm.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
   # Build and package all the platform-agnostic(ish) things
   build-global-artifacts:
     needs:
       - plan
       - build-local-artifacts
+      - custom-build-linux-arm
     runs-on: "ubuntu-20.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -194,6 +204,7 @@ jobs:
     needs:
       - plan
       - build-local-artifacts
+      - custom-build-linux-arm
     uses: ./.github/workflows/build-linux-pkgs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
