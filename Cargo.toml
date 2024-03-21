@@ -24,10 +24,7 @@ pr-run-mode = "upload"
 publish-prereleases = true
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./dotslash"]
-
-[[workspace.metadata.dist.extra-artifacts]]
-artifacts = ["target/dev-scope-aarch64-unknown-linux-gnu.tar.xz"]
-build = [".github/bin/build-with-cross.sh", "aarch64-unknown-linux-gnu"]
+local-artifacts-jobs = ["./linux-arm"]
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
