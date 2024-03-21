@@ -26,6 +26,7 @@ fn test_list_reports_all_config() {
         .success()
         .stdout(predicate::str::contains("ScopeDoctorCheck/path-exists"))
         .stdout(predicate::str::contains("ScopeKnownError/error-exists"))
+        .stdout(predicate::str::contains("ScopeKnownError/disk-full"))
         .stdout(predicate::str::contains("ScopeDoctorGroup/group-1"))
         .stdout(predicate::str::contains("ScopeReportDefinition/template"))
         .stdout(predicate::str::contains("ScopeReportLocation/github"))

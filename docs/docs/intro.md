@@ -34,6 +34,8 @@ Unlike Kubernetes, the `name` field can be any string, without any DNS related c
 
 Additionally, scope will look for shared config in the directory `../etc/scope` relative to where the executable is located.
 
+To exclude files from being loaded, put a [gitignore style](https://git-scm.com/docs/gitignore) file named `.ignore` into a config directory.
+
 ## CLI Options
 All commands support the following options
 

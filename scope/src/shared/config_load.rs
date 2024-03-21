@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use directories::{BaseDirs, UserDirs};
+use ignore::Walk;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
@@ -316,12 +317,12 @@ fn expand_path(path: &Path) -> Result<Vec<PathBuf>> {
 
     if path.is_dir() {
         let mut files = Vec::new();
-        for dir_entry in fs::read_dir(path)?.flatten() {
+        for dir_entry in Walk::new(path).filter_map(|e| e.ok()) {
             if !dir_entry.path().is_file() {
                 continue;
             }
 
-            let file_path = dir_entry.path();
+            let file_path = dir_entry.path().to_path_buf();
             let extension = file_path.extension();
             if extension == Some(OsStr::new("yaml")) || extension == Some(OsStr::new("yml")) {
                 debug!(target: "user", "Found file {:?}", file_path);
