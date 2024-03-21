@@ -208,10 +208,11 @@ fn test_run_group_1() {
     result
         .failure()
         .stdout(predicate::str::contains(
-            "Check initially failed, fix was successful, group: \"group-1\", name: \"1\"",
+            "Check initially failed, fix was successful, group: \"group-1\", name: \"fail then pass\"",
         ))
+        .stdout(predicate::str::contains("Fix ran successfully, group: \"group-1\", name: \"sleep\""))
         .stdout(predicate::str::contains(
-            "Check failed, no fix provided, group: \"group-1\", name: \"2\"",
+            "Check failed, no fix provided, group: \"group-1\", name: \"paths\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 }
