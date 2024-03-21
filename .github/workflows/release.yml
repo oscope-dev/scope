@@ -147,11 +147,11 @@ jobs:
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
 
-  custom-linux-arm:
+  custom-build-linux-arm:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' }}
-    uses: ./.github/workflows/linux-arm.yml
+    uses: ./.github/workflows/build-linux-arm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -161,7 +161,7 @@ jobs:
     needs:
       - plan
       - build-local-artifacts
-      - custom-linux-arm
+      - custom-build-linux-arm
     runs-on: "ubuntu-20.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -204,7 +204,7 @@ jobs:
     needs:
       - plan
       - build-local-artifacts
-      - custom-linux-arm
+      - custom-build-linux-arm
     uses: ./.github/workflows/build-linux-pkgs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}

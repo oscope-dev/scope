@@ -24,7 +24,7 @@ pr-run-mode = "upload"
 publish-prereleases = true
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./dotslash"]
-local-artifacts-jobs = ["./linux-arm"]
+local-artifacts-jobs = ["./build-linux-arm"]
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
