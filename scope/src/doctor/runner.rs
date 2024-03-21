@@ -88,6 +88,9 @@ where
                     ActionRunResult::CheckSucceeded => {
                         info!(target: "user", group = group_name, name = action.name(), "Check was successful");
                     }
+                    ActionRunResult::NoCheckFixSucceeded => {
+                        info!(target: "user", group = group_name, name = action.name(), "Check ran successfully");
+                    }
                     ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
                         info!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix was successful");
                     }
