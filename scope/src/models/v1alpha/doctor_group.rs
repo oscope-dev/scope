@@ -15,6 +15,11 @@ pub struct DoctorCheckSpec {
     #[serde(default)]
     /// A list of globs to check for changes. When the glob matches a new file, or the contents
     /// of the file change, the check will require a fix.
+    ///
+    /// Relative paths are relative to the scope config directory containing the config file.
+    ///
+    /// Shared configs can use the template string `{{ working_dir }}` to access the working
+    /// directory.
     pub paths: Option<Vec<String>>,
 
     #[serde(default)]
