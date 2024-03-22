@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: templated
+  description: Silence any app specific MOTDs
+spec:
+  actions:
+  - name: hushlogin
+    check:
+      paths:
+        - '{{ working_dir }}/.hushlogin'
+    fix:
+      commands:
+        - "touch .hushlogin"
