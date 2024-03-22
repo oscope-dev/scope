@@ -1,7 +1,9 @@
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::shared::models::internal::extract_command_path;
+use anyhow::Result;
 use derive_builder::Builder;
+use minijinja::{context, Environment};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -128,12 +130,28 @@ impl HelpMetadata for DoctorGroup {
     }
 }
 
+fn evaluate_path(work_dir: &str, path: &String) -> Result<String> {
+    let mut env = Environment::new();
+    env.add_template("path", path.as_str())?;
+    let template = env.get_template("path")?;
+    let result = template.render(context! { work_dir => work_dir })?;
+
+    Ok(result)
+}
+
 impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
     type Error = anyhow::Error;
 
     fn try_from(model: V1AlphaDoctorGroup) -> Result<Self, Self::Error> {
         let binding = model.containing_dir();
         let containing_dir = Path::new(&binding);
+        let working_dir = model
+            .metadata
+            .annotations
+            .working_dir
+            .as_ref()
+            .unwrap()
+            .clone();
         let mut actions: Vec<_> = Default::default();
         for (count, spec_action) in model.spec.actions.iter().enumerate() {
             let spec_action = spec_action.clone();
@@ -163,7 +181,10 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
                         .commands
                         .map(|commands| DoctorGroupActionCommand::from((containing_dir, commands))),
                     files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
-                        paths,
+                        paths: paths
+                            .iter() // TODO: should this be as_ref() still? Changed because type inference error
+                            .map(|p| evaluate_path(working_dir.as_str(), p).unwrap()) // TODO: better error handling in map
+                            .collect(),
                         base_path: containing_dir.parent().unwrap().to_path_buf(),
                     }),
                 },

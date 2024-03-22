@@ -19,6 +19,8 @@ pub struct ModelMetadataAnnotations {
     /// Directory containing the resource, generated automatically.
     pub file_dir: Option<String>,
     #[serde(rename = "scope.github.com/bin-path")]
+    /// When running commands, the working directory of the command
+    pub working_dir: Option<String>,
     /// When running commands, additional paths that should be paced at the _beginning_ of the `PATH`.
     pub bin_path: Option<String>,
     #[serde(flatten)]
