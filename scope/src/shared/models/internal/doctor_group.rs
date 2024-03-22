@@ -183,7 +183,7 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
                     files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
                         paths: paths
                             .iter() // TODO: should this be as_ref() still? Changed because type inference error
-                            .map(|p| evaluate_path(working_dir.as_str(), p).unwrap()) // TODO: better error handling in map
+                            .map(|p| evaluate_path(working_dir.as_str(), p).unwrap()) // TODO: implement a function here, make it an early exit
                             .collect(),
                         base_path: containing_dir.parent().unwrap().to_path_buf(),
                     }),

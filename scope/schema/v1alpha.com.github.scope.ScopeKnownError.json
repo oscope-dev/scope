@@ -207,7 +207,8 @@
           "default": {
             "scope.github.com/bin-path": null,
             "scope.github.com/file-dir": null,
-            "scope.github.com/file-path": null
+            "scope.github.com/file-path": null,
+            "working_dir": null
           },
           "$ref": "#/definitions/ModelMetadataAnnotations"
         },
@@ -235,6 +236,14 @@
       "properties": {
         "scope.github.com/bin-path": {
           "description": "When running commands, additional paths that should be paced at the _beginning_ of the `PATH`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "working_dir": {
+          "description": "The current working directory of the scope command, generated automatically.",
           "type": [
             "string",
             "null"
