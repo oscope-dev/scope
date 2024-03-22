@@ -43,11 +43,12 @@ pub enum CacheResults {
     FixNotRequired = 1,
     FixRequired = 2,
     StopExecution = 3,
+    CacheNotDefined = 4,
 }
 
 impl CacheResults {
     fn is_success(&self) -> bool {
-        self == &CacheResults::FixNotRequired
+        self == &CacheResults::FixNotRequired || self == &CacheResults::CacheNotDefined
     }
 }
 
@@ -61,6 +62,7 @@ pub enum ActionRunResult {
     CheckFailedNoRunFix,
     CheckFailedNoFixProvided,
     CheckFailedFixFailedStop,
+    NoCheckFixSucceeded,
 }
 
 impl ActionRunResult {
@@ -73,6 +75,7 @@ impl ActionRunResult {
             ActionRunResult::CheckFailedNoRunFix => true,
             ActionRunResult::CheckFailedNoFixProvided => true,
             ActionRunResult::CheckFailedFixFailedStop => true,
+            ActionRunResult::NoCheckFixSucceeded => false,
         }
     }
 }
@@ -116,6 +119,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         }
 
         let fix_result = self.run_fixes().await?;
+
         match fix_result {
             i32::MIN..=-1 => {
                 return Ok(ActionRunResult::CheckFailedNoFixProvided);
@@ -123,6 +127,11 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             0 => {}
             1...100 => return Ok(ActionRunResult::CheckFailedFixFailed),
             _ => return Ok(ActionRunResult::CheckFailedFixFailedStop),
+        }
+
+        if check_status == CacheResults::CacheNotDefined {
+            self.update_caches().await;
+            return Ok(ActionRunResult::NoCheckFixSucceeded);
         }
 
         if let Some(check_status) = self.evaluate_command_checks().await? {
@@ -207,18 +216,33 @@ impl DefaultDoctorActionRun {
     }
 
     async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
+        let mut path_check = None;
+        let mut command_check = None;
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
-            if result.is_success() {
+            if !result.is_success() {
                 return Ok(result);
             }
+
+            path_check = Some(result);
         }
 
         if let Some(res) = self.evaluate_command_checks().await? {
-            return Ok(res);
+            if !res.is_success() {
+                return Ok(res);
+            }
+            command_check = Some(res);
         }
 
-        Ok(CacheResults::FixRequired)
+        match (path_check, command_check) {
+            (None, None) => Ok(CacheResults::CacheNotDefined),
+            (Some(p), None) if p.is_success() => Ok(CacheResults::FixNotRequired),
+            (None, Some(c)) if c.is_success() => Ok(CacheResults::FixNotRequired),
+            (Some(p), Some(c)) if p.is_success() && c.is_success() => {
+                Ok(CacheResults::FixNotRequired)
+            }
+            _ => Ok(CacheResults::FixRequired),
+        }
     }
 
     async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
