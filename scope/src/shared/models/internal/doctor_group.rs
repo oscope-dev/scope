@@ -134,7 +134,7 @@ fn evaluate_path(work_dir: &str, path: &String) -> Result<String> {
     let mut env = Environment::new();
     env.add_template("path", path.as_str())?;
     let template = env.get_template("path")?;
-    let result = template.render(context! { work_dir => work_dir })?;
+    let result = template.render(context! { working_dir => work_dir })?;
 
     Ok(result)
 }
