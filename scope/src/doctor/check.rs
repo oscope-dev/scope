@@ -324,13 +324,11 @@ pub trait GlobWalker: Send + Sync {
 pub struct DefaultGlobWalker {}
 
 fn make_absolute(base_dir: &Path, glob: &String) -> String {
-    let result = if glob.starts_with("/") {
-        format!("{}", glob)
+    if glob.starts_with('/') {
+        glob.to_string()
     } else {
         format!("{}/{}", base_dir.display(), glob)
-    };
-
-    result
+    }
 }
 
 #[async_trait]

@@ -232,7 +232,7 @@ fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
     }
 }
 
-async fn load_all_config(working_dir: &PathBuf, paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
+async fn load_all_config(working_dir: &Path, paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
     let mut loaded_values = Vec::new();
 
     for file_path in expand_to_files(paths) {
