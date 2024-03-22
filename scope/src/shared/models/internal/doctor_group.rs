@@ -213,9 +213,10 @@ mod tests {
     #[test]
     fn parse_group_1() {
         let test_file = format!("{}/examples/group-1.yaml", env!("CARGO_MANIFEST_DIR"));
+        let work_dir = Path::new("/foo/bar");
         let text = std::fs::read_to_string(test_file).unwrap();
         let path = Path::new("/foo/bar/.scope/file.yaml");
-        let configs = parse_models_from_string(path, &text).unwrap();
+        let configs = parse_models_from_string(work_dir, path, &text).unwrap();
         assert_eq!(1, configs.len());
 
         let dg = configs[0].get_doctor_group().unwrap();
