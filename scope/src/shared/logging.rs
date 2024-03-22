@@ -94,7 +94,7 @@ impl LoggingOpts {
         let indicatif_layer = IndicatifLayer::new()
             .with_span_field_formatter(hide_indicatif_span_fields(DefaultFields::new()))
             .with_progress_style(default_progress_bar());
-        let stderr_writer = indicatif_layer.get_stderr_writer();
+        let indicatif_writer = indicatif_layer.get_stdout_writer();
 
         let level_filter = self.to_level_filter();
         let console_output = tracing_subscriber::fmt::layer()
@@ -104,7 +104,7 @@ impl LoggingOpts {
                     .without_time()
                     .compact(),
             )
-            .with_writer(stderr_writer)
+            .with_writer(indicatif_writer)
             .fmt_fields(PrettyFields::new())
             .with_filter(filter_fn(move |metadata| {
                 metadata.target() == "user" && level_filter >= *metadata.level()
