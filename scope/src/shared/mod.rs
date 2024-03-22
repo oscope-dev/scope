@@ -22,7 +22,7 @@ pub mod prelude {
         MockExecutionProvider, OutputCapture, OutputCaptureBuilder, OutputDestination,
     };
     pub use super::config_load::{build_config_path, ConfigOptions, FoundConfig};
-    pub use super::logging::LoggingOpts;
+    pub use super::logging::{progress_bar_without_pos, LoggingOpts};
     pub use super::models::prelude::*;
     pub use super::print_details;
     pub use super::report::ReportBuilder;

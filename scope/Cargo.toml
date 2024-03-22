@@ -65,6 +65,8 @@ strum.workspace = true
 jsonschema.workspace = true
 tracing.workspace = true
 ignore.workspace = true
+tracing-indicatif.workspace = true
+indicatif.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.14"

@@ -71,3 +71,5 @@ strum = { version = "0.26", features = ["derive"] }
 jsonschema = "0.17"
 tracing = "0.1.40"
 ignore = "0.4.22"
+tracing-indicatif = "0.3"
+indicatif = "0.17"
