@@ -58,7 +58,8 @@ spec:
   help: The command had an error, try reading the logs around there to find out what happened.";
 
         let path = Path::new("/foo/bar/file.yaml");
-        let configs = parse_models_from_string(path, text).unwrap();
+        let work_dir = Path::new("/foo/bar");
+        let configs = parse_models_from_string(work_dir, path, text).unwrap();
         assert_eq!(1, configs.len());
         let model = configs[0].get_known_error_spec().unwrap();
 

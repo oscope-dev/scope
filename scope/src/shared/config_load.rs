@@ -149,7 +149,7 @@ impl FoundConfig {
             .map(|x| x.join("bin").display().to_string())
             .join(":");
 
-        let mut raw_config = load_all_config(&config_path).await;
+        let mut raw_config = load_all_config(&working_dir, &config_path).await;
         raw_config.sort_by_key(|x| x.full_name());
 
         let mut this = Self {
@@ -232,7 +232,7 @@ fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
     }
 }
 
-async fn load_all_config(paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
+async fn load_all_config(working_dir: &Path, paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
     let mut loaded_values = Vec::new();
 
     for file_path in expand_to_files(paths) {
@@ -244,7 +244,7 @@ async fn load_all_config(paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
             Ok(content) => content,
         };
         for doc in Deserializer::from_str(&file_contents) {
-            if let Some(parsed_model) = parse_model(doc, &file_path) {
+            if let Some(parsed_model) = parse_model(doc, working_dir, &file_path) {
                 loaded_values.push(parsed_model)
             }
         }
@@ -253,7 +253,11 @@ async fn load_all_config(paths: &Vec<PathBuf>) -> Vec<ModelRoot<Value>> {
     loaded_values
 }
 
-pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRoot<Value>> {
+pub(crate) fn parse_model(
+    doc: Deserializer,
+    working_dir: &Path,
+    file_path: &Path,
+) -> Option<ModelRoot<Value>> {
     let value = match Value::deserialize(doc) {
         Ok(value) => value,
         Err(e) => {
@@ -270,6 +274,10 @@ pub(crate) fn parse_model(doc: Deserializer, file_path: &Path) -> Option<ModelRo
                 Some(file_path.parent().unwrap().display().to_string());
 
             value.metadata.annotations.bin_path = Some(build_exec_path(file_path));
+
+            // TODO: a better way to convert PathBuf to String?
+            value.metadata.annotations.working_dir =
+                Some(working_dir.to_str().unwrap().to_string());
             Some(value)
         }
         Err(e) => {

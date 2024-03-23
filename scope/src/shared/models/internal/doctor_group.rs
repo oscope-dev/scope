@@ -1,7 +1,9 @@
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::shared::models::internal::extract_command_path;
+use anyhow::Result;
 use derive_builder::Builder;
+use minijinja::{context, Environment};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -128,12 +130,28 @@ impl HelpMetadata for DoctorGroup {
     }
 }
 
+fn evaluate_path(work_dir: &str, path: &str) -> Result<String> {
+    let mut env = Environment::new();
+    env.add_template("path", path)?;
+    let template = env.get_template("path")?;
+    let result = template.render(context! { working_dir => work_dir })?;
+
+    Ok(result)
+}
+
 impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
     type Error = anyhow::Error;
 
     fn try_from(model: V1AlphaDoctorGroup) -> Result<Self, Self::Error> {
         let binding = model.containing_dir();
         let containing_dir = Path::new(&binding);
+        let working_dir = model
+            .metadata
+            .annotations
+            .working_dir
+            .as_ref()
+            .unwrap()
+            .clone();
         let mut actions: Vec<_> = Default::default();
         for (count, spec_action) in model.spec.actions.iter().enumerate() {
             let spec_action = spec_action.clone();
@@ -163,7 +181,10 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
                         .commands
                         .map(|commands| DoctorGroupActionCommand::from((containing_dir, commands))),
                     files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
-                        paths,
+                        paths: paths
+                            .iter() // TODO: should this be as_ref() still? Changed because type inference error
+                            .map(|p| evaluate_path(working_dir.as_str(), p).unwrap()) // TODO: implement a function here, make it an early exit
+                            .collect(),
                         base_path: containing_dir.parent().unwrap().to_path_buf(),
                     }),
                 },
@@ -192,9 +213,10 @@ mod tests {
     #[test]
     fn parse_group_1() {
         let test_file = format!("{}/examples/group-1.yaml", env!("CARGO_MANIFEST_DIR"));
+        let work_dir = Path::new("/foo/bar");
         let text = std::fs::read_to_string(test_file).unwrap();
         let path = Path::new("/foo/bar/.scope/file.yaml");
-        let configs = parse_models_from_string(path, &text).unwrap();
+        let configs = parse_models_from_string(work_dir, path, &text).unwrap();
         assert_eq!(1, configs.len());
 
         let dg = configs[0].get_doctor_group().unwrap();

@@ -357,6 +357,14 @@ pub trait GlobWalker: Send + Sync {
 #[derive(Debug, Default)]
 pub struct DefaultGlobWalker {}
 
+fn make_absolute(base_dir: &Path, glob: &String) -> String {
+    if glob.starts_with('/') {
+        glob.to_string()
+    } else {
+        format!("{}/{}", base_dir.display(), glob)
+    }
+}
+
 #[async_trait]
 impl GlobWalker for DefaultGlobWalker {
     async fn have_globs_changed(
@@ -369,7 +377,7 @@ impl GlobWalker for DefaultGlobWalker {
         use glob::glob;
 
         for glob_str in paths {
-            let glob_path = format!("{}/{}", base_dir.display(), glob_str);
+            let glob_path = make_absolute(base_dir, glob_str);
             for path in glob(&glob_path)?.filter_map(Result::ok) {
                 let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
                 let check_result = file_result == FileCacheStatus::FileMatches;

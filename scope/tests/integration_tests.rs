@@ -219,6 +219,29 @@ fn test_run_group_1() {
 }
 
 #[test]
+fn test_run_templated() {
+    let working_dir = setup_working_dir();
+
+    let mut cmd = Command::cargo_bin("scope").unwrap();
+    let result = cmd
+        .current_dir(working_dir.path())
+        .env("SCOPE_RUN_ID", "test_run_templated")
+        .arg("doctor")
+        .arg("run")
+        .arg("--only=templated")
+        .arg(&format!(
+            "--cache-dir={}/.cache",
+            working_dir.to_str().unwrap()
+        ))
+        .env("NO_COLOR", "1")
+        .assert();
+
+    result.success().stdout(predicate::str::contains(
+        "Check was successful, group: \"templated\", name: \"hushlogin\"",
+    ));
+}
+
+#[test]
 fn test_no_tasks_found() {
     let working_dir = setup_working_dir();
 

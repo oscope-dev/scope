@@ -14,13 +14,19 @@ pub struct ModelMetadataAnnotations {
     #[schemars(skip)]
     /// File path for the resource, generated automatically.
     pub file_path: Option<String>,
+
     #[serde(rename = "scope.github.com/file-dir")]
     #[schemars(skip)]
     /// Directory containing the resource, generated automatically.
     pub file_dir: Option<String>,
+
+    /// The current working directory of the scope command, generated automatically.
+    pub working_dir: Option<String>,
+
     #[serde(rename = "scope.github.com/bin-path")]
     /// When running commands, additional paths that should be paced at the _beginning_ of the `PATH`.
     pub bin_path: Option<String>,
+
     #[serde(flatten)]
     pub extra: BTreeMap<String, String>,
 }
