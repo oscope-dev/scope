@@ -2,6 +2,7 @@ use super::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
+use std::collections::BTreeMap;
 
 use crate::models::HelpMetadata;
 use crate::prelude::progress_bar_without_pos;
@@ -216,13 +217,28 @@ impl DefaultDoctorActionRun {
                 args: &args,
                 output_dest: OutputDestination::StandardOut,
                 path: &self.model.metadata.exec_path(),
-                env_vars: Default::default(),
+                env_vars: self.generate_env_vars(),
             })
             .await?;
 
         info!("fix ran {} and exited {:?}", command, capture.exit_code);
 
         Ok(capture.exit_code.unwrap_or(-1))
+    }
+
+    fn generate_env_vars(&self) -> BTreeMap<String, String> {
+        let mut env_vars = BTreeMap::new();
+        env_vars.insert(
+            "SCOPE_BIN_DIR".to_string(),
+            std::env::current_exe()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        env_vars
     }
 
     async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
@@ -304,7 +320,7 @@ impl DefaultDoctorActionRun {
                     args: &args,
                     output_dest: OutputDestination::Logging,
                     path: &path,
-                    env_vars: Default::default(),
+                    env_vars: self.generate_env_vars(),
                 })
                 .await?;
 
