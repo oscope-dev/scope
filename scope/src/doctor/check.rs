@@ -233,9 +233,9 @@ impl DefaultDoctorActionRun {
             std::env::current_exe()
                 .unwrap()
                 .parent()
-                .unwrap()
+                .expect("executable should be in a directory")
                 .to_str()
-                .unwrap()
+                .expect("bin directory should be a valid string")
                 .to_string(),
         );
         env_vars
