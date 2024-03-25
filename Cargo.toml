@@ -38,7 +38,7 @@ tokio = { version = "1", features = ["full"] }
 dotenv = "0.15.0"
 colored = "2.1.0"
 which = { version = "6.0", features = ["regex"] }
-regex = "1.10.3"
+regex = "1.10.4"
 lazy_static = "1.4.0"
 inquire = {  version = "0.6", features = ["editor"]}
 tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
@@ -53,7 +53,7 @@ json = "0.12"
 minijinja = "1.0"
 itertools = { version = "0.12", features = [] }
 path-clean = "1.0.1"
-async-trait = "0.1.78"
+async-trait = "0.1.79"
 mockall = "0.12.1"
 pathdiff = "0.2.1"
 glob = "0.3"
