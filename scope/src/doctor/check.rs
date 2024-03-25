@@ -492,7 +492,9 @@ pub(crate) mod tests {
         let mut counter = 0;
         mock.expect_run_command()
             .times(expected_results.len())
-            .withf(move |params| params.args[0].eq(command))
+            .withf(move |params| {
+                params.args[0].eq(command) && params.env_vars.contains_key("SCOPE_BIN_DIR")
+            })
             .returning(move |_| {
                 let resp_code = expected_results[counter];
                 counter += 1;
