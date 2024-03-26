@@ -141,7 +141,12 @@ impl FoundConfig {
 
         let mut config_path = config_path.to_vec();
         let exe_path = std::env::current_exe().unwrap();
-        let shared_path = exe_path.parent().unwrap().join("../etc/scope");
+        let shared_path = exe_path
+            .parent()
+            .unwrap()
+            .join("../etc/scope")
+            .canonicalize()
+            .expect("shared path to be canonicalizable");
         config_path.push(shared_path);
 
         let scope_path = config_path
