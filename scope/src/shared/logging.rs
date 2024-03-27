@@ -84,11 +84,12 @@ impl LoggingOpts {
 
         let file_path = PathBuf::from(&full_file_name);
         let (non_blocking, guard) = tracing_appender::non_blocking(
-            File::create(file_path).expect("to be able to create log file"),
+            strip_ansi_escapes::Writer::new(File::create(file_path).expect("to be able to create log file")),
         );
 
         let file_output = tracing_subscriber::fmt::layer()
             .event_format(Format::default().pretty())
+            .with_ansi(false)
             .with_writer(non_blocking);
 
         let indicatif_layer = IndicatifLayer::new()
