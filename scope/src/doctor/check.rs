@@ -416,7 +416,7 @@ impl GlobWalker for DefaultGlobWalker {
         use glob::glob;
 
         for glob_str in paths {
-            let glob_path = format!("{}/{}", base_dir.display(), glob_str);
+            let glob_path = make_absolute(base_dir, glob_str);
             for path in glob(&glob_path)?.filter_map(Result::ok) {
                 file_cache
                     .update_cache_entry(cache_name.to_string(), &path)
