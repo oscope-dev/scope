@@ -9,10 +9,12 @@ use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use thiserror::Error;
+use tokio::io;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument, Level};
 use which::which_in;
 
 #[derive(Debug, Default)]
@@ -51,6 +53,36 @@ pub enum OutputDestination {
     StandardOut,
     Logging,
     Null,
+}
+
+struct StreamCapture<R: io::AsyncRead + Unpin> {
+    reader: R,
+    writer: Arc<RwLock<Box<dyn std::io::Write + Send + Sync>>>,
+    level: Level,
+    dest: OutputDestination,
+}
+
+impl<R: io::AsyncRead + Unpin> StreamCapture<R> {
+    async fn capture_output(self) -> Result<Vec<(DateTime<Utc>, String)>, anyhow::Error> {
+        let captured = RwLockOutput::default();
+
+        let mut reader = BufReader::new(self.reader).lines();
+        while let Some(line) = reader.next_line().await? {
+            captured.add_line(&line).await;
+            match &self.dest {
+                OutputDestination::Logging => match self.level {
+                    Level::ERROR => error!("{}", line),
+                    _ => info!("{}", line),
+                },
+                OutputDestination::StandardOut => {
+                    writeln!(self.writer.write().await, "{}", line).ok();
+                }
+                OutputDestination::Null => {}
+            };
+        }
+
+        Ok::<_, anyhow::Error>(captured.output.into_inner())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -100,6 +132,7 @@ impl<'a> CaptureOpts<'a> {
 }
 
 impl OutputCapture {
+    #[instrument(skip_all)]
     pub async fn capture_output(opts: CaptureOpts<'_>) -> Result<Self, CaptureError> {
         check_pre_exec(&opts)?;
         let args = opts.args.to_vec();
@@ -118,45 +151,27 @@ impl OutputCapture {
             .current_dir(opts.working_dir)
             .spawn()?;
 
+        // capture stdout
         let stdout = child.stdout.take().expect("stdout to be available");
+        let stdout_stream = StreamCapture {
+            reader: stdout,
+            writer: crate::shared::prelude::STDOUT_WRITER.clone(),
+            level: Level::INFO,
+            dest: opts.output_dest.clone(),
+        };
+        let stdout = stdout_stream.capture_output();
+
+        // capture stderr
         let stderr = child.stderr.take().expect("stdout to be available");
-
-        let stdout = {
-            let captured = RwLockOutput::default();
-            let output_dest = opts.output_dest.clone();
-            async move {
-                let mut reader = BufReader::new(stdout).lines();
-                while let Some(line) = reader.next_line().await? {
-                    captured.add_line(&line).await;
-                    match output_dest {
-                        OutputDestination::Logging => info!("{}", line),
-                        OutputDestination::StandardOut => println!("{}", line),
-                        OutputDestination::Null => {}
-                    }
-                }
-
-                Ok::<_, anyhow::Error>(captured.output.into_inner())
-            }
+        let stderr_stream = StreamCapture {
+            reader: stderr,
+            writer: crate::shared::prelude::STDERR_WRITER.clone(),
+            level: Level::ERROR,
+            dest: opts.output_dest.clone(),
         };
+        let stderr = stderr_stream.capture_output();
 
-        let stderr = {
-            let captured = RwLockOutput::default();
-            let output_dest = opts.output_dest.clone();
-            async move {
-                let mut reader = BufReader::new(stderr).lines();
-                while let Some(line) = reader.next_line().await? {
-                    captured.add_line(&line).await;
-                    match output_dest {
-                        OutputDestination::Logging => error!("{}", line),
-                        OutputDestination::StandardOut => eprintln!("{}", line),
-                        OutputDestination::Null => {}
-                    }
-                }
-
-                Ok::<_, anyhow::Error>(captured.output.into_inner())
-            }
-        };
-
+        // wait for app to exit
         let (command_result, wait_stdout, wait_stderr) = tokio::join!(child.wait(), stdout, stderr);
         let end_time = Utc::now();
         debug!("join result {:?}", command_result);

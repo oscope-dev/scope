@@ -1,7 +1,10 @@
 use clap::{ArgGroup, Parser};
 use indicatif::ProgressStyle;
+use lazy_static::lazy_static;
 use std::fs::File;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use tracing::level_filters::LevelFilter;
 use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
@@ -49,6 +52,13 @@ pub struct LoggingOpts {
     default_level: LevelFilter,
 }
 
+lazy_static! {
+    pub static ref STDOUT_WRITER: Arc<RwLock<Box<dyn std::io::Write + Sync + Send>>> =
+        Arc::new(RwLock::new(Box::new(std::io::stdout())));
+    pub static ref STDERR_WRITER: Arc<RwLock<Box<dyn std::io::Write + Sync + Send>>> =
+        Arc::new(RwLock::new(Box::new(std::io::stderr())));
+}
+
 impl LoggingOpts {
     pub fn with_new_default(&self, new_default: LevelFilter) -> Self {
         Self {
@@ -73,7 +83,7 @@ impl LoggingOpts {
         }
     }
 
-    pub fn configure_logging(
+    pub async fn configure_logging(
         &self,
         run_id: &str,
         prefix: &str,
@@ -95,6 +105,9 @@ impl LoggingOpts {
             .with_span_field_formatter(hide_indicatif_span_fields(DefaultFields::new()))
             .with_progress_style(default_progress_bar());
         let indicatif_writer = indicatif_layer.get_stdout_writer();
+
+        *STDOUT_WRITER.write().await = Box::new(indicatif_layer.get_stdout_writer());
+        *STDERR_WRITER.write().await = Box::new(indicatif_layer.get_stderr_writer());
 
         let level_filter = self.to_level_filter();
         let console_output = tracing_subscriber::fmt::layer()
