@@ -370,8 +370,40 @@ pub trait GlobWalker: Send + Sync {
     ) -> Result<(), RuntimeError>;
 }
 
+#[automock]
+trait FileSystem: Send + Sync {
+    fn find_files(&self, glob_pattern: &str) -> Result<Vec<PathBuf>>;
+}
+
 #[derive(Debug, Default)]
-pub struct DefaultGlobWalker {}
+struct DefaultFileSystem {}
+
+/// Abstract away filesystem access for use in testing.
+/// This trait should be a thin wrapper around actions to the filesystem, ideally just action
+/// and error handling. Adding more logic will make testing impossible without setting up a
+/// filesystem.
+impl FileSystem for DefaultFileSystem {
+    /// Search for a glob pattern. This function expects the path to be absolute already,
+    /// so that it's not dependent on the working directory.
+    fn find_files(&self, glob_pattern: &str) -> Result<Vec<PathBuf>> {
+        Ok(glob::glob(glob_pattern)?.filter_map(Result::ok).collect())
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DefaultGlobWalker {
+    #[educe(Debug(ignore))]
+    file_system: Box<dyn FileSystem>,
+}
+
+impl Default for DefaultGlobWalker {
+    fn default() -> Self {
+        Self {
+            file_system: Box::<DefaultFileSystem>::default(),
+        }
+    }
+}
 
 fn make_absolute(base_dir: &Path, glob: &String) -> String {
     if glob.starts_with('/') {
@@ -390,11 +422,9 @@ impl GlobWalker for DefaultGlobWalker {
         cache_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError> {
-        use glob::glob;
-
         for glob_str in paths {
             let glob_path = make_absolute(base_dir, glob_str);
-            for path in glob(&glob_path)?.filter_map(Result::ok) {
+            for path in self.file_system.find_files(&glob_path)? {
                 let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
                 let check_result = file_result == FileCacheStatus::FileMatches;
                 if !check_result {
@@ -413,11 +443,9 @@ impl GlobWalker for DefaultGlobWalker {
         cache_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<(), RuntimeError> {
-        use glob::glob;
-
         for glob_str in paths {
             let glob_path = make_absolute(base_dir, glob_str);
-            for path in glob(&glob_path)?.filter_map(Result::ok) {
+            for path in self.file_system.find_files(&glob_path)? {
                 file_cache
                     .update_cache_entry(cache_name.to_string(), &path)
                     .await?;
@@ -431,13 +459,15 @@ impl GlobWalker for DefaultGlobWalker {
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::doctor::check::{
-        ActionRunResult, DefaultDoctorActionRun, DoctorActionRun, MockGlobWalker, RuntimeError,
+        ActionRunResult, DefaultDoctorActionRun, DefaultGlobWalker, DoctorActionRun, GlobWalker,
+        MockFileSystem, MockGlobWalker, RuntimeError,
     };
-    use crate::doctor::file_cache::{FileCache, NoOpCache};
+    use crate::doctor::file_cache::{FileCache, MockFileCache, NoOpCache};
     use crate::doctor::tests::build_root_model;
     use crate::shared::prelude::*;
     use anyhow::{anyhow, Result};
-    use std::path::PathBuf;
+    use predicates::prelude::predicate;
+    use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
     pub fn build_run_fail_fix_succeed_action() -> DoctorGroupAction {
@@ -656,6 +686,7 @@ pub(crate) mod tests {
             .expect_have_globs_changed()
             .times(1)
             .returning(|_, _, _, _| Ok(false));
+        glob_walker.expect_update_cache().never();
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
@@ -663,5 +694,75 @@ pub(crate) mod tests {
         assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_will_add_base_dir_to_path() {
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("file_cache".to_string()),
+                predicate::eq(Path::new("/foo/bar")),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            .with(predicate::eq("/foo/root/*.txt"))
+            .returning(|_| Ok(vec![PathBuf::from("/foo/bar")]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                &Path::new("/foo/root"),
+                &["*.txt".to_string()],
+                "file_cache",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_honor_abs_paths() {
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("file_cache".to_string()),
+                predicate::eq(Path::new("/foo/bar")),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            .with(predicate::eq("/a/abs/path/*.txt"))
+            .returning(|_| Ok(vec![PathBuf::from("/foo/bar")]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                &Path::new("/foo/root"),
+                &["/a/abs/path/*.txt".to_string()],
+                "file_cache",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
     }
 }
