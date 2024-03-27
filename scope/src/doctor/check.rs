@@ -378,7 +378,13 @@ trait FileSystem: Send + Sync {
 #[derive(Debug, Default)]
 struct DefaultFileSystem {}
 
+/// Abstract away filesystem access for use in testing.
+/// This trait should be a thin wrapper around actions to the filesystem, ideally just action
+/// and error handling. Adding more logic will make testing impossible without setting up a
+/// filesystem.
 impl FileSystem for DefaultFileSystem {
+    /// Search for a glob pattern. This function expects the path to be absolute already,
+    /// so that it's not dependent on the working directory.
     fn find_files(&self, glob_pattern: &str) -> Result<Vec<PathBuf>> {
         Ok(glob::glob(glob_pattern)?.filter_map(Result::ok).collect())
     }
