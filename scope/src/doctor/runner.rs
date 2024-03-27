@@ -411,6 +411,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn with_multiple_dependencies() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+
+        let mut groups = BTreeMap::new();
+
+        let step_1 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_1"),
+            group_noop,
+        );
+        groups.insert("step_1".to_string(), step_1);
+
+        let step_2 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_2"),
+            |group| group.requires(vec!["step_1".to_string()]),
+        );
+        groups.insert("step_2".to_string(), step_2);
+
+        let step_3 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_3"),
+            |group| group.requires(vec!["step_1".to_string(), "step_2".to_string()]),
+        );
+        groups.insert("step_3".to_string(), step_3);
+
+        assert_eq!(
+            vec![vec!["step_1", "step_2", "step_3"]],
+            compute_group_order(&groups, BTreeSet::from(["step_3".to_string()]))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_dep_fails_wont_run_others() -> Result<()> {
         let mut group_actions = BTreeMap::new();
         group_actions.insert(
