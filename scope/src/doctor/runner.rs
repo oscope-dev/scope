@@ -5,6 +5,7 @@ use colored::Colorize;
 use petgraph::algo::all_simple_paths;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
+use solvent::DepGraph;
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -22,7 +23,7 @@ where
     T: DoctorActionRun,
 {
     pub(crate) group_actions: BTreeMap<String, Vec<T>>,
-    pub(crate) all_paths: Vec<Vec<String>>,
+    pub(crate) all_paths: Vec<String>,
 }
 
 impl<T> RunGroups<T>
@@ -30,36 +31,23 @@ where
     T: DoctorActionRun,
 {
     pub async fn execute(&self) -> Result<i32> {
-        let mut visited: BTreeSet<String> = BTreeSet::new();
-        let mut did_succeed = true;
-
         let header_span = info_span!("doctor run", "indicatif.pb_show" = true);
         header_span.pb_set_length(self.all_paths.len() as u64);
         header_span.pb_set_message("scope doctor run");
 
         let _span = header_span.enter();
 
+        let mut full_path = Vec::new();
         for path in &self.all_paths {
             Span::current().pb_inc(1);
-            let mut full_path = Vec::new();
-            for target_group in path {
-                if visited.contains(target_group) {
-                    info!("{} has already been run", target_group);
-                    continue;
-                }
-                if let Some(actions) = self.group_actions.get(target_group) {
-                    full_path.push((target_group, actions));
-                }
+            if let Some(actions) = self.group_actions.get(path) {
+                full_path.push((path, actions));
             }
-
-            let result = self.run_path(full_path).await?;
-            for successful_model in result.succeeded_groups {
-                visited.insert(successful_model);
-            }
-            did_succeed = did_succeed && result.did_succeed;
         }
 
-        if did_succeed {
+        let result = self.run_path(full_path).await?;
+
+        if result.did_succeed {
             Ok(0)
         } else {
             Ok(1)
@@ -223,6 +211,53 @@ pub fn compute_group_order(
     all_paths.sort_by_key(|l| l.len());
 
     all_paths
+}
+
+pub fn compute_group_order_2(
+    groups: &BTreeMap<String, DoctorGroup>,
+    desired_groups: BTreeSet<String>,
+) -> Vec<String> {
+    let mut depgraph: DepGraph<&str> = DepGraph::new();
+
+    // Helper nodes to make a connected graph
+    // TODO: handle name collisions with real groups
+    let start: &str = &"start";
+    depgraph.register_node(start);
+
+    for (name, model) in groups {
+        let deps: Vec<&str> = model.requires.iter().map(|s| s.as_str()).collect();
+        depgraph.register_dependencies(name, deps);
+    }
+
+    match desired_groups.len() {
+        0 => {
+            // No desired groups, run all groups
+            let all_groups: Vec<&str> = groups.keys().map(|s| s.as_str()).collect();
+            depgraph.register_dependencies(start, all_groups);
+        }
+        _ => {
+            // Run only desired groups
+            let desired: Vec<&str> = desired_groups.iter().map(|s| s.as_str()).collect();
+            depgraph.register_dependencies(start, desired);
+        }
+    }
+
+    let mut ordered: Vec<String> = Vec::new();
+    for node in depgraph.dependencies_of(&start).unwrap() {
+        match node {
+            Ok(node) => {
+                if node != &start {
+                    ordered.push(node.to_string());
+                }
+            }
+            Err(e) => {
+                // TODO: better failure here, dep res can fail for cycles, so probably an error via Result<>
+                warn!(target: "user", "Error: {:?}", e);
+            }
+        }
+    }
+
+    ordered
 }
 
 #[cfg(test)]
