@@ -37,6 +37,7 @@ where
 
         let _span = header_span.enter();
 
+        // TODO: reintroduce group re-running on failure, probably caching too?
         let mut full_path = Vec::new();
         for path in &self.all_paths {
             Span::current().pb_inc(1);
