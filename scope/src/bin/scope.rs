@@ -65,7 +65,8 @@ async fn main() {
 
     let (_guard, file_location) = opts
         .logging
-        .configure_logging(&opts.config.get_run_id(), "root");
+        .configure_logging(&opts.config.get_run_id(), "root")
+        .await;
     let error_code = run_subcommand(opts).await;
 
     if error_code != 0 || enabled!(Level::DEBUG) {
