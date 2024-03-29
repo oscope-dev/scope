@@ -722,7 +722,7 @@ pub(crate) mod tests {
 
         let res = walker
             .update_cache(
-                &Path::new("/foo/root"),
+                Path::new("/foo/root"),
                 &["*.txt".to_string()],
                 "file_cache",
                 Arc::new(file_cache),
@@ -757,7 +757,7 @@ pub(crate) mod tests {
 
         let res = walker
             .update_cache(
-                &Path::new("/foo/root"),
+                Path::new("/foo/root"),
                 &["/a/abs/path/*.txt".to_string()],
                 "file_cache",
                 Arc::new(file_cache),

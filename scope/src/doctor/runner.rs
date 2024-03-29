@@ -2,7 +2,6 @@ use super::check::{ActionRunResult, DoctorActionRun};
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
 use colored::Colorize;
-use petgraph::algo::all_simple_paths;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
 use petgraph::visit::{DfsPostOrder, Walker};
@@ -156,67 +155,6 @@ where
 pub fn compute_group_order(
     groups: &BTreeMap<String, DoctorGroup>,
     desired_groups: BTreeSet<String>,
-) -> Vec<Vec<String>> {
-    let mut graph = DiGraph::<&str, i32>::new();
-
-    let start = graph.add_node("root");
-    let end = graph.add_node("desired");
-    let mut node_graph: BTreeMap<String, NodeIndex> = BTreeMap::new();
-    for name in groups.keys() {
-        node_graph.insert(name.to_string(), graph.add_node(name));
-    }
-
-    for (name, model) in groups {
-        let this = node_graph.get(name).unwrap();
-        let mut needs_start = true;
-        for dep in &model.requires {
-            if let Some(other) = node_graph.get(dep) {
-                graph.add_edge(*other, *this, 1);
-                needs_start = false;
-            } else {
-                warn!(target: "user", "{} needs {} but no such dependency found, ignoring dependency", name, dep);
-            }
-        }
-
-        if needs_start {
-            graph.add_edge(start, *this, 1);
-        }
-    }
-
-    for name in &desired_groups {
-        if let Some(this) = node_graph.get(name) {
-            graph.add_edge(*this, end, 1);
-        }
-    }
-
-    debug!(
-        format = "graphviz",
-        "{:?}",
-        Dot::with_config(&graph, &[Config::NodeIndexLabel])
-    );
-
-    let mut all_paths = Vec::new();
-
-    for path in all_simple_paths::<Vec<_>, _>(&graph, start, end, 0, None) {
-        let mut named_path = Vec::new();
-        for node in path.iter() {
-            if node == &start || node == &end {
-                continue;
-            }
-            let name = graph.node_weight(*node).unwrap().to_string();
-            named_path.push(name)
-        }
-        all_paths.push(named_path);
-    }
-
-    all_paths.sort_by_key(|l| l.len());
-
-    all_paths
-}
-
-pub fn compute_group_order_2(
-    groups: &BTreeMap<String, DoctorGroup>,
-    desired_groups: BTreeSet<String>,
 ) -> Vec<String> {
     let mut graph = DiGraph::<&str, i32>::new();
     let mut node_graph: BTreeMap<String, NodeIndex> = BTreeMap::new();
@@ -319,7 +257,7 @@ mod tests {
         groups.insert("step_2".to_string(), step_2);
 
         assert_eq!(
-            vec![vec!["step_1", "step_2"]],
+            vec!["step_1", "step_2"],
             compute_group_order(&groups, BTreeSet::from(["step_2".to_string()]))
         );
 
@@ -354,7 +292,7 @@ mod tests {
         groups.insert("step_3".to_string(), step_3);
 
         assert_eq!(
-            vec![vec!["step_1", "step_3"], vec!["step_1", "step_2"]],
+            vec!["step_1", "step_2", "step_3"],
             compute_group_order(
                 &groups,
                 BTreeSet::from(["step_2".to_string(), "step_3".to_string()])
@@ -392,7 +330,7 @@ mod tests {
         groups.insert("step_3".to_string(), step_3);
 
         assert_eq!(
-            vec![vec!["step_3"], vec!["step_1", "step_2"]],
+            vec!["step_1", "step_2", "step_3"],
             compute_group_order(
                 &groups,
                 BTreeSet::from(["step_2".to_string(), "step_3".to_string()])
@@ -438,8 +376,9 @@ mod tests {
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                vec!["step_1".to_string(), "step_3".to_string()],
-                vec!["step_1".to_string(), "step_2".to_string()],
+                "step_1".to_string(),
+                "step_2".to_string(),
+                "step_3".to_string(),
             ],
         };
 
@@ -477,7 +416,7 @@ mod tests {
         groups.insert("step_3".to_string(), step_3);
 
         assert_eq!(
-            vec![vec!["step_1", "step_2", "step_3"]],
+            vec!["step_1", "step_2", "step_3"],
             compute_group_order(&groups, BTreeSet::from(["step_3".to_string()]))
         );
 
@@ -497,8 +436,9 @@ mod tests {
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                vec!["step_1".to_string(), "step_3".to_string()],
-                vec!["step_1".to_string(), "step_2".to_string()],
+                "step_1".to_string(),
+                "step_2".to_string(),
+                "step_3".to_string(),
             ],
         };
 
@@ -528,12 +468,10 @@ mod tests {
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                vec![
-                    "step_1".to_string(),
-                    "step_2".to_string(),
-                    "step_3".to_string(),
-                ],
-                vec!["step_1".to_string(), "step_4".to_string()],
+                "step_1".to_string(),
+                "step_2".to_string(),
+                "step_3".to_string(),
+                "step_4".to_string(),
             ],
         };
 
