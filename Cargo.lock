@@ -567,7 +567,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha256",
- "solvent",
  "strum",
  "thiserror",
  "time",
@@ -2267,12 +2266,6 @@ dependencies = [
  "libc",
  "windows-sys 0.52.0",
 ]
-
-[[package]]
-name = "solvent"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14a50198e546f29eb0a4f977763c8277ec2184b801923c3be71eeaec05471f16"
 
 [[package]]
 name = "spin"

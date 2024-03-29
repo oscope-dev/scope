@@ -5,7 +5,7 @@ use colored::Colorize;
 use petgraph::algo::all_simple_paths;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
-use solvent::DepGraph;
+use petgraph::visit::{DfsPostOrder, Walker};
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -218,47 +218,50 @@ pub fn compute_group_order_2(
     groups: &BTreeMap<String, DoctorGroup>,
     desired_groups: BTreeSet<String>,
 ) -> Vec<String> {
-    let mut depgraph: DepGraph<&str> = DepGraph::new();
+    let mut graph = DiGraph::<&str, i32>::new();
+    let mut node_graph: BTreeMap<String, NodeIndex> = BTreeMap::new();
 
-    // Helper nodes to make a connected graph
-    // TODO: handle name collisions with real groups
-    let start: &str = &"start";
-    depgraph.register_node(start);
+    for name in groups.keys() {
+        node_graph.insert(name.to_string(), graph.add_node(name));
+    }
 
     for (name, model) in groups {
-        let deps: Vec<&str> = model.requires.iter().map(|s| s.as_str()).collect();
-        depgraph.register_dependencies(name, deps);
-    }
-
-    match desired_groups.len() {
-        0 => {
-            // No desired groups, run all groups
-            let all_groups: Vec<&str> = groups.keys().map(|s| s.as_str()).collect();
-            depgraph.register_dependencies(start, all_groups);
-        }
-        _ => {
-            // Run only desired groups
-            let desired: Vec<&str> = desired_groups.iter().map(|s| s.as_str()).collect();
-            depgraph.register_dependencies(start, desired);
-        }
-    }
-
-    let mut ordered: Vec<String> = Vec::new();
-    for node in depgraph.dependencies_of(&start).unwrap() {
-        match node {
-            Ok(node) => {
-                if node != &start {
-                    ordered.push(node.to_string());
-                }
-            }
-            Err(e) => {
-                // TODO: better failure here, dep res can fail for cycles, so probably an error via Result<>
-                warn!(target: "user", "Error: {:?}", e);
+        let this = node_graph.get(name).unwrap();
+        for dep in &model.requires {
+            if let Some(other) = node_graph.get(dep) {
+                graph.add_edge(*other, *this, 1);
+            } else {
+                warn!(target: "user", "{} needs {} but no such dependency found, ignoring dependency", name, dep);
             }
         }
     }
 
-    ordered
+    let start = graph.add_node("start");
+
+    for name in &desired_groups {
+        if let Some(this) = node_graph.get(name) {
+            graph.add_edge(*this, start, 1);
+        }
+    }
+
+    debug!(
+        format = "graphviz",
+        "{:?}",
+        Dot::with_config(&graph, &[Config::NodeIndexLabel])
+    );
+
+    graph.reverse();
+
+    let mut order = Vec::new();
+    for node in DfsPostOrder::new(&graph, start).iter(&graph) {
+        if node == start {
+            continue;
+        }
+        let name = graph.node_weight(node).unwrap().to_string();
+        order.push(name)
+    }
+
+    order
 }
 
 #[cfg(test)]
