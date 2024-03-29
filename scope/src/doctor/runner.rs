@@ -212,7 +212,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     #[tokio::test]
-    async fn with_no_dep_will_have_no_tasks() -> Result<()> {
+    async fn test_compute_group_order_with_no_dep_will_have_no_tasks() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
 
         let mut groups = BTreeMap::new();
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn with_one_path_will_give_path() -> Result<()> {
+    async fn test_compute_group_order_with_one_dep_will_include_dep() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
 
         let mut groups = BTreeMap::new();
@@ -265,7 +265,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn with_two_paths_will_give_path() -> Result<()> {
+    async fn test_compute_group_order_with_reversed_definition_order() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
 
         let mut groups = BTreeMap::new();
@@ -273,52 +273,14 @@ mod tests {
         let step_1 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_1"),
-            group_noop,
+            |group| group.requires(vec!["step_2".to_string()]),
         );
         groups.insert("step_1".to_string(), step_1);
 
         let step_2 = make_root_model_additional(
             vec![action.clone()],
             |meta| meta.name("step_2"),
-            |group| group.requires(vec!["step_1".to_string()]),
-        );
-        groups.insert("step_2".to_string(), step_2);
-
-        let step_3 = make_root_model_additional(
-            vec![action.clone()],
-            |meta| meta.name("step_3"),
-            |group| group.requires(vec!["step_1".to_string()]),
-        );
-        groups.insert("step_3".to_string(), step_3);
-
-        assert_eq!(
-            vec!["step_1", "step_2", "step_3"],
-            compute_group_order(
-                &groups,
-                BTreeSet::from(["step_2".to_string(), "step_3".to_string()])
-            )
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn will_sort_by_shortest_path() -> Result<()> {
-        let action = build_run_fail_fix_succeed_action();
-
-        let mut groups = BTreeMap::new();
-
-        let step_1 = make_root_model_additional(
-            vec![action.clone()],
-            |meta| meta.name("step_1"),
-            group_noop,
-        );
-        groups.insert("step_1".to_string(), step_1);
-
-        let step_2 = make_root_model_additional(
-            vec![action.clone()],
-            |meta| meta.name("step_2"),
-            |group| group.requires(vec!["step_1".to_string()]),
+            |group| group.requires(vec!["step_3".to_string()]),
         );
         groups.insert("step_2".to_string(), step_2);
 
@@ -330,66 +292,15 @@ mod tests {
         groups.insert("step_3".to_string(), step_3);
 
         assert_eq!(
-            vec!["step_1", "step_2", "step_3"],
-            compute_group_order(
-                &groups,
-                BTreeSet::from(["step_2".to_string(), "step_3".to_string()])
-            )
+            vec!["step_3", "step_2", "step_1"],
+            compute_group_order(&groups, BTreeSet::from(["step_1".to_string()]))
         );
 
         Ok(())
     }
 
-    fn make_action_run(result: ActionRunResult) -> Vec<MockDoctorActionRun> {
-        let mut run = MockDoctorActionRun::new();
-        run.expect_run_action()
-            .returning(move || Ok(result.clone()));
-        run.expect_help_text().return_const(None);
-        run.expect_help_url().return_const(None);
-        run.expect_name().returning(|| "foo".to_string());
-        run.expect_required().return_const(true);
-        vec![run]
-    }
-
-    fn will_not_run() -> Vec<MockDoctorActionRun> {
-        let run = MockDoctorActionRun::new();
-        vec![run]
-    }
-
     #[tokio::test]
-    async fn run_with_multiple_paths_only_run_group_once() -> Result<()> {
-        let mut group_actions = BTreeMap::new();
-
-        group_actions.insert(
-            "step_1".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
-        );
-        group_actions.insert(
-            "step_2".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
-        );
-        group_actions.insert(
-            "step_3".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
-        );
-
-        let run_groups = RunGroups {
-            group_actions,
-            all_paths: vec![
-                "step_1".to_string(),
-                "step_2".to_string(),
-                "step_3".to_string(),
-            ],
-        };
-
-        let exit_code = run_groups.execute().await?;
-        assert_eq!(0, exit_code);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn with_multiple_dependencies() -> Result<()> {
+    async fn test_compute_group_order_with_multiple_dependencies() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
 
         let mut groups = BTreeMap::new();
@@ -424,7 +335,90 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_dep_fails_wont_run_others() -> Result<()> {
+    async fn test_compute_group_order_with_single_shared_dependency() -> Result<()> {
+        let action = build_run_fail_fix_succeed_action();
+
+        let mut groups = BTreeMap::new();
+
+        let step_1 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_1"),
+            group_noop,
+        );
+        groups.insert("step_1".to_string(), step_1);
+
+        let step_2 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_2"),
+            |group| group.requires(vec!["step_1".to_string()]),
+        );
+        groups.insert("step_2".to_string(), step_2);
+
+        let step_3 = make_root_model_additional(
+            vec![action.clone()],
+            |meta| meta.name("step_3"),
+            |group| group.requires(vec!["step_1".to_string()]),
+        );
+        groups.insert("step_3".to_string(), step_3);
+
+        assert_eq!(
+            vec!["step_1", "step_3"],
+            compute_group_order(&groups, BTreeSet::from(["step_3".to_string()]))
+        );
+
+        Ok(())
+    }
+
+    fn make_action_run(result: ActionRunResult) -> Vec<MockDoctorActionRun> {
+        let mut run = MockDoctorActionRun::new();
+        run.expect_run_action()
+            .returning(move || Ok(result.clone()));
+        run.expect_help_text().return_const(None);
+        run.expect_help_url().return_const(None);
+        run.expect_name().returning(|| "foo".to_string());
+        run.expect_required().return_const(true);
+        vec![run]
+    }
+
+    fn will_not_run() -> Vec<MockDoctorActionRun> {
+        let run = MockDoctorActionRun::new();
+        vec![run]
+    }
+
+    #[tokio::test]
+    async fn test_execute_run_with_multiple_paths_only_run_group_once() -> Result<()> {
+        let mut group_actions = BTreeMap::new();
+
+        group_actions.insert(
+            "step_1".to_string(),
+            make_action_run(ActionRunResult::CheckSucceeded),
+        );
+        group_actions.insert(
+            "step_2".to_string(),
+            make_action_run(ActionRunResult::CheckSucceeded),
+        );
+        group_actions.insert(
+            "step_3".to_string(),
+            make_action_run(ActionRunResult::CheckSucceeded),
+        );
+
+        let run_groups = RunGroups {
+            group_actions,
+            all_paths: vec![
+                "step_1".to_string(),
+                "step_2".to_string(),
+                "step_3".to_string(),
+            ],
+        };
+
+        let exit_code = run_groups.execute().await?;
+        assert_eq!(0, exit_code);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_dep_fails_wont_run_others() -> Result<()> {
         let mut group_actions = BTreeMap::new();
         group_actions.insert(
             "step_1".to_string(),
@@ -449,7 +443,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_branch_fails_but_other_branch_continues() -> Result<()> {
+    async fn test_execute_branch_fails_but_other_branch_continues() -> Result<()> {
         let mut group_actions = BTreeMap::new();
         group_actions.insert(
             "step_1".to_string(),
