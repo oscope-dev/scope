@@ -1,9 +1,9 @@
 use colored::Colorize;
 
 use crate::models::HelpMetadata;
+use crate::report_stdout;
 use std::cmp::max;
 use std::path::Path;
-use tracing::info;
 
 mod capture;
 mod config_load;
@@ -33,7 +33,7 @@ pub(crate) fn convert_to_string(input: Vec<&str>) -> Vec<String> {
     input.iter().map(|x| x.to_string()).collect()
 }
 
-pub fn print_details<T>(working_dir: &Path, config: &Vec<T>)
+pub async fn print_details<T>(working_dir: &Path, config: &Vec<T>)
 where
     T: HelpMetadata,
 {
@@ -44,7 +44,12 @@ where
         .unwrap_or(20);
     let max_name_length = max(max_name_length, 20) + 2;
 
-    info!(target: "user", "  {:max_name_length$}{:60}{}", "Name".white().bold(), "Description".white().bold(), "Path".white().bold());
+    report_stdout!(
+        "  {:max_name_length$}{:60}{}",
+        "Name".white().bold(),
+        "Description".white().bold(),
+        "Path".white().bold()
+    );
     for resource in config {
         let mut description = resource.description().to_string();
         if description.len() > 55 {
@@ -60,6 +65,11 @@ where
             loc = format!("...{}", loc.split_off(loc.len() - 35));
         }
 
-        info!(target: "user", "- {:max_name_length$}{:60}{}", resource.full_name(), description, loc);
+        report_stdout!(
+            "- {:max_name_length$}{:60}{}",
+            resource.full_name(),
+            description,
+            loc
+        );
     }
 }

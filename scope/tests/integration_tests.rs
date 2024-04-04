@@ -1,7 +1,9 @@
+use assert_cmd::assert::Assert;
 use assert_cmd::Command;
 use assert_fs::{prelude::*, TempDir};
 use predicates::prelude::*;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn setup_working_dir() -> TempDir {
     let file_path = PathBuf::from(format!("{}/../examples", env!("CARGO_MANIFEST_DIR")));
@@ -12,15 +14,62 @@ fn setup_working_dir() -> TempDir {
     temp
 }
 
+struct ScopeTestHelper<'a> {
+    work_dir: TempDir,
+    name: &'a str,
+    counter: AtomicUsize,
+}
+
+impl<'a> ScopeTestHelper<'a> {
+    fn new(name: &'a str) -> Self {
+        Self {
+            work_dir: setup_working_dir(),
+            name,
+            counter: AtomicUsize::new(0),
+        }
+    }
+
+    fn run_command(&self, args: &[&str]) -> Assert {
+        let mut cmd = Command::cargo_bin("scope").unwrap();
+        cmd.current_dir(self.work_dir.path())
+            .env(
+                "SCOPE_RUN_ID",
+                format!(
+                    "{}-{}",
+                    self.name,
+                    self.counter.fetch_add(1, Ordering::Relaxed)
+                ),
+            )
+            .env("SCOPE_OUTPUT_PROGRESS", "plain")
+            .env("NO_COLOR", "1")
+            .args(args)
+            .assert()
+    }
+
+    /// Execute `doctor run` (with optional args) with a cache-dir that's relative to the working dir.
+    fn doctor_run(&self, args: Option<&[&str]>) -> Assert {
+        let cache_args = format!("--cache-dir={}/.cache", self.work_dir.to_str().unwrap());
+
+        let mut run_command = vec!["doctor", "run", &cache_args];
+
+        if let Some(extra) = args {
+            for entry in extra {
+                run_command.push(entry)
+            }
+        }
+
+        self.run_command(&run_command)
+    }
+
+    fn clean_work_dir(mut self) {
+        self.work_dir.close().unwrap();
+    }
+}
+
 #[test]
 fn test_list_reports_all_config() {
-    let working_dir = setup_working_dir();
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_list_reports_all_config")
-        .arg("list")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_list_reports_all_config");
+    let result = test_helper.run_command(&["list"]);
 
     result
         .success()
@@ -40,19 +89,13 @@ fn test_list_reports_all_config() {
             predicate::str::is_match(r"bar\s+External sub-command, run `scope bar` for help")
                 .unwrap(),
         );
-    working_dir.close().unwrap();
+    test_helper.clean_work_dir();
 }
 
 #[test]
 fn test_doctor_list() {
-    let working_dir = setup_working_dir();
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_doctor_list")
-        .arg("doctor")
-        .arg("list")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_doctor_list");
+    let result = test_helper.run_command(&["doctor", "list"]);
 
     result
         .success()
@@ -60,81 +103,47 @@ fn test_doctor_list() {
         .stdout(predicate::str::contains(
             "Check your shell for basic functionality",
         ));
-    working_dir.close().unwrap();
+    test_helper.clean_work_dir();
 }
 
 #[test]
 fn test_sub_command_works() {
-    let working_dir = setup_working_dir();
-
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_sub_command_works")
-        .arg("-d")
-        .arg("bar")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_sub_command_works");
+    let result = test_helper.run_command(&["-vv", "bar"]);
 
     result.success().stdout(predicate::str::contains("in bar"));
-    working_dir.close().unwrap();
+    test_helper.clean_work_dir();
 }
 
 #[test]
 fn test_run_check_path_exists() {
-    let working_dir = setup_working_dir();
-
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_check_path_exists")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=path-exists")
-        .env("NO_COLOR", "1")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_run_check_path_exists");
+    let result = test_helper.doctor_run(Some(&["--only=path-exists"]));
 
     result.success().stdout(predicate::str::contains(
         "Check initially failed, fix was successful, group: \"path-exists\", name: \"1\"",
     ));
 
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_check_path_exists_2")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=path-exists-fix-in-scope-dir")
-        .env("NO_COLOR", "1")
-        .assert();
+    let result = test_helper.doctor_run(Some(&["--only=path-exists-fix-in-scope-dir"]));
 
     result.success().stdout(predicate::str::contains(
         "Check initially failed, fix was successful, group: \"path-exists-fix-in-scope-dir\", name: \"1\"",
     ));
 
-    working_dir.close().unwrap();
+    test_helper.clean_work_dir();
 }
 
 #[test]
 fn test_run_setup() {
-    let working_dir = setup_working_dir();
-    working_dir
+    let test_helper = ScopeTestHelper::new("test_run_setup");
+
+    test_helper
+        .work_dir
         .child("foo/requirements.txt")
         .write_str("initial cache")
         .unwrap();
 
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_setup_1")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=setup")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+    let result = test_helper.doctor_run(Some(&["--only=setup"]));
 
     result
         .success()
@@ -143,41 +152,19 @@ fn test_run_setup() {
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_setup_2")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=setup")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+    let result = test_helper.doctor_run(Some(&["--only=setup"]));
 
     result.success().stdout(predicate::str::contains(
         "Check was successful, group: \"setup\", name: \"1\"",
     ));
 
-    working_dir
+    test_helper
+        .work_dir
         .child("foo/requirements.txt")
         .write_str("cache buster")
         .unwrap();
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_setup_3")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=setup")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+
+    let result = test_helper.doctor_run(Some(&["--only=setup"]));
 
     result.success().stdout(predicate::str::contains(
         "Check initially failed, fix was successful, group: \"setup\", name: \"1\"",
@@ -186,25 +173,14 @@ fn test_run_setup() {
 
 #[test]
 fn test_run_group_1() {
-    let working_dir = setup_working_dir();
-    working_dir
+    let test_helper = ScopeTestHelper::new("test_run_group_1");
+    test_helper
+        .work_dir
         .child("foo/requirements.txt")
         .write_str("initial cache")
         .unwrap();
 
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_group_1")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=group-1")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+    let result = test_helper.doctor_run(Some(&["--only=group-1"]));
 
     result
         .failure()
@@ -220,21 +196,8 @@ fn test_run_group_1() {
 
 #[test]
 fn test_run_templated() {
-    let working_dir = setup_working_dir();
-
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_run_templated")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=templated")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_run_templated");
+    let result = test_helper.doctor_run(Some(&["--only=templated"]));
 
     result.success().stdout(predicate::str::contains(
         "Check was successful, group: \"templated\", name: \"hushlogin\"",
@@ -243,21 +206,8 @@ fn test_run_templated() {
 
 #[test]
 fn test_no_tasks_found() {
-    let working_dir = setup_working_dir();
-
-    let mut cmd = Command::cargo_bin("scope").unwrap();
-    let result = cmd
-        .current_dir(working_dir.path())
-        .env("SCOPE_RUN_ID", "test_no_tasks_found")
-        .arg("doctor")
-        .arg("run")
-        .arg("--only=bogus-group")
-        .arg(&format!(
-            "--cache-dir={}/.cache",
-            working_dir.to_str().unwrap()
-        ))
-        .env("NO_COLOR", "1")
-        .assert();
+    let test_helper = ScopeTestHelper::new("test_no_tasks_found");
+    let result = test_helper.doctor_run(Some(&["--only=bogus-group"]));
 
     result.success().stdout(predicate::str::contains(
         "Could not find any tasks to execute",
