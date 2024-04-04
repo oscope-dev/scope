@@ -1,10 +1,12 @@
+use std::collections::BTreeSet;
+
+use anyhow::Result;
+use clap::Args;
+
 use crate::doctor::runner::compute_group_order;
 use crate::report_stdout;
 use crate::shared::prelude::{DoctorGroup, FoundConfig};
 use crate::shared::print_details;
-use anyhow::Result;
-use clap::Args;
-use std::collections::BTreeSet;
 
 #[derive(Debug, Args)]
 pub struct DoctorListArgs {}
@@ -17,7 +19,13 @@ pub async fn doctor_list(found_config: &FoundConfig, _args: &DoctorListArgs) -> 
 }
 
 pub fn generate_doctor_list(found_config: &FoundConfig) -> Vec<DoctorGroup> {
-    let all_keys = BTreeSet::from_iter(found_config.doctor_group.keys().map(|x| x.to_string()));
+    let all_keys = BTreeSet::from_iter(
+        found_config
+            .doctor_group
+            .iter()
+            .filter(|(_, v)| v.run_by_default)
+            .map(|(k, _)| k.to_string()),
+    );
     let group_order = compute_group_order(&found_config.doctor_group, all_keys);
 
     group_order

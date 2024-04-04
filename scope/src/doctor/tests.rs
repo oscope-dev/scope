@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use crate::models::prelude::{ModelMetadataAnnotations, ModelMetadataBuilder};
 use crate::shared::prelude::{DoctorGroup, DoctorGroupAction, DoctorGroupBuilder};
-use std::collections::BTreeMap;
 
 pub fn make_root_model_additional<Meta, Group>(
     actions: Vec<DoctorGroupAction>,
@@ -24,7 +25,8 @@ where
         .full_name("DoctorGroup/fake-name")
         .actions(actions)
         .metadata(metadata)
-        .requires(Vec::new());
+        .requires(Vec::new())
+        .run_by_default(true);
 
     edit_group(group_builder).build().unwrap()
 }

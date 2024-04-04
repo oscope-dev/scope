@@ -160,6 +160,11 @@
             "$ref": "#/definitions/DoctorGroupActionSpec"
           }
         },
+        "include": {
+          "description": "Change how a group is handled when building the dependency task graph. When set to `when-required`, the group will be ignored unless it's required by another dependency.",
+          "default": "by-default",
+          "$ref": "#/definitions/DoctorInclude"
+        },
         "needs": {
           "description": "A list of `ScopeDoctorGroup` that are required for this group to execute. If not all finish successfully, this group will not execute.",
           "default": [],
@@ -170,6 +175,25 @@
         }
       },
       "additionalProperties": false
+    },
+    "DoctorInclude": {
+      "description": "Configure how a groups will be used when determining the task graph.",
+      "oneOf": [
+        {
+          "description": "Default option, the group will be included by default when determining which groups should run.",
+          "type": "string",
+          "enum": [
+            "by-default"
+          ]
+        },
+        {
+          "description": "Useful for shared configuration. The group will not run unless another group depends on it.",
+          "type": "string",
+          "enum": [
+            "when-required"
+          ]
+        }
+      ]
     },
     "KnownErrorKind": {
       "type": "string",

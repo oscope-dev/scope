@@ -1,10 +1,13 @@
-use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
-use crate::models::HelpMetadata;
-use crate::shared::models::internal::extract_command_path;
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
 use derive_builder::Builder;
 use minijinja::{context, Environment};
-use std::path::{Path, PathBuf};
+
+use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
+use crate::models::HelpMetadata;
+use crate::prelude::DoctorInclude;
+use crate::shared::models::internal::extract_command_path;
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
@@ -117,6 +120,7 @@ pub struct DoctorGroup {
     pub full_name: String,
     pub metadata: ModelMetadata,
     pub requires: Vec<String>,
+    pub run_by_default: bool,
     pub actions: Vec<DoctorGroupAction>,
 }
 
@@ -196,19 +200,20 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
             metadata: model.metadata,
             actions,
             requires: model.spec.needs,
+            run_by_default: model.spec.include == DoctorInclude::ByDefault,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::{
         DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand, DoctorGroupActionFix,
     };
     use crate::shared::prelude::DoctorGroupCachePath;
-
-    use std::path::Path;
 
     #[test]
     fn parse_group_1() {

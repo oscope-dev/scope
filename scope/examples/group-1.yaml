@@ -3,6 +3,7 @@ kind: ScopeDoctorGroup
 metadata:
   name: foo
 spec:
+  include: when-required
   description: Check your shell for basic functionality
   needs:
     - bar

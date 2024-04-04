@@ -2,7 +2,7 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeKnownError
 metadata:
   name: error-exists
-spec:
   description: Check if the word error is in the logs
+spec:
   pattern: error
   help: The command had an error, try reading the logs around there to find out what happened.

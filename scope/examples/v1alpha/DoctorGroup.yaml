@@ -2,8 +2,9 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
   name: foo
-spec:
   description: Check your shell for basic functionality
+spec:
+  include: by-default
   needs:
     - bar
   actions:
