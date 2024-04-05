@@ -6,15 +6,43 @@ use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
 use petgraph::visit::{DfsPostOrder, Walker};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{Display, Formatter};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 #[derive(Debug, Default)]
-struct PathRunResult {
-    did_succeed: bool,
-    succeeded_groups: Vec<String>,
-    failed_group: Vec<String>,
-    skipped_group: Vec<String>,
+pub struct PathRunResult {
+    pub did_succeed: bool,
+    pub succeeded_groups: Vec<String>,
+    pub failed_group: Vec<String>,
+    pub skipped_group: Vec<String>,
+}
+
+impl Display for PathRunResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut output = Vec::new();
+        output.push(format!(
+            "{} groups {}",
+            self.succeeded_groups.len(),
+            "succeeded".bold()
+        ));
+        if !self.failed_group.is_empty() {
+            output.push(format!(
+                "{} groups {}",
+                self.failed_group.len(),
+                "failed".bold().red()
+            ));
+        }
+        if !self.skipped_group.is_empty() {
+            output.push(format!(
+                "{} groups {}",
+                self.skipped_group.len(),
+                "skipped".bold().yellow()
+            ));
+        }
+
+        write!(f, "{}", output.join(", "))
+    }
 }
 
 pub struct RunGroups<T>
@@ -29,7 +57,7 @@ impl<T> RunGroups<T>
 where
     T: DoctorActionRun,
 {
-    pub async fn execute(&self) -> Result<i32> {
+    pub async fn execute(&self) -> Result<PathRunResult> {
         let header_span = info_span!("doctor run", "indicatif.pb_show" = true);
         header_span.pb_set_length(self.all_paths.len() as u64);
         header_span.pb_set_message("scope doctor run");
@@ -38,19 +66,12 @@ where
 
         let mut full_path = Vec::new();
         for path in &self.all_paths {
-            Span::current().pb_inc(1);
             if let Some(actions) = self.group_actions.get(path) {
                 full_path.push((path, actions));
             }
         }
 
-        let result = self.run_path(full_path).await?;
-
-        if result.did_succeed {
-            Ok(0)
-        } else {
-            Ok(1)
-        }
+        self.run_path(full_path).await
     }
 
     async fn run_path(&self, path: Vec<(&String, &Vec<T>)>) -> Result<PathRunResult> {
@@ -63,6 +84,7 @@ where
         };
 
         for (group_name, actions) in path {
+            Span::current().pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
             let group_span = info_span!("group", "indicatif.pb_show" = true);
