@@ -9,6 +9,7 @@ use tracing::{info, warn};
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use crate::doctor::runner::{compute_group_order, RunGroups};
+use crate::report_stdout;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
 #[derive(Debug, Parser, Default)]
@@ -59,14 +60,19 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         all_paths,
     };
 
-    let exit_code = run_groups.execute().await?;
+    let result = run_groups.execute().await?;
+    report_stdout!("Summary: {}", result);
 
     if let Err(e) = transform.file_cache.persist().await {
         info!("Unable to store cache {:?}", e);
         warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
-    Ok(exit_code)
+    if result.did_succeed {
+        Ok(0)
+    } else {
+        Ok(1)
+    }
 }
 
 struct RunTransform {
