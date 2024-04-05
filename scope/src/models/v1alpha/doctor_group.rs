@@ -1,10 +1,10 @@
-use crate::models::core::ModelMetadata;
-
-use crate::models::v1alpha::V1AlphaApiVersion;
-use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::models::core::ModelMetadata;
+use crate::models::v1alpha::V1AlphaApiVersion;
+use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 
 /// What needs to be checked before the action will run. All `paths` will be checked first, then
 /// `commands`. If a `path` has changed, the `command` will not run.
@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct DoctorCheckSpec {
-    #[serde(default)]
     /// A list of globs to check for changes. When the glob matches a new file, or the contents
     /// of the file change, the check will require a fix.
     ///
@@ -20,10 +19,11 @@ pub struct DoctorCheckSpec {
     ///
     /// Shared configs can use the template string `{{ working_dir }}` to access the working
     /// directory.
+    #[serde(default)]
     pub paths: Option<Vec<String>>,
 
-    #[serde(default)]
     /// A list of commands to execute to check the environment.
+    #[serde(default)]
     pub commands: Option<Vec<String>>,
 }
 
@@ -32,16 +32,16 @@ pub struct DoctorCheckSpec {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct DoctorFixSpec {
-    #[serde(default)]
     /// List of commands to run to fix the env.
+    #[serde(default)]
     pub commands: Vec<String>,
 
-    #[serde(default)]
     /// Text to display when no command is provided / fails to fix the env.
+    #[serde(default)]
     pub help_text: Option<String>,
 
-    #[serde(default)]
     /// Link to documentation to fix the issue.
+    #[serde(default)]
     pub help_url: Option<String>,
 }
 
@@ -67,9 +67,9 @@ pub struct DoctorGroupActionSpec {
     /// run when the `check` "fails".
     pub fix: Option<DoctorFixSpec>,
 
-    #[serde(default = "doctor_group_action_required_default")]
     /// If false, the action is allowed to fail and let other actions in the group execute. Defaults
     /// to `true`.
+    #[serde(default = "doctor_group_action_required_default")]
     pub required: bool,
 }
 
@@ -83,13 +83,36 @@ fn doctor_group_action_required_default() -> bool {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct DoctorGroupSpec {
-    #[serde(default)]
     /// A list of `ScopeDoctorGroup` that are required for this group to execute. If not all finish
     /// successfully, this group will not execute.
+    #[serde(default)]
     pub needs: Vec<String>,
 
     /// A series of steps to check and fix for the group.
     pub actions: Vec<DoctorGroupActionSpec>,
+
+    /// Change how a group is handled when building the dependency task graph.
+    /// When set to `when-required`, the group will be ignored unless it's required by another
+    /// dependency.
+    #[serde(default)]
+    pub include: DoctorInclude,
+}
+
+/// Configure how a groups will be used when determining the task graph.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum DoctorInclude {
+    /// Default option, the group will be included by default when determining which groups should
+    /// run.
+    ByDefault,
+    /// Useful for shared configuration. The group will not run unless another group depends on it.
+    WhenRequired,
+}
+
+impl Default for DoctorInclude {
+    fn default() -> Self {
+        Self::ByDefault
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, JsonSchema)]

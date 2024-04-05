@@ -1,16 +1,17 @@
-use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
-use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
-use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
-use anyhow::Result;
-use clap::Parser;
 use std::collections::{BTreeMap, BTreeSet};
-
-use crate::doctor::runner::{compute_group_order, RunGroups};
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use anyhow::Result;
+use clap::Parser;
 use tracing::{info, warn};
 
-#[derive(Debug, Parser)]
+use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
+use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
+use crate::doctor::runner::{compute_group_order, RunGroups};
+use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
+
+#[derive(Debug, Parser, Default)]
 pub struct DoctorRunArgs {
     /// When set, only the checks listed will run
     #[arg(short, long)]
@@ -46,6 +47,35 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
 }
 
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
+    let transform = transform_inputs(found_config, args);
+
+    let all_paths = compute_group_order(&found_config.doctor_group, transform.desired_groups);
+    if all_paths.is_empty() {
+        warn!(target: "user", "Could not find any tasks to execute");
+    }
+
+    let run_groups = RunGroups {
+        group_actions: transform.groups,
+        all_paths,
+    };
+
+    let exit_code = run_groups.execute().await?;
+
+    if let Err(e) = transform.file_cache.persist().await {
+        info!("Unable to store cache {:?}", e);
+        warn!(target: "user", "Unable to update cache, re-runs may redo work");
+    }
+
+    Ok(exit_code)
+}
+
+struct RunTransform {
+    groups: BTreeMap<String, Vec<DefaultDoctorActionRun>>,
+    desired_groups: BTreeSet<String>,
+    file_cache: Arc<dyn FileCache>,
+}
+
+fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTransform {
     let mut groups = BTreeMap::new();
     let mut desired_groups = BTreeSet::new();
 
@@ -55,7 +85,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
     for check in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
-            None => true,
+            None => check.run_by_default,
             Some(names) => names.contains(&check.metadata.name().to_string()),
         };
 
@@ -82,22 +112,57 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         }
     }
 
-    let all_paths = compute_group_order(&found_config.doctor_group, desired_groups);
-    if all_paths.is_empty() {
-        warn!(target: "user", "Could not find any tasks to execute");
+    RunTransform {
+        groups,
+        desired_groups,
+        file_cache,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::BTreeSet;
+    use std::path::PathBuf;
+
+    use crate::doctor::commands::run::transform_inputs;
+    use crate::doctor::commands::DoctorRunArgs;
+    use crate::doctor::tests::{group_noop, make_root_model_additional, meta_noop};
+    use crate::prelude::FoundConfig;
+
+    #[test]
+    fn test_will_include_by_default() {
+        let mut fc = FoundConfig::empty(PathBuf::from("/tmp"));
+        fc.doctor_group.insert(
+            "included".to_string(),
+            make_root_model_additional(vec![], |meta| meta.name("included"), group_noop),
+        );
+        let args = DoctorRunArgs {
+            only: None,
+            no_cache: true,
+            ..Default::default()
+        };
+
+        let transform = transform_inputs(&fc, &args);
+        assert_eq!(
+            BTreeSet::from(["included".to_string()]),
+            transform.desired_groups
+        );
     }
 
-    let run_groups = RunGroups {
-        group_actions: groups,
-        all_paths,
-    };
+    #[test]
+    fn test_include_will_skip() {
+        let mut fc = FoundConfig::empty(PathBuf::from("/tmp"));
+        fc.doctor_group.insert(
+            "not-included".to_string(),
+            make_root_model_additional(vec![], meta_noop, |g| g.run_by_default(false)),
+        );
+        let args = DoctorRunArgs {
+            only: None,
+            no_cache: true,
+            ..Default::default()
+        };
 
-    let exit_code = run_groups.execute().await?;
-
-    if let Err(e) = file_cache.persist().await {
-        info!("Unable to store cache {:?}", e);
-        warn!(target: "user", "Unable to update cache, re-runs may redo work");
+        let transform = transform_inputs(&fc, &args);
+        assert!(transform.desired_groups.is_empty());
     }
-
-    Ok(exit_code)
 }
