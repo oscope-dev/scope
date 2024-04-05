@@ -87,13 +87,13 @@ where
 
                 match action_result {
                     ActionRunResult::CheckSucceeded => {
-                        info!(target: "user", group = group_name, name = action.name(), "Check was successful");
+                        info!(target: "progress", group = group_name, name = action.name(), "Check was successful");
                     }
                     ActionRunResult::NoCheckFixSucceeded => {
-                        info!(target: "user", group = group_name, name = action.name(), "Fix ran successfully");
+                        info!(target: "progress", group = group_name, name = action.name(), "Fix ran successfully");
                     }
                     ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
-                        info!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix was successful");
+                        info!(target: "progress", group = group_name, name = action.name(), "Check initially failed, fix was successful");
                     }
                     ActionRunResult::CheckFailedFixFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
@@ -102,7 +102,7 @@ where
                         error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
                     }
                     ActionRunResult::CheckFailedNoRunFix => {
-                        info!(target: "user", group = group_name, name = action.name(), "Check failed, fix was not run");
+                        info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
                     }
                     ActionRunResult::CheckFailedNoFixProvided => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");

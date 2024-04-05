@@ -1,18 +1,18 @@
 use crate::doctor::runner::compute_group_order;
+use crate::report_stdout;
 use crate::shared::prelude::{DoctorGroup, FoundConfig};
 use crate::shared::print_details;
 use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeSet;
-use tracing::info;
 
 #[derive(Debug, Args)]
 pub struct DoctorListArgs {}
 
 pub async fn doctor_list(found_config: &FoundConfig, _args: &DoctorListArgs) -> Result<()> {
-    info!(target: "user", "Available checks that will run");
+    report_stdout!("Available checks that will run");
     let order = generate_doctor_list(found_config).clone();
-    print_details(&found_config.working_dir, &order);
+    print_details(&found_config.working_dir, &order).await;
     Ok(())
 }
 

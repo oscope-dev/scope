@@ -18,7 +18,7 @@ use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Parser, Debug)]
 #[clap(group = ArgGroup::new("config"))]
@@ -221,7 +221,7 @@ impl FoundConfig {
                 if self.report_definition.is_none() {
                     self.report_definition.replace(report_definition);
                 } else {
-                    warn!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.metadata().file_path());
+                    info!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.metadata().file_path());
                 }
             }
         }
@@ -231,7 +231,7 @@ impl FoundConfig {
 fn insert_if_absent<T: HelpMetadata>(map: &mut BTreeMap<String, T>, entry: T) {
     let name = entry.name().to_string();
     if map.contains_key(&name) {
-        warn!(target: "user", "Duplicate {} found, dropping {} in {}", entry.full_name().to_string().bold(), entry.name().bold(), entry.metadata().file_path());
+        info!(target: "user", "Duplicate {} found, dropping {} in {}", entry.full_name().to_string().bold(), entry.name().bold(), entry.metadata().file_path());
     } else {
         map.insert(name.to_string(), entry);
     }

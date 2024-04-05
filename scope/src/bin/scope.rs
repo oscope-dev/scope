@@ -3,6 +3,7 @@ use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use dev_scope::prelude::*;
+use dev_scope::report_stdout;
 use human_panic::setup_panic;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -97,7 +98,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
     match command {
         Command::Doctor(args) => doctor_root(found_config, args).await,
         Command::Report(args) => report_root(found_config, args).await,
-        Command::List => show_config(found_config).map(|_| 0),
+        Command::List => show_config(found_config).await.map(|_| 0),
         Command::Version(args) => print_version(args).await,
         Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await,
         Command::Analyze(args) => analyze_root(found_config, args).await,
@@ -141,17 +142,17 @@ lazy_static! {
     static ref SCOPE_SUBCOMMAND_REGEX: Regex = Regex::new("^scope-.*").unwrap();
 }
 
-fn show_config(found_config: &FoundConfig) -> Result<()> {
+async fn show_config(found_config: &FoundConfig) -> Result<()> {
     info!(target: "user", "Found Resources");
-    print_details(&found_config.working_dir, &found_config.raw_config);
+    print_details(&found_config.working_dir, &found_config.raw_config).await;
 
     info!(target: "user", "");
     info!(target: "user", "Commands");
-    print_commands(found_config);
+    print_commands(found_config).await;
     Ok(())
 }
 
-fn print_commands(found_config: &FoundConfig) {
+async fn print_commands(found_config: &FoundConfig) {
     if let Ok(commands) = which::which_re_in(
         SCOPE_SUBCOMMAND_REGEX.clone(),
         Some(OsString::from(&found_config.bin_path)),
@@ -176,23 +177,47 @@ fn print_commands(found_config: &FoundConfig) {
         let mut command_names: Vec<_> = command_map.keys().collect();
         command_names.sort();
 
-        info!(target: "user", "  {:20}{:60}", "Name".white().bold(), "Description".white().bold());
+        report_stdout!(
+            "  {:20}{:60}",
+            "Name".white().bold(),
+            "Description".white().bold()
+        );
         for command_name in command_names {
             let description = command_map.get(command_name.as_str()).unwrap();
-            info!(target: "user", "- {:20}{:60}", command_name, description);
+            report_stdout!("- {:20}{:60}", command_name, description);
         }
     }
 }
 
 async fn print_version(args: &VersionArgs) -> Result<i32> {
     if args.short {
-        println!("scope {}", env!("CARGO_PKG_VERSION"));
+        report_stdout!("scope {}", env!("CARGO_PKG_VERSION"));
     } else {
-        info!(target: "user", "{}: {:60}", "Version".white().bold(), env!("CARGO_PKG_VERSION"));
-        info!(target: "user", "{}: {:60}", "Build Timestamp".white().bold(), env!("VERGEN_BUILD_TIMESTAMP"));
-        info!(target: "user", "{}: {:60}", "Describe".white().bold(), env!("VERGEN_GIT_DESCRIBE"));
-        info!(target: "user", "{}: {:60}", "Commit SHA".white().bold(), env!("VERGEN_GIT_SHA"));
-        info!(target: "user", "{}: {:60}", "Commit Date".white().bold(), env!("VERGEN_GIT_COMMIT_DATE"));
+        report_stdout!(
+            "{}: {:60}",
+            "Version".white().bold(),
+            env!("CARGO_PKG_VERSION")
+        );
+        report_stdout!(
+            "{}: {:60}",
+            "Build Timestamp".white().bold(),
+            env!("VERGEN_BUILD_TIMESTAMP")
+        );
+        report_stdout!(
+            "{}: {:60}",
+            "Describe".white().bold(),
+            env!("VERGEN_GIT_DESCRIBE")
+        );
+        report_stdout!(
+            "{}: {:60}",
+            "Commit SHA".white().bold(),
+            env!("VERGEN_GIT_SHA")
+        );
+        report_stdout!(
+            "{}: {:60}",
+            "Commit Date".white().bold(),
+            env!("VERGEN_GIT_COMMIT_DATE")
+        );
     }
 
     Ok(0)

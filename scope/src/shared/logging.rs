@@ -1,7 +1,8 @@
-use clap::{ArgGroup, Parser};
+use clap::{ArgGroup, Parser, ValueEnum};
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 use std::fs::File;
+use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -37,49 +38,64 @@ pub fn progress_bar_without_pos() -> ProgressStyle {
 #[clap(group = ArgGroup::new("logging"))]
 pub struct LoggingOpts {
     /// A level of verbosity, and can be used multiple times
-    #[arg(short, long, action = clap::ArgAction::Count, global(true), group = "logging")]
-    pub debug: u8,
+    #[arg(short, long, action = clap::ArgAction::Count, global(true))]
+    pub verbose: u8,
 
-    /// Enable warn logging
-    #[arg(short, long, global(true), group = "logging")]
-    pub warn: bool,
+    #[arg(
+        long,
+        global(true),
+        default_value = "auto",
+        env = "SCOPE_OUTPUT_PROGRESS"
+    )]
+    /// Set the progress output. Use plain to disable updating UI.
+    pub progress: LoggingProgress,
 
-    /// Disable everything but error logging
-    #[arg(short, long, global(true), group = "logging")]
-    pub error: bool,
-
-    #[arg(skip = LevelFilter::INFO)]
+    #[arg(skip = LevelFilter::WARN)]
     default_level: LevelFilter,
 }
 
+#[derive(ValueEnum, Debug, Copy, Clone)]
+pub enum LoggingProgress {
+    /// Determine output format based on execution context
+    Auto,
+    /// Standard output, no progress bar, no auto-updating output.
+    Plain,
+    /// Use progress bar
+    Tty,
+}
+
+impl LoggingProgress {
+    fn is_tty(&self) -> bool {
+        match self {
+            LoggingProgress::Auto => std::io::stdout().is_terminal(),
+            LoggingProgress::Plain => false,
+            LoggingProgress::Tty => true,
+        }
+    }
+}
+
 lazy_static! {
-    pub static ref STDOUT_WRITER: Arc<RwLock<Box<dyn std::io::Write + Sync + Send>>> =
+    pub static ref STDOUT_WRITER: Arc<RwLock<Box<dyn Write + Sync + Send>>> =
         Arc::new(RwLock::new(Box::new(std::io::stdout())));
-    pub static ref STDERR_WRITER: Arc<RwLock<Box<dyn std::io::Write + Sync + Send>>> =
+    pub static ref STDERR_WRITER: Arc<RwLock<Box<dyn Write + Sync + Send>>> =
         Arc::new(RwLock::new(Box::new(std::io::stderr())));
 }
 
 impl LoggingOpts {
     pub fn with_new_default(&self, new_default: LevelFilter) -> Self {
         Self {
-            debug: self.debug,
-            warn: self.warn,
-            error: self.error,
+            verbose: self.verbose,
+            progress: self.progress,
             default_level: new_default,
         }
     }
 
     pub fn to_level_filter(&self) -> LevelFilter {
-        if self.error {
-            LevelFilter::ERROR
-        } else if self.warn {
-            LevelFilter::WARN
-        } else if self.debug == 0 {
-            self.default_level
-        } else if self.debug == 1 {
-            LevelFilter::DEBUG
-        } else {
-            LevelFilter::TRACE
+        match self.verbose {
+            0 => self.default_level,
+            1 => LevelFilter::INFO,
+            2 => LevelFilter::DEBUG,
+            _ => LevelFilter::TRACE,
         }
     }
 
@@ -111,6 +127,8 @@ impl LoggingOpts {
         *STDOUT_WRITER.write().await = Box::new(indicatif_layer.get_stdout_writer());
         *STDERR_WRITER.write().await = Box::new(indicatif_layer.get_stderr_writer());
 
+        let is_tty_output = self.progress.is_tty();
+
         let level_filter = self.to_level_filter();
         let console_output = tracing_subscriber::fmt::layer()
             .event_format(
@@ -121,15 +139,23 @@ impl LoggingOpts {
             )
             .with_writer(indicatif_writer)
             .fmt_fields(PrettyFields::new())
-            .with_filter(filter_fn(move |metadata| {
-                metadata.target() == "user" && level_filter >= *metadata.level()
-                    || metadata.target() == "always"
+            .with_filter(filter_fn(move |metadata| match metadata.target() {
+                "user" => level_filter >= *metadata.level(),
+                "always" => true,
+                "progress" => !is_tty_output,
+                "stdout" => false,
+                _ => false,
             }));
+
+        let progress_layer = if is_tty_output {
+            Some(indicatif_layer.with_filter(IndicatifFilter::new(false)))
+        } else {
+            None
+        };
 
         let subscriber = Registry::default()
             .with(console_output)
-            .with(indicatif_layer.with_filter(IndicatifFilter::new(false)))
-            // .with(console)
+            .with(progress_layer)
             .with(file_output);
 
         tracing::subscriber::set_global_default(subscriber)
