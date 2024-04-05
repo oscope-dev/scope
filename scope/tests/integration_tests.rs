@@ -61,7 +61,7 @@ impl<'a> ScopeTestHelper<'a> {
         self.run_command(&run_command)
     }
 
-    fn clean_work_dir(mut self) {
+    fn clean_work_dir(self) {
         self.work_dir.close().unwrap();
     }
 }
