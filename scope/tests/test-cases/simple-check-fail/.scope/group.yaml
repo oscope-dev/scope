@@ -2,13 +2,13 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
   name: path-exists
-  description: Check your shell for basic functionality
+  description: Check if file exists
 spec:
   actions:
-    - description: foo1
+    - name: file-exists
       check:
         commands:
-          - ./scripts/fail-first-call path-exists
+          - test -f {{ working_dir }}/file-mod.txt
       fix:
         commands:
-          - ../bin/truey
+          - echo {{ working_dir }}/file-mod.txt

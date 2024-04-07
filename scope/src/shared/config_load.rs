@@ -280,9 +280,7 @@ pub(crate) fn parse_model(
 
             value.metadata.annotations.bin_path = Some(build_exec_path(file_path));
 
-            // TODO: a better way to convert PathBuf to String?
-            value.metadata.annotations.working_dir =
-                Some(working_dir.to_str().unwrap().to_string());
+            value.metadata.annotations.working_dir = Some(working_dir.display().to_string());
             Some(value)
         }
         Err(e) => {

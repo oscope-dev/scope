@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: group-two
+  description: Check if file-bar exists
+spec:
+  actions:
+    - name: file-exists
+      check:
+        commands:
+          - test -f {{ working_dir }}/file-bar.txt
+      fix:
+        commands:
+          - touch {{ working_dir }}/file-bar.txt

@@ -152,7 +152,6 @@ where
                         has_failure = true;
                     }
                     _ => {
-                        run_result.failed_group.push(group_name.to_string());
                         if action.required() {
                             skip_remaining = true;
                         }

@@ -6,7 +6,7 @@ use minijinja::{context, Environment};
 
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
-use crate::prelude::DoctorInclude;
+use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
 use crate::shared::models::internal::extract_command_path;
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -134,10 +134,10 @@ impl HelpMetadata for DoctorGroup {
     }
 }
 
-fn evaluate_path(work_dir: &str, path: &str) -> Result<String> {
+fn substitute_templates(work_dir: &str, input_str: &str) -> Result<String> {
     let mut env = Environment::new();
-    env.add_template("path", path)?;
-    let template = env.get_template("path")?;
+    env.add_template("input_str", input_str)?;
+    let template = env.get_template("input_str")?;
     let result = template.render(context! { working_dir => work_dir })?;
 
     Ok(result)
@@ -147,52 +147,9 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
     type Error = anyhow::Error;
 
     fn try_from(model: V1AlphaDoctorGroup) -> Result<Self, Self::Error> {
-        let binding = model.containing_dir();
-        let containing_dir = Path::new(&binding);
-        let working_dir = model
-            .metadata
-            .annotations
-            .working_dir
-            .as_ref()
-            .unwrap()
-            .clone();
         let mut actions: Vec<_> = Default::default();
         for (count, spec_action) in model.spec.actions.iter().enumerate() {
-            let spec_action = spec_action.clone();
-            let help_text = spec_action
-                .fix
-                .as_ref()
-                .and_then(|x| x.help_text.as_ref().map(|st| st.trim().to_string()).clone());
-            let help_url = spec_action.fix.as_ref().and_then(|x| x.help_url.clone());
-            let fix_command = spec_action.fix.as_ref().map(|commands| {
-                DoctorGroupActionCommand::from((containing_dir, commands.commands.clone()))
-            });
-
-            actions.push(DoctorGroupAction {
-                name: spec_action.name.unwrap_or_else(|| format!("{}", count + 1)),
-                required: spec_action.required,
-                description: spec_action
-                    .description
-                    .unwrap_or_else(|| "default".to_string()),
-                fix: DoctorGroupActionFix {
-                    command: fix_command,
-                    help_text,
-                    help_url,
-                },
-                check: DoctorGroupActionCheck {
-                    command: spec_action
-                        .check
-                        .commands
-                        .map(|commands| DoctorGroupActionCommand::from((containing_dir, commands))),
-                    files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
-                        paths: paths
-                            .iter() // TODO: should this be as_ref() still? Changed because type inference error
-                            .map(|p| evaluate_path(working_dir.as_str(), p).unwrap()) // TODO: implement a function here, make it an early exit
-                            .collect(),
-                        base_path: containing_dir.parent().unwrap().to_path_buf(),
-                    }),
-                },
-            })
+            actions.push(parse_action(count, &model, spec_action)?);
         }
 
         Ok(DoctorGroup {
@@ -203,6 +160,77 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
             run_by_default: model.spec.include == DoctorInclude::ByDefault,
         })
     }
+}
+
+fn parse_action(
+    idx: usize,
+    group_model: &V1AlphaDoctorGroup,
+    action: &DoctorGroupActionSpec,
+) -> Result<DoctorGroupAction> {
+    let binding = group_model.containing_dir();
+    let containing_dir = Path::new(&binding);
+    let working_dir = group_model
+        .metadata
+        .annotations
+        .working_dir
+        .as_ref()
+        .unwrap()
+        .clone();
+
+    let spec_action = action.clone();
+    let help_text = spec_action
+        .fix
+        .as_ref()
+        .and_then(|x| x.help_text.as_ref().map(|st| st.trim().to_string()).clone());
+    let help_url = spec_action.fix.as_ref().and_then(|x| x.help_url.clone());
+    let fix_command = if let Some(fix) = &spec_action.fix {
+        let mut templated_commands = Vec::new();
+        for command in &fix.commands {
+            templated_commands.push(substitute_templates(&working_dir, command)?);
+        }
+        Some(DoctorGroupActionCommand::from((
+            containing_dir,
+            templated_commands,
+        )))
+    } else {
+        None
+    };
+
+    let check_command = if let Some(ref check) = spec_action.check.commands {
+        let mut templated_commands = Vec::new();
+        for command in check {
+            templated_commands.push(substitute_templates(&working_dir, command)?);
+        }
+        Some(DoctorGroupActionCommand::from((
+            containing_dir,
+            templated_commands,
+        )))
+    } else {
+        None
+    };
+
+    Ok(DoctorGroupAction {
+        name: spec_action.name.unwrap_or_else(|| format!("{}", idx + 1)),
+        required: spec_action.required,
+        description: spec_action
+            .description
+            .unwrap_or_else(|| "default".to_string()),
+        fix: DoctorGroupActionFix {
+            command: fix_command,
+            help_text,
+            help_url,
+        },
+        check: DoctorGroupActionCheck {
+            command: check_command,
+            files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
+                paths: paths
+                    .iter() // TODO: should this be as_ref() still? Changed because type inference error
+                    .map(|p| substitute_templates(working_dir.as_str(), p).unwrap()) // TODO: implement a function here, make it an early exit
+                    .collect(),
+                base_path: containing_dir.parent().unwrap().to_path_buf(),
+            }),
+        },
+    })
 }
 
 #[cfg(test)]

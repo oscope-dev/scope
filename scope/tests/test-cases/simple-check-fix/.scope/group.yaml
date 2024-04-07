@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: path-exists
+  description: Check if file exists
+spec:
+  actions:
+    - name: file-exists
+      check:
+        commands:
+          - test -f {{ working_dir }}/file-mod.txt
+      fix:
+        commands:
+          - touch {{ working_dir }}/file-mod.txt

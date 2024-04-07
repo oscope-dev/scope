@@ -1,0 +1,13 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: setup
+  description: Run dep install
+spec:
+  actions:
+    - check:
+        paths:
+          - '**/requirements.txt'
+      fix:
+        commands:
+          - 'true'

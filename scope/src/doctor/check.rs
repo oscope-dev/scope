@@ -305,6 +305,7 @@ impl DefaultDoctorActionRun {
         &self,
         action_command: &DoctorGroupActionCommand,
     ) -> Result<CacheResults, RuntimeError> {
+        info!("Evaluating {:?}", action_command);
         let mut result: Option<CacheResults> = None;
         for command in &action_command.commands {
             let args = vec![command.clone()];
