@@ -1,0 +1,15 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: path-exists
+  description: Check your shell for basic functionality
+spec:
+  actions:
+    - name: create path-exists file
+      check:
+        commands:
+          # when not using an absolute-path, or a command on PATH, the command is relative to the file
+          - ./scripts/file-exists path-exists
+      fix:
+        commands:
+          - ../bin/create-file path-exists

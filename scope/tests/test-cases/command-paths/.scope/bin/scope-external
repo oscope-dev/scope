@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "in external"
+
+exit 0

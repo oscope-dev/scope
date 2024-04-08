@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: fail-then-fix
+  description: Run dep install
+spec:
+  actions:
+    - name: task
+      check:
+        commands:
+          - ./scripts/check-file
+      fix:
+        commands:
+          - ./scripts/create-file

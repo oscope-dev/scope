@@ -1,0 +1,8 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: disk-full
+  description: The disk is full of files
+spec:
+  pattern: because the disk is full
+  help: Delete some unused files, and empty the trash.

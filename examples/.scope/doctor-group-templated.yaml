@@ -9,6 +9,8 @@ spec:
     check:
       paths:
         - '{{ working_dir }}/.hushlogin'
+      commands:
+        - "test -f {{ working_dir }}/.hushlogin"
     fix:
       commands:
-        - "touch .hushlogin"
+        - "touch {{ working_dir }}/.hushlogin"
