@@ -13,9 +13,9 @@ use tracing_indicatif::span_ext::IndicatifSpanExt;
 #[derive(Debug, Default)]
 pub struct PathRunResult {
     pub did_succeed: bool,
-    pub succeeded_groups: Vec<String>,
-    pub failed_group: Vec<String>,
-    pub skipped_group: Vec<String>,
+    pub succeeded_groups: BTreeSet<String>,
+    pub failed_group: BTreeSet<String>,
+    pub skipped_group: BTreeSet<String>,
 }
 
 impl Display for PathRunResult {
@@ -78,9 +78,9 @@ where
         let mut skip_remaining = false;
         let mut run_result = PathRunResult {
             did_succeed: true,
-            succeeded_groups: vec![],
-            failed_group: vec![],
-            skipped_group: vec![],
+            succeeded_groups: BTreeSet::new(),
+            failed_group: BTreeSet::new(),
+            skipped_group: BTreeSet::new(),
         };
 
         for (group_name, actions) in path {
@@ -93,15 +93,15 @@ where
             let _span = group_span.enter();
 
             if skip_remaining {
-                run_result.skipped_group.push(group_name.to_string());
+                run_result.skipped_group.insert(group_name.to_string());
             }
             let mut has_failure = false;
 
             for action in actions {
                 group_span.pb_inc(1);
                 if skip_remaining {
-                    warn!(target: "user", "Check `{}` was skipped.", group_name.bold());
-                    run_result.skipped_group.push(group_name.to_string());
+                    info!(target: "user", "Check `{}/{}` was skipped.", group_name.bold(), action.name());
+                    run_result.skipped_group.insert(group_name.to_string());
                     continue;
                 }
 
@@ -161,10 +161,10 @@ where
             }
 
             if has_failure {
-                run_result.failed_group.push(group_name.to_string());
+                run_result.failed_group.insert(group_name.to_string());
                 run_result.did_succeed = false;
             } else {
-                run_result.succeeded_groups.push(group_name.to_string());
+                run_result.succeeded_groups.insert(group_name.to_string());
             }
         }
 
