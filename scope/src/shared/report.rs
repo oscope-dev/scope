@@ -3,9 +3,12 @@ use super::config_load::FoundConfig;
 use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
+use jsonwebtoken::EncodingKey;
 use minijinja::{context, Environment};
-use octocrab::models::InstallationToken;
+use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
+use octocrab::Octocrab;
+use secrecy::SecretString;
 use std::fs::File;
 use std::io::Write;
 use tracing::{debug, info, warn};
@@ -180,7 +183,7 @@ impl ReportUploadLocationDestination {
     }
 }
 
-async fn get_octocrab(repo: &str) -> Result<octocrab::Octocrab> {
+async fn get_octocrab(repo: &str) -> Result<Octocrab> {
     match (
         std::env::var("SCOPE_GH_APP_ID"),
         std::env::var("SCOPE_GH_APP_KEY"),
@@ -189,11 +192,9 @@ async fn get_octocrab(repo: &str) -> Result<octocrab::Octocrab> {
         (Ok(app_id), Ok(app_key), _) => {
             // Influenced by https://github.com/XAMPPRocky/octocrab/blob/main/examples/github_app_authentication_manual.rs
             let app_id = app_id.parse::<u64>()?;
-            let app_key = jsonwebtoken::EncodingKey::from_rsa_pem(app_key.as_bytes())?;
+            let app_key = EncodingKey::from_rsa_pem(app_key.as_bytes())?;
 
-            let client = octocrab::Octocrab::builder()
-                .app(octocrab::models::AppId(app_id), app_key)
-                .build()?;
+            let client = Octocrab::builder().app(AppId(app_id), app_key).build()?;
 
             let installations = client
                 .apps()
@@ -214,15 +215,11 @@ async fn get_octocrab(repo: &str) -> Result<octocrab::Octocrab> {
                 .await
                 .unwrap();
 
-            Ok(octocrab::OctocrabBuilder::new()
-                .personal_token(access.token)
-                .build()?)
+            Ok(Octocrab::builder().personal_token(access.token).build()?)
         }
         (_, _, Ok(token)) => {
-            let token = secrecy::SecretString::new(token);
-            Ok(octocrab::Octocrab::builder()
-                .personal_token(token)
-                .build()?)
+            let token = SecretString::new(token);
+            Ok(Octocrab::builder().personal_token(token).build()?)
         }
         (_, _, _) => Err(anyhow!("No GitHub auth configured")),
     }
