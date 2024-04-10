@@ -36,6 +36,9 @@ struct Cli {
 async fn main() -> anyhow::Result<()> {
     setup_panic!();
     dotenv::dotenv().ok();
+    let exe_path = std::env::current_exe().unwrap();
+    let env_path = exe_path.parent().unwrap().join("../etc/scope.env");
+    dotenv::from_path(env_path).ok();
     let opts = Cli::parse();
 
     let (_guard, file_location) = opts
