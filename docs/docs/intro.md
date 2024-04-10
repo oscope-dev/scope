@@ -55,3 +55,10 @@ Options:
 ```
 
 Normally, you will not need to set any of these files.
+
+## Environment Variables
+
+Scope will load environment variables in this order of presedence:
+
+1. `../etc/scope.env` relative to where the executable is located
+1. `.env` in the current working directory
