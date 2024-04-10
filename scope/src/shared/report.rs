@@ -4,10 +4,14 @@ use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};
+use octocrab::models::{InstallationRepositories, InstallationToken};
+use octocrab::params::apps::CreateInstallationAccessToken;
+use octocrab::Octocrab;
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use std::fs::File;
 use std::io::Write;
 use tracing::{debug, info, warn};
+use url::Url;
 
 pub struct ReportBuilder<'a> {
     message: String,
@@ -114,69 +118,29 @@ impl ReportUploadLocationDestination {
         tags: Vec<String>,
         report: &str,
     ) -> Result<()> {
-        let gh_auth = match std::env::var("GH_TOKEN") {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(anyhow!(
-                    "GH_TOKEN env var was not set with token to access GitHub"
-                ))
-            }
-        };
+        let client = get_octocrab().await?;
 
         let title = match report.find('\n') {
             Some(value) => report[0..value].to_string(),
             None => "Scope bug report".to_string(),
         };
 
-        let body = json::object! {
-            title: title,
-            body: report,
-            labels: tags
-        };
-
-        let client = reqwest::Client::new();
         let res = client
-            .post(format!(
-                "https://api.github.com/repos/{}/{}/issues",
-                owner, repo
-            ))
-            .header(ACCEPT, "application/vnd.github+json")
-            .header(AUTHORIZATION, format!("Bearer {}", gh_auth))
-            .header(USER_AGENT, "scope")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .body(body.dump())
+            .issues(owner, repo)
+            .create(title)
+            .body(report)
+            .labels(tags)
             .send()
             .await;
 
         match res {
-            Ok(res) => {
-                debug!("API Response was {:?}", res);
-                let status = res.status();
-                match res.text().await {
-                    Err(e) => {
-                        warn!(target: "user", "Unable to read Github response: {:?}", e)
-                    }
-                    Ok(body) => {
-                        let body = body.trim();
-                        if status.is_success() {
-                            match json::parse(body) {
-                                Ok(json_body) => {
-                                    info!(target: "always", "Report was uploaded to {}.", json_body["html_url"])
-                                }
-                                Err(e) => {
-                                    warn!(server = "github", "GitHub response {}", body);
-                                    warn!(server = "github", "GitHub parse error {:?}", e);
-                                    warn!(target: "always", server="github", "GitHub responded with weird response, please check the logs.");
-                                }
-                            }
-                        } else {
-                            info!(target: "always", server="github", "Report upload failed for {}.", body)
-                        }
-                    }
-                }
+            Ok(issue) => {
+                debug!("Created issue was {:?}", issue);
+                info!(target: "always", "Report was uploaded to {}.", issue.html_url)
             }
             Err(e) => {
-                warn!(target: "always", "Unable to upload report to server because {}", e)
+                dbg!(&e);
+                warn!(target: "always", "Unable to upload report to GitHub because {}", e)
             }
         }
 
@@ -216,6 +180,66 @@ impl ReportUploadLocationDestination {
             }
         }
         Ok(())
+    }
+}
+
+async fn get_octocrab() -> Result<octocrab::Octocrab, anyhow::Error> {
+    // Try GH_TOKEN first
+    // Then try GitHub app credentials first
+    match (
+        std::env::var("SCOPE_GH_APP_ID"),
+        std::env::var("SCOPE_GH_APP_KEY"),
+        std::env::var("SCOPE_GH_TOKEN"),
+    ) {
+        (Ok(app_id), Ok(app_key), _) => {
+            // Influenced by https://github.com/XAMPPRocky/octocrab/blob/main/examples/github_app_authentication_manual.rs
+            let app_id = app_id.parse::<u64>()?;
+            let app_key = jsonwebtoken::EncodingKey::from_rsa_pem(app_key.as_bytes())?;
+
+            let token =
+                octocrab::auth::create_jwt(octocrab::models::AppId(app_id), &app_key).unwrap();
+
+            let client = octocrab::Octocrab::builder()
+                .personal_token(token)
+                .build()?;
+
+            let installations = client
+                .apps()
+                .installations()
+                .send()
+                .await
+                .unwrap()
+                .take_items();
+
+            let mut create_access_token = CreateInstallationAccessToken::default();
+            // TODO: accept repo as argument
+            create_access_token.repositories = vec!["dev-environments".to_string()];
+
+            let access_token_url =
+                Url::parse(installations[0].access_tokens_url.as_ref().unwrap()).unwrap();
+
+            let access: InstallationToken = client
+                .post(access_token_url.path(), Some(&create_access_token))
+                .await
+                .unwrap();
+
+            dbg!(&access.token);
+            Ok(octocrab::OctocrabBuilder::new()
+                .personal_token(access.token)
+                .build()?)
+
+            // octocrab::Octocrab::builder()
+            //     .app(octocrab::models::AppId(app_id), app_key)
+            //     .build()
+            //     .map_err(anyhow::Error::msg)
+        }
+        (_, _, Ok(token)) => {
+            let token = secrecy::SecretString::new(token);
+            Ok(octocrab::Octocrab::builder()
+                .personal_token(token)
+                .build()?)
+        }
+        (_, _, _) => Err(anyhow!("No GitHub auth configured")),
     }
 }
 
