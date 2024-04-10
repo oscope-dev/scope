@@ -137,7 +137,6 @@ impl ReportUploadLocationDestination {
                 info!(target: "always", "Report was uploaded to {}.", issue.html_url)
             }
             Err(e) => {
-                dbg!(&e);
                 warn!(target: "always", "Unable to upload report to GitHub because {}", e)
             }
         }
