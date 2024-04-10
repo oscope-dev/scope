@@ -14,7 +14,10 @@ Define where to upload the bug report to. Currently, only support `GitHubIssues`
 
 ### GitHub Issues
 
-When reporting to GitHub Issues, the env-var `GH_TOKEN` must be set to get the API token.
+When reporting to GitHub Issues, the env-var `SCOPE_GH_TOKEN` must be set to get the API token.
+When reporting to GitHub Issues, multiple authentication methods are supported:
+1. [GitHub App](https://docs.github.com/en/apps): `SCOPE_GH_APP_ID` and `SCOPE_GH_APP_KEY`
+1. Personal Access Token: `SCOPE_GH_TOKEN`
 
 ```yaml
 ---
