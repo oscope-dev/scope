@@ -68,6 +68,10 @@ ignore.workspace = true
 tracing-indicatif.workspace = true
 indicatif.workspace = true
 strip-ansi-escapes.workspace = true
+octocrab.workspace = true
+jsonwebtoken.workspace = true
+secrecy.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.14"
