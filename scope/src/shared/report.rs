@@ -192,11 +192,8 @@ async fn get_octocrab(repo: &str) -> Result<octocrab::Octocrab> {
             let app_id = app_id.parse::<u64>()?;
             let app_key = jsonwebtoken::EncodingKey::from_rsa_pem(app_key.as_bytes())?;
 
-            let token =
-                octocrab::auth::create_jwt(octocrab::models::AppId(app_id), &app_key).unwrap();
-
             let client = octocrab::Octocrab::builder()
-                .personal_token(token)
+                .app(octocrab::models::AppId(app_id), app_key)
                 .build()?;
 
             let installations = client
