@@ -1,6 +1,6 @@
 [package]
 name = "dev-scope"
-version = "2024.2.43"
+version = "2024.2.45"
 edition = "2021"
 default-run = "scope"
 repository =  "https://github.com/oscope-dev/scope"
@@ -29,7 +29,6 @@ name = "scope-intercept"
 clap.workspace = true
 human-panic.workspace = true
 tokio.workspace = true
-dotenv.workspace = true
 colored.workspace = true
 which.workspace = true
 regex.workspace = true
@@ -72,6 +71,7 @@ octocrab.workspace = true
 jsonwebtoken.workspace = true
 secrecy.workspace = true
 url.workspace = true
+dotenvy.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.14"
