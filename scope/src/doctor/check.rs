@@ -576,7 +576,7 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "check", vec![0]);
 
@@ -593,7 +593,7 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "check", vec![1, 0]);
         command_result(&mut exec_runner, "fix", vec![0]);
@@ -611,7 +611,7 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
         command_result(&mut exec_runner, "fix", vec![0]);
@@ -629,7 +629,7 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "check", vec![1]);
         command_result(&mut exec_runner, "fix", vec![1]);
@@ -647,7 +647,7 @@ pub(crate) mod tests {
         let action = build_file_fix_action();
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -673,7 +673,7 @@ pub(crate) mod tests {
         let action = build_file_fix_action();
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -699,7 +699,7 @@ pub(crate) mod tests {
         let action = build_file_fix_action();
         let mut exec_runner = MockExecutionProvider::new();
         let mut glob_walker = MockGlobWalker::new();
-        let mut report = ReportBuilder::blank();
+        let mut report = ReportBuilder::new_blank();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 

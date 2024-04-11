@@ -83,7 +83,7 @@ where
             succeeded_groups: BTreeSet::new(),
             failed_group: BTreeSet::new(),
             skipped_group: BTreeSet::new(),
-            report: ReportBuilder::blank(),
+            report: ReportBuilder::new_blank(),
         };
 
         for (group_name, actions) in path {

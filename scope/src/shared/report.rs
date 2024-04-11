@@ -16,16 +16,16 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct ReportBuilder {
-    message: String,
+    message: Option<String>,
     command_results: String,
 }
 
 impl<'a> ReportBuilder {
-    pub async fn new(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
+    pub async fn new_from_error(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
         let message = Self::make_default_message(&capture.command, config)?;
 
         let mut this = Self {
-            message,
+            message: Some(message),
             command_results: String::new(),
         };
 
@@ -36,11 +36,9 @@ impl<'a> ReportBuilder {
         Ok(this)
     }
 
-    pub fn blank() -> Self {
-        let message = "No command run yet.".to_string();
-
+    pub fn new_blank() -> Self {
         Self {
-            message,
+            message: None,
             command_results: String::new(),
         }
     }
@@ -53,7 +51,7 @@ impl<'a> ReportBuilder {
         Ok(())
     }
 
-    pub async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
+    async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
             let capture = OutputCapture::capture_output(CaptureOpts {
@@ -91,10 +89,12 @@ impl<'a> ReportBuilder {
     }
 
     fn make_report_test(&self) -> String {
-        format!(
-            "{}\n\n## Captured Data\n\n{}",
-            self.message, self.command_results
-        )
+        let top = self
+            .message
+            .clone()
+            .map_or("".to_string(), |m| format!("{}\n\n", m));
+
+        format!("{}## Captured Data\n\n{}", top, self.command_results)
     }
 
     pub async fn distribute_report(&self, config: &'a FoundConfig) -> Result<()> {

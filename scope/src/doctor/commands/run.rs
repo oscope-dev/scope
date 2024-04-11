@@ -69,8 +69,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     }
 
     if !result.did_succeed && !found_config.report_upload.is_empty() {
-        let mut report_builder = result.report.clone();
-
+        println!("");
         let ans = inquire::Confirm::new("Do you want to upload a bug report?")
             .with_default(true)
             .with_help_message(
@@ -79,8 +78,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             .prompt();
 
         if let Ok(true) = ans {
-            report_builder.add_additional_data(found_config).await?;
-            if let Err(e) = report_builder.distribute_report(found_config).await {
+            if let Err(e) = result.report.distribute_report(found_config).await {
                 warn!(target: "user", "Unable to upload report: {}", e);
             }
         }
