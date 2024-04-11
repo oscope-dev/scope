@@ -576,13 +576,13 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "check", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        // TODO: use automock for report builder here
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckSucceeded, result);
 
         Ok(())
@@ -593,13 +593,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "check", vec![1, 0]);
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -610,13 +611,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifyFailed, result);
 
         Ok(())
@@ -627,13 +629,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "check", vec![1]);
         command_result(&mut exec_runner, "fix", vec![1]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())
@@ -642,9 +645,9 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works() -> Result<()> {
         let action = build_file_fix_action();
-
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -659,7 +662,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -668,9 +671,9 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works_unable_to_update_cache() -> Result<()> {
         let action = build_file_fix_action();
-
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -685,7 +688,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -696,6 +699,7 @@ pub(crate) mod tests {
         let action = build_file_fix_action();
         let mut exec_runner = MockExecutionProvider::new();
         let mut glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::blank();
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
@@ -707,7 +711,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action(&mut ReportBuilder::blank()).await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())

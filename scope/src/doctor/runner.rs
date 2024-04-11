@@ -435,7 +435,7 @@ mod tests {
         };
 
         let exit_code = run_groups.execute().await?;
-        assert_eq!(true, exit_code.did_succeed);
+        assert!(exit_code.did_succeed);
 
         Ok(())
     }
@@ -460,7 +460,7 @@ mod tests {
         };
 
         let exit_code = run_groups.execute().await?;
-        assert_eq!(false, exit_code.did_succeed);
+        assert!(!exit_code.did_succeed);
 
         Ok(())
     }
@@ -493,7 +493,7 @@ mod tests {
         };
 
         let exit_code = run_groups.execute().await?;
-        assert_eq!(false, exit_code.did_succeed);
+        assert!(!exit_code.did_succeed);
 
         Ok(())
     }
