@@ -61,10 +61,11 @@ enum Command {
 #[tokio::main]
 async fn main() {
     setup_panic!();
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let exe_path = std::env::current_exe().unwrap();
     let env_path = exe_path.parent().unwrap().join("../etc/scope.env");
-    dotenv::from_path(env_path).ok();
+    dotenvy::from_path(env_path).ok();
+    dbg!(dotenvy::vars());
     let opts = Cli::parse();
 
     let (_guard, file_location) = opts
