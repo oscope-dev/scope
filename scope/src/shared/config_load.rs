@@ -103,7 +103,7 @@ impl ConfigOptions {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FoundConfig {
     pub working_dir: PathBuf,
     pub raw_config: Vec<ModelRoot<Value>>,
