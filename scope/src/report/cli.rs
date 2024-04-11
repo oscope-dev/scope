@@ -33,7 +33,7 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
         return Ok(exit_code);
     }
 
-    if let Err(e) = report_builder.distribute_report().await {
+    if let Err(e) = report_builder.distribute_report(found_config).await {
         warn!(target: "user", "Unable to upload report: {}", e);
     }
 

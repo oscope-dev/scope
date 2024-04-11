@@ -14,24 +14,46 @@ use std::io::Write;
 use tracing::{debug, info, warn};
 use url::Url;
 
-pub struct ReportBuilder<'a> {
+#[derive(Clone, Debug)]
+pub struct ReportBuilder {
     message: String,
     command_results: String,
-    config: &'a FoundConfig,
 }
 
-impl<'a> ReportBuilder<'a> {
+impl<'a> ReportBuilder {
     pub async fn new(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
         let message = Self::make_default_message(&capture.command, config)?;
 
         let mut this = Self {
             message,
             command_results: String::new(),
-            config,
         };
 
         this.add_capture(capture)?;
 
+        this.add_additional_data(config).await?;
+
+        Ok(this)
+    }
+
+    pub fn blank() -> Self {
+        let message = "No command run yet.".to_string();
+
+        Self {
+            message,
+            command_results: String::new(),
+        }
+    }
+
+    pub fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
+        self.command_results.push('\n');
+        self.command_results
+            .push_str(&capture.create_report_text()?);
+
+        Ok(())
+    }
+
+    pub async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
             let capture = OutputCapture::capture_output(CaptureOpts {
@@ -42,16 +64,9 @@ impl<'a> ReportBuilder<'a> {
                 env_vars: Default::default(),
             })
             .await?;
-            this.add_capture(&capture)?;
+
+            self.add_capture(&capture)?;
         }
-
-        Ok(this)
-    }
-
-    fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
-        self.command_results.push('\n');
-        self.command_results
-            .push_str(&capture.create_report_text()?);
 
         Ok(())
     }
@@ -82,10 +97,10 @@ impl<'a> ReportBuilder<'a> {
         )
     }
 
-    pub async fn distribute_report(&self) -> Result<()> {
+    pub async fn distribute_report(&self, config: &'a FoundConfig) -> Result<()> {
         let report = self.make_report_test();
 
-        for dest in self.config.report_upload.values() {
+        for dest in config.report_upload.values() {
             if let Err(e) = &dest.destination.upload(&report).await {
                 warn!(target: "user", "Unable to upload to {}: {}", dest.metadata.name(), e);
             }

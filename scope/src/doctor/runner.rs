@@ -1,4 +1,5 @@
 use super::check::{ActionRunResult, DoctorActionRun};
+use crate::prelude::ReportBuilder;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
 use colored::Colorize;
@@ -10,12 +11,13 @@ use std::fmt::{Display, Formatter};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PathRunResult {
     pub did_succeed: bool,
     pub succeeded_groups: BTreeSet<String>,
     pub failed_group: BTreeSet<String>,
     pub skipped_group: BTreeSet<String>,
+    pub report: ReportBuilder,
 }
 
 impl Display for PathRunResult {
@@ -81,6 +83,7 @@ where
             succeeded_groups: BTreeSet::new(),
             failed_group: BTreeSet::new(),
             skipped_group: BTreeSet::new(),
+            report: ReportBuilder::blank(),
         };
 
         for (group_name, actions) in path {
@@ -105,7 +108,7 @@ where
                     continue;
                 }
 
-                let action_result = action.run_action().await?;
+                let action_result = action.run_action(&mut run_result.report).await?;
 
                 match action_result {
                     ActionRunResult::CheckSucceeded => {
@@ -392,7 +395,7 @@ mod tests {
     fn make_action_run(result: ActionRunResult) -> Vec<MockDoctorActionRun> {
         let mut run = MockDoctorActionRun::new();
         run.expect_run_action()
-            .returning(move || Ok(result.clone()));
+            .returning(move |_| Ok(result.clone()));
         run.expect_help_text().return_const(None);
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "foo".to_string());
