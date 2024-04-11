@@ -109,9 +109,10 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
-    let report_builder = ReportBuilder::new(&capture, &found_config).await?;
+    let title = format!("Scope bug report: `{:?}`", command);
+    let report_builder = ReportBuilder::new_from_error(title, &capture, &found_config).await?;
     if let Ok(true) = ans {
-        if let Err(e) = report_builder.distribute_report().await {
+        if let Err(e) = report_builder.distribute_report(&found_config).await {
             warn!(target: "user", "Unable to upload report: {}", e);
         }
     } else {

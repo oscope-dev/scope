@@ -5,7 +5,7 @@ use std::cmp::max;
 use std::collections::BTreeMap;
 
 use crate::models::HelpMetadata;
-use crate::prelude::progress_bar_without_pos;
+use crate::prelude::{progress_bar_without_pos, ReportBuilder};
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, OutputDestination,
@@ -86,7 +86,7 @@ impl ActionRunResult {
 #[automock]
 #[async_trait::async_trait]
 pub trait DoctorActionRun: Send + Sync {
-    async fn run_action(&self) -> Result<ActionRunResult>;
+    async fn run_action(&self, report: &mut ReportBuilder) -> Result<ActionRunResult>;
     fn required(&self) -> bool;
     fn name(&self) -> String;
     fn help_text(&self) -> Option<String>;
@@ -111,7 +111,7 @@ pub struct DefaultDoctorActionRun {
 #[async_trait::async_trait]
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
-    async fn run_action(&self) -> Result<ActionRunResult> {
+    async fn run_action(&self, report: &mut ReportBuilder) -> Result<ActionRunResult> {
         let action_span = info_span!("action", "indicatif.pb_show" = true);
         action_span.pb_set_message(&format!(
             "action {} - {}",
@@ -120,7 +120,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         action_span.pb_set_style(&progress_bar_without_pos());
         let _span = action_span.enter();
 
-        let check_status = self.evaluate_checks().await?;
+        let check_status = self.evaluate_checks(report).await?;
         if check_status == CacheResults::FixNotRequired {
             return Ok(ActionRunResult::CheckSucceeded);
         }
@@ -129,7 +129,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             return Ok(ActionRunResult::CheckFailedNoRunFix);
         }
 
-        let fix_result = self.run_fixes().await?;
+        let fix_result = self.run_fixes(report).await?;
 
         match fix_result {
             i32::MIN..=-1 => {
@@ -145,7 +145,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             return Ok(ActionRunResult::NoCheckFixSucceeded);
         }
 
-        if let Some(check_status) = self.evaluate_command_checks().await? {
+        if let Some(check_status) = self.evaluate_command_checks(report).await? {
             if check_status != CacheResults::FixNotRequired {
                 return Ok(ActionRunResult::CheckFailedFixSucceedVerifyFailed);
             }
@@ -193,11 +193,11 @@ impl DefaultDoctorActionRun {
         }
     }
 
-    async fn run_fixes(&self) -> Result<i32, RuntimeError> {
+    async fn run_fixes(&self, report: &mut ReportBuilder) -> Result<i32, RuntimeError> {
         let mut highest_exit_code = -1;
         if let Some(action_command) = &self.action.fix.command {
             for command in &action_command.commands {
-                let result = self.run_single_fix(command).await?;
+                let result = self.run_single_fix(command, report).await?;
                 highest_exit_code = max(highest_exit_code, result);
                 if highest_exit_code >= 100 {
                     return Ok(highest_exit_code);
@@ -208,7 +208,11 @@ impl DefaultDoctorActionRun {
         Ok(highest_exit_code)
     }
 
-    async fn run_single_fix(&self, command: &str) -> Result<i32, RuntimeError> {
+    async fn run_single_fix(
+        &self,
+        command: &str,
+        report: &mut ReportBuilder,
+    ) -> Result<i32, RuntimeError> {
         let args = vec![command.to_string()];
         let capture = self
             .exec_runner
@@ -220,6 +224,8 @@ impl DefaultDoctorActionRun {
                 env_vars: self.generate_env_vars(),
             })
             .await?;
+
+        report.add_capture(&capture)?;
 
         info!("fix ran {} and exited {:?}", command, capture.exit_code);
 
@@ -241,7 +247,10 @@ impl DefaultDoctorActionRun {
         env_vars
     }
 
-    async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
+    async fn evaluate_checks(
+        &self,
+        report: &mut ReportBuilder,
+    ) -> Result<CacheResults, RuntimeError> {
         let mut path_check = None;
         let mut command_check = None;
         if let Some(cache_path) = &self.action.check.files {
@@ -253,7 +262,7 @@ impl DefaultDoctorActionRun {
             path_check = Some(result);
         }
 
-        if let Some(res) = self.evaluate_command_checks().await? {
+        if let Some(res) = self.evaluate_command_checks(report).await? {
             if !res.is_success() {
                 return Ok(res);
             }
@@ -271,9 +280,12 @@ impl DefaultDoctorActionRun {
         }
     }
 
-    async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
+    async fn evaluate_command_checks(
+        &self,
+        report: &mut ReportBuilder,
+    ) -> Result<Option<CacheResults>, RuntimeError> {
         if let Some(action_command) = &self.action.check.command {
-            let result = self.run_check_command(action_command).await?;
+            let result = self.run_check_command(action_command, report).await?;
             return Ok(Some(result));
         }
 
@@ -304,6 +316,7 @@ impl DefaultDoctorActionRun {
     async fn run_check_command(
         &self,
         action_command: &DoctorGroupActionCommand,
+        report: &mut ReportBuilder,
     ) -> Result<CacheResults, RuntimeError> {
         info!("Evaluating {:?}", action_command);
         let mut result: Option<CacheResults> = None;
@@ -324,6 +337,8 @@ impl DefaultDoctorActionRun {
                     env_vars: self.generate_env_vars(),
                 })
                 .await?;
+
+            report.add_capture(&output)?;
 
             info!(
                 "check ran command {} and result was {:?}",
@@ -561,12 +576,13 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "check", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckSucceeded, result);
 
         Ok(())
@@ -577,13 +593,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "check", vec![1, 0]);
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -594,13 +611,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "check", vec![1, 1]);
         command_result(&mut exec_runner, "fix", vec![0]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifyFailed, result);
 
         Ok(())
@@ -611,13 +629,14 @@ pub(crate) mod tests {
         let action = build_run_fail_fix_succeed_action();
         let mut exec_runner = MockExecutionProvider::new();
         let glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "check", vec![1]);
         command_result(&mut exec_runner, "fix", vec![1]);
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())
@@ -626,9 +645,9 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works() -> Result<()> {
         let action = build_file_fix_action();
-
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -643,7 +662,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -652,9 +671,9 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_file_cache_invalid_fix_works_unable_to_update_cache() -> Result<()> {
         let action = build_file_fix_action();
-
         let mut glob_walker = MockGlobWalker::new();
         let mut exec_runner = MockExecutionProvider::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "fix", vec![0]);
 
@@ -669,7 +688,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
 
         Ok(())
@@ -680,6 +699,7 @@ pub(crate) mod tests {
         let action = build_file_fix_action();
         let mut exec_runner = MockExecutionProvider::new();
         let mut glob_walker = MockGlobWalker::new();
+        let mut report = ReportBuilder::new_blank("Test".to_string());
 
         command_result(&mut exec_runner, "fix", vec![1]);
 
@@ -691,7 +711,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(&mut report).await?;
         assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
 
         Ok(())

@@ -65,7 +65,6 @@ async fn main() {
     let exe_path = std::env::current_exe().unwrap();
     let env_path = exe_path.parent().unwrap().join("../etc/scope.env");
     dotenvy::from_path(env_path).ok();
-    dbg!(dotenvy::vars());
     let opts = Cli::parse();
 
     let (_guard, file_location) = opts

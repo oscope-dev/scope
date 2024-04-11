@@ -68,6 +68,22 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
+    if !result.did_succeed && !found_config.report_upload.is_empty() {
+        println!();
+        let ans = inquire::Confirm::new("Do you want to upload a bug report?")
+            .with_default(true)
+            .with_help_message(
+                "This will allow you to share the error with other engineers for support.",
+            )
+            .prompt();
+
+        if let Ok(true) = ans {
+            if let Err(e) = result.report.distribute_report(found_config).await {
+                warn!(target: "user", "Unable to upload report: {}", e);
+            }
+        }
+    }
+
     if result.did_succeed {
         Ok(0)
     } else {
