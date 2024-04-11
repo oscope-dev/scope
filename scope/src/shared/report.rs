@@ -16,15 +16,21 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct ReportBuilder {
+    title: String,
     message: Option<String>,
     command_results: String,
 }
 
 impl<'a> ReportBuilder {
-    pub async fn new_from_error(capture: &OutputCapture, config: &'a FoundConfig) -> Result<Self> {
+    pub async fn new_from_error(
+        title: String,
+        capture: &OutputCapture,
+        config: &'a FoundConfig,
+    ) -> Result<Self> {
         let message = Self::make_default_message(&capture.command, config)?;
 
         let mut this = Self {
+            title,
             message: Some(message),
             command_results: String::new(),
         };
@@ -36,8 +42,9 @@ impl<'a> ReportBuilder {
         Ok(this)
     }
 
-    pub fn new_blank() -> Self {
+    pub fn new_blank(title: String) -> Self {
         Self {
+            title,
             message: None,
             command_results: String::new(),
         }
@@ -101,7 +108,7 @@ impl<'a> ReportBuilder {
         let report = self.make_report_test();
 
         for dest in config.report_upload.values() {
-            if let Err(e) = &dest.destination.upload(&report).await {
+            if let Err(e) = &dest.destination.upload(&self.title, &report).await {
                 warn!(target: "user", "Unable to upload to {}: {}", dest.metadata.name(), e);
             }
         }
@@ -111,7 +118,7 @@ impl<'a> ReportBuilder {
 }
 
 impl ReportUploadLocationDestination {
-    async fn upload(&self, report: &str) -> Result<()> {
+    async fn upload(&self, title: &str, report: &str) -> Result<()> {
         match self {
             ReportUploadLocationDestination::RustyPaste { url } => {
                 ReportUploadLocationDestination::upload_to_rusty_paste(url, report).await
@@ -121,6 +128,7 @@ impl ReportUploadLocationDestination {
                     owner,
                     repo,
                     tags.clone(),
+                    title,
                     report,
                 )
                 .await
@@ -132,14 +140,10 @@ impl ReportUploadLocationDestination {
         owner: &str,
         repo: &str,
         tags: Vec<String>,
+        title: &str,
         report: &str,
     ) -> Result<()> {
         let client = get_octocrab(repo).await?;
-
-        let title = match report.find('\n') {
-            Some(value) => report[0..value].to_string(),
-            None => "Scope bug report".to_string(),
-        };
 
         let res = client
             .issues(owner, repo)

@@ -69,7 +69,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     }
 
     if !result.did_succeed && !found_config.report_upload.is_empty() {
-        println!("");
+        println!();
         let ans = inquire::Confirm::new("Do you want to upload a bug report?")
             .with_default(true)
             .with_help_message(
