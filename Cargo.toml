@@ -35,7 +35,6 @@ lto = "thin"
 clap = { version = "4.5.4", features = ["derive", "env"]}
 human-panic = "1.2.3"
 tokio = { version = "1", features = ["full"] }
-dotenv = "0.15.0"
 colored = "2.1.0"
 which = { version = "6.0", features = ["regex"] }
 regex = "1.10.4"
@@ -78,3 +77,4 @@ octocrab = "0.38.0"
 jsonwebtoken = "9.3.0"
 secrecy = "0.8.0"
 url = "2.5.0"
+dotenvy = "0.15.7"
