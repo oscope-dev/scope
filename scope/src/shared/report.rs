@@ -58,7 +58,7 @@ impl<'a> ReportBuilder {
         Ok(())
     }
 
-    async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
+    pub async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
             let capture = OutputCapture::capture_output(CaptureOpts {
