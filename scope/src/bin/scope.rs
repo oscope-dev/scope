@@ -67,16 +67,17 @@ async fn main() {
     dotenvy::from_path(env_path).ok();
     let opts = Cli::parse();
 
-    let (_guard, file_location) = opts
+    let configured_logger = opts
         .logging
         .configure_logging(&opts.config.get_run_id(), "root")
         .await;
     let error_code = run_subcommand(opts).await;
 
     if error_code != 0 || enabled!(Level::DEBUG) {
-        info!(target: "user", "More detailed logs at {}", file_location);
+        info!(target: "user", "More detailed logs at {}", configured_logger.log_location);
     }
 
+    drop(configured_logger);
     std::process::exit(error_code);
 }
 
