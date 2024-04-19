@@ -1,15 +1,29 @@
 use clap::{ArgGroup, Parser, ValueEnum};
+use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
+use opentelemetry::{global, KeyValue};
+use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
+use opentelemetry_sdk::metrics::reader::{DefaultAggregationSelector, DefaultTemporalitySelector};
+use opentelemetry_sdk::metrics::SdkMeterProvider;
+use opentelemetry_sdk::trace::Tracer;
+use opentelemetry_sdk::{
+    trace::{self, RandomIdGenerator, Sampler},
+    Resource,
+};
 use std::fs::File;
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
+use tonic::metadata::MetadataMap;
 
 use tracing::level_filters::LevelFilter;
+use tracing::warn;
 use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
 use tracing_indicatif::IndicatifLayer;
+use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::fmt::format::DefaultFields;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
@@ -17,6 +31,20 @@ use tracing_subscriber::{
     layer::SubscriberExt,
     Registry,
 };
+
+lazy_static! {
+    static ref IGNORED_MODULES: &'static [&'static str] = &[
+        "want",
+        "hyper",
+        "mio",
+        "rustls",
+        "tokio_threadpool",
+        "tokio_reactor",
+        "tower",
+        "tonic",
+        "h2",
+    ];
+}
 
 pub fn default_progress_bar() -> ProgressStyle {
     ProgressStyle::with_template(
@@ -52,6 +80,15 @@ pub struct LoggingOpts {
 
     #[arg(skip = LevelFilter::WARN)]
     default_level: LevelFilter,
+
+    /// When set metrics will be sent to an otel collector at the endpoint provided
+    #[clap(long = "otel-collector", env = "SCOPE_OTEL_ENDPOINT", global(true))]
+    otel_collector: Option<String>,
+
+    /// When set, we'll send debug details to otel endpoint.
+    /// This option is hidden when running --help
+    #[arg(long, hide = true, global(true))]
+    pub otel_debug: bool,
 }
 
 #[derive(ValueEnum, Debug, Copy, Clone)]
@@ -81,12 +118,36 @@ lazy_static! {
         Arc::new(RwLock::new(Box::new(std::io::stderr())));
 }
 
+pub struct ConfiguredLogger {
+    /// needed to drop otel and finish the last write later
+    _otel: Option<OtelProperties>,
+    /// needed to keep the logger running
+    _guard: tracing_appender::non_blocking::WorkerGuard,
+    pub log_location: String,
+}
+
+struct OtelProperties {
+    tracer: Tracer,
+    metrics: SdkMeterProvider,
+}
+
+impl Drop for OtelProperties {
+    fn drop(&mut self) {
+        if let Err(e) = self.metrics.shutdown() {
+            warn!("Unable to emit final metrics: {:?}", e);
+        }
+        global::shutdown_tracer_provider();
+    }
+}
+
 impl LoggingOpts {
     pub fn with_new_default(&self, new_default: LevelFilter) -> Self {
         Self {
             verbose: self.verbose,
             progress: self.progress,
             default_level: new_default,
+            otel_collector: self.otel_collector.clone(),
+            otel_debug: self.otel_debug,
         }
     }
 
@@ -99,14 +160,82 @@ impl LoggingOpts {
         }
     }
 
-    pub async fn configure_logging(
-        &self,
-        run_id: &str,
-        prefix: &str,
-    ) -> (tracing_appender::non_blocking::WorkerGuard, String) {
+    fn make_exporter(&self, id: &str) -> TonicExporterBuilder {
+        let endpoint = self.otel_collector.clone().unwrap();
+        let mut map = MetadataMap::with_capacity(2);
+
+        map.insert(
+            "host",
+            gethostname()
+                .into_string()
+                .unwrap_or_else(|_| "unknown".to_string())
+                .parse()
+                .unwrap(),
+        );
+        map.insert("scope.id", id.parse().unwrap());
+
+        opentelemetry_otlp::new_exporter()
+            .tonic()
+            .with_endpoint(endpoint)
+            .with_timeout(Duration::from_secs(3))
+            .with_metadata(map)
+    }
+
+    fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
+        if self.otel_collector.is_some() {
+            let resources = Resource::new(vec![
+                KeyValue::new("service.name", "scope"),
+                KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                KeyValue::new(
+                    "host.name",
+                    gethostname()
+                        .into_string()
+                        .unwrap_or_else(|_| "unknown".to_string()),
+                ),
+                KeyValue::new("scope.id", run_id.to_string()),
+            ]);
+            let tracer = opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(self.make_exporter(run_id))
+                .with_trace_config(
+                    trace::config()
+                        .with_sampler(Sampler::AlwaysOn)
+                        .with_id_generator(RandomIdGenerator::default())
+                        .with_max_events_per_span(64)
+                        .with_max_attributes_per_span(16)
+                        .with_max_events_per_span(16)
+                        .with_resource(resources.clone()),
+                )
+                .install_batch(opentelemetry_sdk::runtime::Tokio)?;
+
+            let metrics = opentelemetry_otlp::new_pipeline()
+                .metrics(opentelemetry_sdk::runtime::Tokio)
+                .with_exporter(self.make_exporter(run_id))
+                .with_resource(resources)
+                .with_period(Duration::from_secs(3))
+                .with_timeout(Duration::from_secs(10))
+                .with_aggregation_selector(DefaultAggregationSelector::new())
+                .with_temporality_selector(DefaultTemporalitySelector::new())
+                .build()?;
+
+            Ok(Some(OtelProperties { metrics, tracer }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn configure_logging(&self, run_id: &str, prefix: &str) -> ConfiguredLogger {
         let file_name = format!("scope-{}-{}.log", prefix, run_id);
         let full_file_name = format!("/tmp/scope/{}", file_name);
         std::fs::create_dir_all("/tmp/scope").expect("to be able to create tmp dir");
+
+        let otel_props = self.setup_otel(run_id).unwrap_or_else(|e| {
+            println!(
+                "opentelemetry configuration failed. Events will not be sent. {:?}",
+                e
+            );
+            None
+        });
 
         let file_path = PathBuf::from(&full_file_name);
         let (non_blocking, guard) =
@@ -153,7 +282,38 @@ impl LoggingOpts {
             None
         };
 
+        let otel_level = if self.otel_debug {
+            LevelFilter::DEBUG
+        } else {
+            LevelFilter::INFO
+        };
+        let filter_func = filter_fn(move |metadata| {
+            if metadata
+                .module_path()
+                .map(|x| IGNORED_MODULES.iter().any(|module| x.starts_with(module)))
+                .unwrap_or(false)
+            {
+                return false;
+            }
+
+            otel_level >= *metadata.level()
+        });
+
+        let (otel_tracer_layer, otel_metrics_layer) = match otel_props {
+            Some(ref props) => (
+                Some(
+                    tracing_opentelemetry::layer()
+                        .with_tracer(props.tracer.clone())
+                        .with_filter(filter_func.clone()),
+                ),
+                Some(MetricsLayer::new(props.metrics.clone()).with_filter(filter_func)),
+            ),
+            None => (None, None),
+        };
+
         let subscriber = Registry::default()
+            .with(otel_metrics_layer)
+            .with(otel_tracer_layer)
             .with(console_output)
             .with(progress_layer)
             .with(file_output);
@@ -161,6 +321,10 @@ impl LoggingOpts {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        (guard, full_file_name)
+        ConfiguredLogger {
+            _guard: guard,
+            log_location: full_file_name,
+            _otel: otel_props,
+        }
     }
 }

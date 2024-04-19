@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
@@ -47,6 +47,7 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
     }
 }
 
+#[instrument("scope doctor run", skip(found_config))]
 pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Result<i32> {
     let transform = transform_inputs(found_config, args);
 

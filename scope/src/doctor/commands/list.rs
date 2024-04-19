@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 use clap::Args;
+use tracing::instrument;
 
 use crate::doctor::runner::compute_group_order;
 use crate::report_stdout;
@@ -11,6 +12,7 @@ use crate::shared::print_details;
 #[derive(Debug, Args)]
 pub struct DoctorListArgs {}
 
+#[instrument("scope doctor list", skip_all)]
 pub async fn doctor_list(found_config: &FoundConfig, _args: &DoctorListArgs) -> Result<()> {
     report_stdout!("Available checks that will run");
     let order = generate_doctor_list(found_config).clone();

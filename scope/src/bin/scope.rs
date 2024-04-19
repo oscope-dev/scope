@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use tracing::{debug, enabled, error, info, Level};
+use tracing::{debug, enabled, error, info, instrument, Level};
 
 /// scope
 ///
@@ -67,16 +67,17 @@ async fn main() {
     dotenvy::from_path(env_path).ok();
     let opts = Cli::parse();
 
-    let (_guard, file_location) = opts
+    let configured_logger = opts
         .logging
         .configure_logging(&opts.config.get_run_id(), "root")
         .await;
     let error_code = run_subcommand(opts).await;
 
     if error_code != 0 || enabled!(Level::DEBUG) {
-        info!(target: "user", "More detailed logs at {}", file_location);
+        info!(target: "user", "More detailed logs at {}", configured_logger.log_location);
     }
 
+    drop(configured_logger);
     std::process::exit(error_code);
 }
 
@@ -108,6 +109,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
     }
 }
 
+#[instrument("scope external-command", skip_all)]
 async fn exec_sub_command(found_config: &FoundConfig, args: &[String]) -> Result<i32> {
     let mut args = args.to_owned();
     let command = match args.first() {
@@ -145,6 +147,7 @@ lazy_static! {
     static ref SCOPE_SUBCOMMAND_REGEX: Regex = Regex::new("^scope-.*").unwrap();
 }
 
+#[instrument("scope list", skip_all)]
 async fn show_config(found_config: &FoundConfig) -> Result<()> {
     info!(target: "user", "Found Resources");
     print_details(&found_config.working_dir, &found_config.raw_config).await;
@@ -192,6 +195,7 @@ async fn print_commands(found_config: &FoundConfig) {
     }
 }
 
+#[instrument("scope version", skip_all)]
 async fn print_version(args: &VersionArgs) -> Result<i32> {
     if args.short {
         report_stdout!("scope {}", env!("CARGO_PKG_VERSION"));

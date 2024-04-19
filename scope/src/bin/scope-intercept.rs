@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::from_path(env_path).ok();
     let opts = Cli::parse();
 
-    let (_guard, file_location) = opts
+    let configured_logger = opts
         .logging
         .with_new_default(tracing::level_filters::LevelFilter::WARN)
         .configure_logging(&opts.config_options.get_run_id(), "intercept")
@@ -53,9 +53,10 @@ async fn main() -> anyhow::Result<()> {
     });
 
     if exit_code != 0 || enabled!(Level::DEBUG) {
-        info!(target: "user", "More detailed logs at {}", file_location);
+        info!(target: "user", "More detailed logs at {}", configured_logger.log_location);
     }
 
+    drop(configured_logger);
     std::process::exit(exit_code);
 }
 
