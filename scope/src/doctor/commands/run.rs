@@ -78,7 +78,13 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             .prompt();
 
         if let Ok(true) = ans {
-            if let Err(e) = result.report.distribute_report(found_config).await {
+            let mut report = result.report.clone();
+
+            if let Err(e) = report.add_additional_data(found_config).await {
+                warn!(target: "user", "Unable to add additional data to bug report: {}", e);
+            }
+
+            if let Err(e) = report.distribute_report(found_config).await {
                 warn!(target: "user", "Unable to upload report: {}", e);
             }
         }
