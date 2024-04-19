@@ -84,6 +84,11 @@ pub struct LoggingOpts {
     /// When set metrics will be sent to an otel collector at the endpoint provided
     #[clap(long = "otel-collector", env = "SCOPE_OTEL_ENDPOINT", global(true))]
     otel_collector: Option<String>,
+
+    /// When set, we'll send debug details to otel endpoint.
+    /// This option is hidden when running --help
+    #[arg(long, hide = true, global(true))]
+    pub otel_debug: bool,
 }
 
 #[derive(ValueEnum, Debug, Copy, Clone)]
@@ -142,6 +147,7 @@ impl LoggingOpts {
             progress: self.progress,
             default_level: new_default,
             otel_collector: self.otel_collector.clone(),
+            otel_debug: self.otel_debug,
         }
     }
 
@@ -276,7 +282,12 @@ impl LoggingOpts {
             None
         };
 
-        let filter_func = filter_fn(|metadata| {
+        let otel_level = if self.otel_debug {
+            LevelFilter::DEBUG
+        } else {
+            LevelFilter::INFO
+        };
+        let filter_func = filter_fn(move |metadata| {
             if metadata
                 .module_path()
                 .map(|x| IGNORED_MODULES.iter().any(|module| x.starts_with(module)))
@@ -285,7 +296,7 @@ impl LoggingOpts {
                 return false;
             }
 
-            LevelFilter::INFO >= *metadata.level()
+            otel_level >= *metadata.level()
         });
 
         let (otel_tracer_layer, otel_metrics_layer) = match otel_props {
