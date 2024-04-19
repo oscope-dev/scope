@@ -1,15 +1,26 @@
 use clap::{ArgGroup, Parser, ValueEnum};
+use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
+use opentelemetry_sdk::metrics::reader::{DefaultAggregationSelector, DefaultTemporalitySelector};
+use opentelemetry_sdk::{
+    trace::{self, RandomIdGenerator, Sampler},
+    Resource,
+};
 use std::fs::File;
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
+use tonic::metadata::MetadataMap;
 
 use tracing::level_filters::LevelFilter;
 use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
 use tracing_indicatif::IndicatifLayer;
+use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::fmt::format::DefaultFields;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
@@ -52,6 +63,10 @@ pub struct LoggingOpts {
 
     #[arg(skip = LevelFilter::WARN)]
     default_level: LevelFilter,
+
+    /// When set metrics will be sent to an otel collector at the endpoint provided
+    #[clap(long = "otel-collector", env = "SCOPE_OTEL_ENDPOINT", global(true))]
+    otel_collector: Option<String>,
 }
 
 #[derive(ValueEnum, Debug, Copy, Clone)]
@@ -87,6 +102,7 @@ impl LoggingOpts {
             verbose: self.verbose,
             progress: self.progress,
             default_level: new_default,
+            otel_collector: self.otel_collector.clone(),
         }
     }
 
@@ -99,6 +115,81 @@ impl LoggingOpts {
         }
     }
 
+    fn make_exporter(&self, id: &str) -> TonicExporterBuilder {
+        let endpoint = self.otel_collector.clone().unwrap();
+        let mut map = MetadataMap::with_capacity(2);
+
+        map.insert(
+            "x-host",
+            gethostname()
+                .into_string()
+                .unwrap_or_else(|_| "unknown".to_string())
+                .parse()
+                .unwrap(),
+        );
+        map.insert("x-id", id.parse().unwrap());
+
+        opentelemetry_otlp::new_exporter()
+            .tonic()
+            .with_endpoint(endpoint)
+            .with_timeout(Duration::from_secs(3))
+            .with_metadata(map)
+    }
+
+    // this is a complicated type, but is only used in one place
+    #[allow(clippy::type_complexity)]
+    fn setup_otel<TL, ML>(
+        &self,
+        run_id: &str,
+    ) -> Result<
+        (
+            Option<OpenTelemetryLayer<TL, trace::Tracer>>,
+            Option<MetricsLayer<ML>>,
+        ),
+        anyhow::Error,
+    >
+    where
+        TL: tracing::Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
+        ML: for<'span> tracing_subscriber::registry::LookupSpan<'span> + tracing::Subscriber,
+    {
+        let mut otel_tracer_layer = None;
+        let mut otel_metrics_layer = None;
+        if self.otel_collector.is_some() {
+            let tracer = opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(self.make_exporter(run_id))
+                .with_trace_config(
+                    trace::config()
+                        .with_sampler(Sampler::AlwaysOn)
+                        .with_id_generator(RandomIdGenerator::default())
+                        .with_max_events_per_span(64)
+                        .with_max_attributes_per_span(16)
+                        .with_max_events_per_span(16)
+                        .with_resource(Resource::new(vec![KeyValue::new("service.name", "scope")])),
+                )
+                .install_batch(opentelemetry_sdk::runtime::Tokio)?;
+
+            otel_tracer_layer = Some(tracing_opentelemetry::layer().with_tracer(tracer));
+
+            let metrics = opentelemetry_otlp::new_pipeline()
+                .metrics(opentelemetry_sdk::runtime::Tokio)
+                .with_exporter(self.make_exporter(run_id))
+                .with_resource(Resource::new(vec![KeyValue::new(
+                    "service.name",
+                    "example",
+                )]))
+                .with_period(Duration::from_secs(3))
+                .with_timeout(Duration::from_secs(10))
+                .with_aggregation_selector(DefaultAggregationSelector::new())
+                .with_temporality_selector(DefaultTemporalitySelector::new())
+                .build()?;
+
+            otel_metrics_layer = Some(MetricsLayer::new(metrics));
+        }
+
+        Ok((otel_tracer_layer, otel_metrics_layer))
+    }
+
     pub async fn configure_logging(
         &self,
         run_id: &str,
@@ -107,6 +198,14 @@ impl LoggingOpts {
         let file_name = format!("scope-{}-{}.log", prefix, run_id);
         let full_file_name = format!("/tmp/scope/{}", file_name);
         std::fs::create_dir_all("/tmp/scope").expect("to be able to create tmp dir");
+
+        let (otel_tracer_layer, otel_metrics_layer) = self.setup_otel(run_id).unwrap_or_else(|e| {
+            println!(
+                "opentelemetry configuration failed. Events will not be sent. {:?}",
+                e
+            );
+            (None, None)
+        });
 
         let file_path = PathBuf::from(&full_file_name);
         let (non_blocking, guard) =
@@ -156,6 +255,8 @@ impl LoggingOpts {
         let subscriber = Registry::default()
             .with(console_output)
             .with(progress_layer)
+            .with(otel_metrics_layer)
+            .with(otel_tracer_layer)
             .with(file_output);
 
         tracing::subscriber::set_global_default(subscriber)
