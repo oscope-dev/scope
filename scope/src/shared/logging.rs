@@ -159,14 +159,14 @@ impl LoggingOpts {
         let mut map = MetadataMap::with_capacity(2);
 
         map.insert(
-            "x-host",
+            "host",
             gethostname()
                 .into_string()
                 .unwrap_or_else(|_| "unknown".to_string())
                 .parse()
                 .unwrap(),
         );
-        map.insert("x-id", id.parse().unwrap());
+        map.insert("scope.id", id.parse().unwrap());
 
         opentelemetry_otlp::new_exporter()
             .tonic()
@@ -177,6 +177,17 @@ impl LoggingOpts {
 
     fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
         if self.otel_collector.is_some() {
+            let resources = Resource::new(vec![
+                KeyValue::new("service.name", "scope"),
+                KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                KeyValue::new(
+                    "host.name",
+                    gethostname()
+                        .into_string()
+                        .unwrap_or_else(|_| "unknown".to_string()),
+                ),
+                KeyValue::new("scope.id", run_id.to_string()),
+            ]);
             let tracer = opentelemetry_otlp::new_pipeline()
                 .tracing()
                 .with_exporter(self.make_exporter(run_id))
@@ -187,17 +198,14 @@ impl LoggingOpts {
                         .with_max_events_per_span(64)
                         .with_max_attributes_per_span(16)
                         .with_max_events_per_span(16)
-                        .with_resource(Resource::new(vec![KeyValue::new("service.name", "scope")])),
+                        .with_resource(resources.clone()),
                 )
                 .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
             let metrics = opentelemetry_otlp::new_pipeline()
                 .metrics(opentelemetry_sdk::runtime::Tokio)
                 .with_exporter(self.make_exporter(run_id))
-                .with_resource(Resource::new(vec![KeyValue::new(
-                    "service.name",
-                    "example",
-                )]))
+                .with_resource(resources)
                 .with_period(Duration::from_secs(3))
                 .with_timeout(Duration::from_secs(10))
                 .with_aggregation_selector(DefaultAggregationSelector::new())
@@ -269,10 +277,15 @@ impl LoggingOpts {
         };
 
         let filter_func = filter_fn(|metadata| {
-            !metadata
+            if metadata
                 .module_path()
                 .map(|x| IGNORED_MODULES.iter().any(|module| x.starts_with(module)))
-                .unwrap_or(true)
+                .unwrap_or(false)
+            {
+                return false;
+            }
+
+            LevelFilter::INFO >= *metadata.level()
         });
 
         let (otel_tracer_layer, otel_metrics_layer) = match otel_props {

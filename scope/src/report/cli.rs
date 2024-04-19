@@ -3,7 +3,7 @@ use crate::shared::prelude::{
 };
 use anyhow::Result;
 use clap::Args;
-use tracing::warn;
+use tracing::{instrument, warn};
 
 #[derive(Debug, Args)]
 pub struct ReportArgs {
@@ -16,6 +16,7 @@ pub struct ReportArgs {
     command: Vec<String>,
 }
 
+#[instrument("scope report", skip_all)]
 pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Result<i32> {
     let capture = OutputCapture::capture_output(CaptureOpts {
         working_dir: &found_config.working_dir,
