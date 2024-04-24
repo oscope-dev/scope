@@ -1,4 +1,4 @@
-use super::check::{ActionRunStatus, DoctorActionRun};
+use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
 use crate::prelude::ReportBuilder;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error, info, info_span, warn, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
+use crate::report_stdout;
 
 #[derive(Debug)]
 pub struct PathRunResult {
@@ -110,7 +111,6 @@ where
 
                 let action_result = action.run_action(&mut run_result.report).await?;
 
-
                 match action_result.status {
                     ActionRunStatus::CheckSucceeded => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check was successful");
@@ -123,18 +123,22 @@ where
                     }
                     ActionRunStatus::CheckFailedFixFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
+                        print_pretty_result(&group_name, &action.name(), &action_result)?;
                     }
                     ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
+                        print_pretty_result(&group_name, &action.name(), &action_result)?;
                     }
                     ActionRunStatus::CheckFailedNoRunFix => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
                     }
                     ActionRunStatus::CheckFailedNoFixProvided => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");
+                        print_pretty_result(&group_name, &action.name(), &action_result)?;
                     }
                     ActionRunStatus::CheckFailedFixFailedStop => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
+                        print_pretty_result(&group_name, &action.name(), &action_result)?;
                     }
                 }
 
@@ -174,6 +178,17 @@ where
 
         Ok(run_result)
     }
+}
+
+fn print_pretty_result(group_name: &str, action_name: &str, result: &ActionRunResult) -> Result<()> {
+    if let Some(text) = &result.error_output {
+        let line_prefix = format!("{}/{}", group_name, action_name);
+        text.lines().for_each(|line| {
+            let output_line = format!("{}:  {}", line_prefix.dimmed(), line);
+            report_stdout!("{}", output_line);
+        });
+    }
+    Ok(())
 }
 
 pub fn compute_group_order(
