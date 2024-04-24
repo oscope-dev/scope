@@ -1,6 +1,7 @@
 use super::redact::Redactor;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use colored::Colorize;
 use derive_builder::Builder;
 use mockall::automock;
 use std::collections::BTreeMap;
@@ -10,7 +11,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use colored::Colorize;
 use thiserror::Error;
 use tokio::io;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -80,7 +80,7 @@ impl<R: io::AsyncRead + Unpin> StreamCapture<R> {
                     writeln!(self.writer.write().await, "{}", line).ok();
                 }
                 OutputDestination::StandardOutWithPrefix(prefix) => {
-                    writeln!(self.writer.write().await, "{}:  {}", prefix.dimmed(),  line).ok();
+                    writeln!(self.writer.write().await, "{}:  {}", prefix.dimmed(), line).ok();
                 }
                 OutputDestination::Null => {}
             };
