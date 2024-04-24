@@ -57,7 +57,7 @@ impl CacheResults {
 
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::enum_variant_names)]
-pub enum ActionRunResult {
+pub enum ActionRunStatus {
     CheckSucceeded,
     CheckFailedFixSucceedVerifySucceed,
     CheckFailedFixFailed,
@@ -68,17 +68,32 @@ pub enum ActionRunResult {
     NoCheckFixSucceeded,
 }
 
-impl ActionRunResult {
+#[derive(Debug, PartialEq, Clone)]
+pub struct ActionRunResult {
+    pub status: ActionRunStatus,
+    pub error_output: Option<String>,
+}
+
+impl From<ActionRunStatus> for ActionRunResult {
+    fn from(value: ActionRunStatus) -> Self {
+        Self {
+            status: value,
+            error_output: None
+        }
+    }
+}
+
+impl ActionRunStatus {
     pub(crate) fn is_failure(&self) -> bool {
         match self {
-            ActionRunResult::CheckSucceeded => false,
-            ActionRunResult::CheckFailedFixSucceedVerifySucceed => false,
-            ActionRunResult::CheckFailedFixFailed => true,
-            ActionRunResult::CheckFailedFixSucceedVerifyFailed => true,
-            ActionRunResult::CheckFailedNoRunFix => true,
-            ActionRunResult::CheckFailedNoFixProvided => true,
-            ActionRunResult::CheckFailedFixFailedStop => true,
-            ActionRunResult::NoCheckFixSucceeded => false,
+            ActionRunStatus::CheckSucceeded => false,
+            ActionRunStatus::CheckFailedFixSucceedVerifySucceed => false,
+            ActionRunStatus::CheckFailedFixFailed => true,
+            ActionRunStatus::CheckFailedFixSucceedVerifyFailed => true,
+            ActionRunStatus::CheckFailedNoRunFix => true,
+            ActionRunStatus::CheckFailedNoFixProvided => true,
+            ActionRunStatus::CheckFailedFixFailedStop => true,
+            ActionRunStatus::NoCheckFixSucceeded => false,
         }
     }
 }
@@ -122,38 +137,38 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
         let check_status = self.evaluate_checks(report).await?;
         if check_status == CacheResults::FixNotRequired {
-            return Ok(ActionRunResult::CheckSucceeded);
+            return Ok(ActionRunStatus::CheckSucceeded.into());
         }
 
         if !self.run_fix {
-            return Ok(ActionRunResult::CheckFailedNoRunFix);
+            return Ok(ActionRunStatus::CheckFailedNoRunFix.into());
         }
 
         let fix_result = self.run_fixes(report).await?;
 
         match fix_result {
             i32::MIN..=-1 => {
-                return Ok(ActionRunResult::CheckFailedNoFixProvided);
+                return Ok(ActionRunStatus::CheckFailedNoFixProvided.into());
             }
             0 => {}
-            1...100 => return Ok(ActionRunResult::CheckFailedFixFailed),
-            _ => return Ok(ActionRunResult::CheckFailedFixFailedStop),
+            1...100 => return Ok(ActionRunStatus::CheckFailedFixFailed.into()),
+            _ => return Ok(ActionRunStatus::CheckFailedFixFailedStop.into()),
         }
 
         if check_status == CacheResults::CacheNotDefined {
             self.update_caches().await;
-            return Ok(ActionRunResult::NoCheckFixSucceeded);
+            return Ok(ActionRunStatus::NoCheckFixSucceeded.into());
         }
 
         if let Some(check_status) = self.evaluate_command_checks(report).await? {
             if check_status != CacheResults::FixNotRequired {
-                return Ok(ActionRunResult::CheckFailedFixSucceedVerifyFailed);
+                return Ok(ActionRunStatus::CheckFailedFixSucceedVerifyFailed.into());
             }
         }
 
         self.update_caches().await;
 
-        Ok(ActionRunResult::CheckFailedFixSucceedVerifySucceed)
+        Ok(ActionRunStatus::CheckFailedFixSucceedVerifySucceed.into())
     }
 
     fn required(&self) -> bool {
@@ -475,7 +490,7 @@ impl GlobWalker for DefaultGlobWalker {
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::doctor::check::{
-        ActionRunResult, DefaultDoctorActionRun, DefaultGlobWalker, DoctorActionRun, GlobWalker,
+        ActionRunStatus, DefaultDoctorActionRun, DefaultGlobWalker, DoctorActionRun, GlobWalker,
         MockFileSystem, MockGlobWalker, RuntimeError,
     };
     use crate::doctor::file_cache::{FileCache, MockFileCache, NoOpCache};
@@ -583,7 +598,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckSucceeded, result);
+        assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
 
         Ok(())
     }
@@ -601,7 +616,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixSucceedVerifySucceed, result.status);
 
         Ok(())
     }
@@ -619,7 +634,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifyFailed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixSucceedVerifyFailed, result.status);
 
         Ok(())
     }
@@ -637,7 +652,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
 
         Ok(())
     }
@@ -663,7 +678,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixSucceedVerifySucceed, result.status);
 
         Ok(())
     }
@@ -689,7 +704,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixSucceedVerifySucceed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixSucceedVerifySucceed, result.status);
 
         Ok(())
     }
@@ -712,7 +727,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(&mut report).await?;
-        assert_eq!(ActionRunResult::CheckFailedFixFailed, result);
+        assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
 
         Ok(())
     }

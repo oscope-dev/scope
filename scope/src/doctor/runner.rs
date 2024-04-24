@@ -1,4 +1,4 @@
-use super::check::{ActionRunResult, DoctorActionRun};
+use super::check::{ActionRunStatus, DoctorActionRun};
 use crate::prelude::ReportBuilder;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
@@ -76,7 +76,7 @@ where
         self.run_path(full_path).await
     }
 
-    async fn run_path(&self, path: Vec<(&String, &Vec<T>)>) -> Result<PathRunResult> {
+    async fn run_path(&self, groups: Vec<(&String, &Vec<T>)>) -> Result<PathRunResult> {
         let mut skip_remaining = false;
         let mut run_result = PathRunResult {
             did_succeed: true,
@@ -86,7 +86,7 @@ where
             report: ReportBuilder::new_blank("Scope bug report: `scope doctor run`".to_string()),
         };
 
-        for (group_name, actions) in path {
+        for (group_name, actions) in groups {
             Span::current().pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
@@ -110,34 +110,35 @@ where
 
                 let action_result = action.run_action(&mut run_result.report).await?;
 
-                match action_result {
-                    ActionRunResult::CheckSucceeded => {
+
+                match action_result.status {
+                    ActionRunStatus::CheckSucceeded => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check was successful");
                     }
-                    ActionRunResult::NoCheckFixSucceeded => {
+                    ActionRunStatus::NoCheckFixSucceeded => {
                         info!(target: "progress", group = group_name, name = action.name(), "Fix ran successfully");
                     }
-                    ActionRunResult::CheckFailedFixSucceedVerifySucceed => {
+                    ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check initially failed, fix was successful");
                     }
-                    ActionRunResult::CheckFailedFixFailed => {
+                    ActionRunStatus::CheckFailedFixFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
                     }
-                    ActionRunResult::CheckFailedFixSucceedVerifyFailed => {
+                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
                     }
-                    ActionRunResult::CheckFailedNoRunFix => {
+                    ActionRunStatus::CheckFailedNoRunFix => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
                     }
-                    ActionRunResult::CheckFailedNoFixProvided => {
+                    ActionRunStatus::CheckFailedNoFixProvided => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");
                     }
-                    ActionRunResult::CheckFailedFixFailedStop => {
+                    ActionRunStatus::CheckFailedFixFailedStop => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
                     }
                 }
 
-                if action_result.is_failure() {
+                if action_result.status.is_failure() {
                     if let Some(help_text) = &action.help_text() {
                         error!(target: "user", group = group_name, name = action.name(), "Action Help: {}", help_text);
                     }
@@ -146,11 +147,11 @@ where
                     }
                 }
 
-                match action_result {
-                    ActionRunResult::CheckSucceeded
-                    | ActionRunResult::NoCheckFixSucceeded
-                    | ActionRunResult::CheckFailedFixSucceedVerifySucceed => {}
-                    ActionRunResult::CheckFailedFixFailedStop => {
+                match action_result.status {
+                    ActionRunStatus::CheckSucceeded
+                    | ActionRunStatus::NoCheckFixSucceeded
+                    | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
+                    ActionRunStatus::CheckFailedFixFailedStop => {
                         skip_remaining = true;
                         has_failure = true;
                     }
@@ -228,7 +229,7 @@ pub fn compute_group_order(
 #[cfg(test)]
 mod tests {
     use crate::doctor::check::tests::build_run_fail_fix_succeed_action;
-    use crate::doctor::check::{ActionRunResult, MockDoctorActionRun};
+    use crate::doctor::check::{ActionRunResult, ActionRunStatus, MockDoctorActionRun};
     use crate::doctor::runner::{compute_group_order, RunGroups};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
     use anyhow::Result;
@@ -392,10 +393,10 @@ mod tests {
         Ok(())
     }
 
-    fn make_action_run(result: ActionRunResult) -> Vec<MockDoctorActionRun> {
+    fn make_action_run(result: ActionRunStatus) -> Vec<MockDoctorActionRun> {
         let mut run = MockDoctorActionRun::new();
         run.expect_run_action()
-            .returning(move |_| Ok(result.clone()));
+            .returning(move |_| Ok(ActionRunResult::from(result.clone())));
         run.expect_help_text().return_const(None);
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "foo".to_string());
@@ -414,15 +415,15 @@ mod tests {
 
         group_actions.insert(
             "step_1".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
+            make_action_run(ActionRunStatus::CheckSucceeded),
         );
         group_actions.insert(
             "step_2".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
+            make_action_run(ActionRunStatus::CheckSucceeded),
         );
         group_actions.insert(
             "step_3".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
+            make_action_run(ActionRunStatus::CheckSucceeded),
         );
 
         let run_groups = RunGroups {
@@ -445,7 +446,7 @@ mod tests {
         let mut group_actions = BTreeMap::new();
         group_actions.insert(
             "step_1".to_string(),
-            make_action_run(ActionRunResult::CheckFailedFixSucceedVerifyFailed),
+            make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
         );
         group_actions.insert("step_2".to_string(), will_not_run());
         group_actions.insert("step_3".to_string(), will_not_run());
@@ -470,16 +471,16 @@ mod tests {
         let mut group_actions = BTreeMap::new();
         group_actions.insert(
             "step_1".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
+            make_action_run(ActionRunStatus::CheckSucceeded),
         );
         group_actions.insert(
             "step_2".to_string(),
-            make_action_run(ActionRunResult::CheckFailedFixSucceedVerifyFailed),
+            make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
         );
         group_actions.insert("step_3".to_string(), will_not_run());
         group_actions.insert(
             "step_4".to_string(),
-            make_action_run(ActionRunResult::CheckSucceeded),
+            make_action_run(ActionRunStatus::CheckSucceeded),
         );
 
         let run_groups = RunGroups {
