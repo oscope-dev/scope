@@ -42,16 +42,31 @@ pub enum RuntimeError {
 }
 
 #[derive(Debug, Clone, PartialEq, Ord, Eq, PartialOrd)]
-pub enum CacheResults {
+pub enum CacheStatus {
     FixNotRequired = 1,
     FixRequired = 2,
     StopExecution = 3,
     CacheNotDefined = 4,
 }
 
-impl CacheResults {
+impl CacheStatus {
     fn is_success(&self) -> bool {
-        self == &CacheResults::FixNotRequired || self == &CacheResults::CacheNotDefined
+        self == &CacheStatus::FixNotRequired || self == &CacheStatus::CacheNotDefined
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheResults {
+    pub status: CacheStatus,
+    pub output: Option<String>
+}
+
+impl From<CacheStatus> for CacheResults {
+    fn from(value: CacheStatus) -> Self {
+        Self {
+            status: value,
+            output: None
+        }
     }
 }
 
@@ -135,8 +150,9 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         action_span.pb_set_style(&progress_bar_without_pos());
         let _span = action_span.enter();
 
-        let check_status = self.evaluate_checks(report).await?;
-        if check_status == CacheResults::FixNotRequired {
+        let check_results = self.evaluate_checks(report).await?;
+        let check_status = check_results.status;
+        if check_status == CacheStatus::FixNotRequired {
             return Ok(ActionRunStatus::CheckSucceeded.into());
         }
 
@@ -155,13 +171,13 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             _ => return Ok(ActionRunStatus::CheckFailedFixFailedStop.into()),
         }
 
-        if check_status == CacheResults::CacheNotDefined {
+        if check_status == CacheStatus::CacheNotDefined {
             self.update_caches().await;
             return Ok(ActionRunStatus::NoCheckFixSucceeded.into());
         }
 
         if let Some(check_status) = self.evaluate_command_checks(report).await? {
-            if check_status != CacheResults::FixNotRequired {
+            if check_status != CacheStatus::FixNotRequired {
                 return Ok(ActionRunStatus::CheckFailedFixSucceedVerifyFailed.into());
             }
         }
@@ -271,7 +287,7 @@ impl DefaultDoctorActionRun {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
-                return Ok(result);
+                return Ok(result.into());
             }
 
             path_check = Some(result);
@@ -279,26 +295,26 @@ impl DefaultDoctorActionRun {
 
         if let Some(res) = self.evaluate_command_checks(report).await? {
             if !res.is_success() {
-                return Ok(res);
+                return Ok(res.into());
             }
             command_check = Some(res);
         }
 
         match (path_check, command_check) {
-            (None, None) => Ok(CacheResults::CacheNotDefined),
-            (Some(p), None) if p.is_success() => Ok(CacheResults::FixNotRequired),
-            (None, Some(c)) if c.is_success() => Ok(CacheResults::FixNotRequired),
+            (None, None) => Ok(CacheStatus::CacheNotDefined.into()),
+            (Some(p), None) if p.is_success() => Ok(CacheStatus::FixNotRequired.into()),
+            (None, Some(c)) if c.is_success() => Ok(CacheStatus::FixNotRequired.into()),
             (Some(p), Some(c)) if p.is_success() && c.is_success() => {
-                Ok(CacheResults::FixNotRequired)
+                Ok(CacheStatus::FixNotRequired.into())
             }
-            _ => Ok(CacheResults::FixRequired),
+            _ => Ok(CacheStatus::FixRequired.into()),
         }
     }
 
     async fn evaluate_command_checks(
         &self,
         report: &mut ReportBuilder,
-    ) -> Result<Option<CacheResults>, RuntimeError> {
+    ) -> Result<Option<CacheStatus>, RuntimeError> {
         if let Some(action_command) = &self.action.check.command {
             let result = self.run_check_command(action_command, report).await?;
             return Ok(Some(result));
@@ -310,7 +326,7 @@ impl DefaultDoctorActionRun {
     async fn evaluate_path_check(
         &self,
         paths: &DoctorGroupCachePath,
-    ) -> Result<CacheResults, RuntimeError> {
+    ) -> Result<CacheStatus, RuntimeError> {
         let result = self
             .glob_walker
             .have_globs_changed(
@@ -322,9 +338,9 @@ impl DefaultDoctorActionRun {
             .await?;
 
         if result {
-            Ok(CacheResults::FixNotRequired)
+            Ok(CacheStatus::FixNotRequired)
         } else {
-            Ok(CacheResults::FixRequired)
+            Ok(CacheStatus::FixRequired)
         }
     }
 
@@ -332,9 +348,9 @@ impl DefaultDoctorActionRun {
         &self,
         action_command: &DoctorGroupActionCommand,
         report: &mut ReportBuilder,
-    ) -> Result<CacheResults, RuntimeError> {
+    ) -> Result<CacheStatus, RuntimeError> {
         info!("Evaluating {:?}", action_command);
-        let mut result: Option<CacheResults> = None;
+        let mut result: Option<CacheStatus> = None;
         for command in &action_command.commands {
             let args = vec![command.clone()];
             let path = format!(
@@ -361,9 +377,9 @@ impl DefaultDoctorActionRun {
             );
 
             let command_result = match output.exit_code {
-                Some(0) => CacheResults::FixNotRequired,
-                Some(100..=i32::MAX) => CacheResults::StopExecution,
-                _ => CacheResults::FixRequired,
+                Some(0) => CacheStatus::FixNotRequired,
+                Some(100..=i32::MAX) => CacheStatus::StopExecution,
+                _ => CacheStatus::FixRequired,
             };
 
             let next = match &result {
@@ -372,12 +388,12 @@ impl DefaultDoctorActionRun {
             };
 
             result.replace(next);
-            if result == Some(CacheResults::StopExecution) {
+            if result == Some(CacheStatus::StopExecution) {
                 break;
             }
         }
 
-        Ok(result.unwrap_or(CacheResults::FixRequired))
+        Ok(result.unwrap_or(CacheStatus::FixRequired))
     }
 }
 
