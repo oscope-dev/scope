@@ -34,6 +34,8 @@ fn test_run_check_fix_then_recheck_fails_shows_output() {
         "Check initially failed, fix ran, verification failed, group: \"path-exists\", name: \"file-exists\"",
     ))
         .stdout(predicate::str::contains("file-mod.txt"))
+        .stdout(predicate::str::contains("path-exists/file-exists:  /"))
+        .stdout(predicate::str::contains("path-exists/file-exists:  found file /"))
         .stdout(predicate::str::contains("Summary: 0 groups succeeded, 1 groups failed"));
 
     helper.clean_work_dir();

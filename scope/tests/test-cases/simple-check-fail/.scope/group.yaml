@@ -8,6 +8,7 @@ spec:
     - name: file-exists
       check:
         commands:
+          - echo "found file {{ working_dir }}/file-mod.txt"
           - test -f {{ working_dir }}/file-mod.txt
       fix:
         commands:
