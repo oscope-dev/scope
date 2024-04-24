@@ -123,22 +123,22 @@ where
                     }
                     ActionRunStatus::CheckFailedFixFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
-                        print_pretty_result(&group_name, &action.name(), &action_result)?;
+                        print_pretty_result(&group_name, &action.name(), &action_result).await.ok();
                     }
                     ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
                         error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
-                        print_pretty_result(&group_name, &action.name(), &action_result)?;
+                        print_pretty_result(&group_name, &action.name(), &action_result).await.ok();
                     }
                     ActionRunStatus::CheckFailedNoRunFix => {
                         info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
                     }
                     ActionRunStatus::CheckFailedNoFixProvided => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");
-                        print_pretty_result(&group_name, &action.name(), &action_result)?;
+                        print_pretty_result(&group_name, &action.name(), &action_result).await.ok();
                     }
                     ActionRunStatus::CheckFailedFixFailedStop => {
                         error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
-                        print_pretty_result(&group_name, &action.name(), &action_result)?;
+                        print_pretty_result(&group_name, &action.name(), &action_result).await.ok();
                     }
                 }
 
@@ -180,13 +180,13 @@ where
     }
 }
 
-fn print_pretty_result(group_name: &str, action_name: &str, result: &ActionRunResult) -> Result<()> {
+async fn print_pretty_result(group_name: &str, action_name: &str, result: &ActionRunResult) -> Result<()> {
     if let Some(text) = &result.error_output {
         let line_prefix = format!("{}/{}", group_name, action_name);
-        text.lines().for_each(|line| {
+        for line in text.lines() {
             let output_line = format!("{}:  {}", line_prefix.dimmed(), line);
             report_stdout!("{}", output_line);
-        });
+        }
     }
     Ok(())
 }
