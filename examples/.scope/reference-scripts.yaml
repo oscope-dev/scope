@@ -9,7 +9,7 @@ spec:
       check:
         commands:
           # when not using an absolute-path, or a command on PATH, the command is relative to the file
-          - ./scripts/file-exists path-exists
+          - ./scripts/file-exists.sh path-exists
       fix:
         commands:
-          - ../bin/create-file path-exists
+          - ../bin/create-file.sh path-exists

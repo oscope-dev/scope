@@ -1,6 +1,7 @@
 use super::redact::Redactor;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use colored::Colorize;
 use derive_builder::Builder;
 use mockall::automock;
 use std::collections::BTreeMap;
@@ -51,6 +52,7 @@ pub struct OutputCapture {
 #[derive(Clone, Debug)]
 pub enum OutputDestination {
     StandardOut,
+    StandardOutWithPrefix(String),
     Logging,
     Null,
 }
@@ -76,6 +78,9 @@ impl<R: io::AsyncRead + Unpin> StreamCapture<R> {
                 },
                 OutputDestination::StandardOut => {
                     writeln!(self.writer.write().await, "{}", line).ok();
+                }
+                OutputDestination::StandardOutWithPrefix(prefix) => {
+                    writeln!(self.writer.write().await, "{}:  {}", prefix.dimmed(), line).ok();
                 }
                 OutputDestination::Null => {}
             };
@@ -222,6 +227,20 @@ impl OutputCapture {
             .join("\n");
 
         Redactor::new().redact_text(&text).to_string()
+    }
+
+    pub fn generate_user_output(&self) -> String {
+        let mut output = Vec::new();
+        output.extend(self.stdout.iter());
+        output.extend(self.stderr.iter());
+
+        output.sort_by(|(l_time, _), (r_time, _)| l_time.cmp(r_time));
+
+        output
+            .iter()
+            .map(|(_, line)| line.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     pub fn create_report_text(&self) -> anyhow::Result<String> {
