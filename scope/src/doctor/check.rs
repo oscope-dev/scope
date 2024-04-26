@@ -5,7 +5,7 @@ use std::cmp::max;
 use std::collections::BTreeMap;
 
 use crate::models::HelpMetadata;
-use crate::prelude::{progress_bar_without_pos, ReportBuilder};
+use crate::prelude::ReportBuilder;
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorGroup, DoctorGroupAction, DoctorGroupActionCommand,
     DoctorGroupCachePath, ExecutionProvider, OutputDestination,
@@ -17,8 +17,7 @@ use mockall::automock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, info_span, instrument};
-use tracing_indicatif::span_ext::IndicatifSpanExt;
+use tracing::{error, info, instrument};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -128,6 +127,7 @@ pub trait DoctorActionRun: Send + Sync {
     async fn run_action(&self, report: &mut ReportBuilder) -> Result<ActionRunResult>;
     fn required(&self) -> bool;
     fn name(&self) -> String;
+    fn description(&self) -> String;
     fn help_text(&self) -> Option<String>;
     fn help_url(&self) -> Option<String>;
 }
@@ -151,14 +151,6 @@ pub struct DefaultDoctorActionRun {
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     async fn run_action(&self, report: &mut ReportBuilder) -> Result<ActionRunResult> {
-        let action_span = info_span!("action", "indicatif.pb_show" = true);
-        action_span.pb_set_message(&format!(
-            "action {} - {}",
-            self.action.name, self.action.description
-        ));
-        action_span.pb_set_style(&progress_bar_without_pos());
-        let _span = action_span.enter();
-
         let check_results = self.evaluate_checks(report).await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
@@ -223,6 +215,10 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
     fn help_url(&self) -> Option<String> {
         self.action.fix.help_url.clone()
+    }
+
+    fn description(&self) -> String {
+        self.action.description.to_string()
     }
 }
 

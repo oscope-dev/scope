@@ -1,0 +1,17 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: noop-2
+  description: Sleep test to show UX
+spec:
+  needs:
+    - noop-1
+  actions:
+    - name: sleep 10
+      check:
+        commands:
+          - sleep 10
+    - name: sleep 5
+      check:
+        commands:
+          - sleep 5
