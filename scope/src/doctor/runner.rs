@@ -461,6 +461,7 @@ mod tests {
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "foo".to_string());
         run.expect_required().return_const(true);
+        run.expect_description().returning(|| "description".to_string());
         vec![run]
     }
 
