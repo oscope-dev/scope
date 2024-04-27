@@ -50,7 +50,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
 
       - name: Install cargo-release
-        run: cargo install cargo-release
+        run: cargo install cargo-release@0.25.6
 
       - name: Setup user details
         run: |

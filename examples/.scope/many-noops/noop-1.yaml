@@ -1,0 +1,15 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: noop-1
+  description: Sleep Test to validate UI
+spec:
+  actions:
+    - name: sleep 1
+      check:
+        commands:
+          - sleep 1
+    - name: sleep 2
+      check:
+        commands:
+          - sleep 2

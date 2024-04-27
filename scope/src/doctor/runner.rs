@@ -1,5 +1,5 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
-use crate::prelude::ReportBuilder;
+use crate::prelude::{progress_bar_without_pos, ReportBuilder};
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
@@ -9,7 +9,7 @@ use petgraph::prelude::*;
 use petgraph::visit::{DfsPostOrder, Walker};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
-use tracing::{debug, error, info, info_span, warn, Span};
+use tracing::{debug, error, info, info_span, warn, Instrument, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 #[derive(Debug)]
@@ -74,10 +74,14 @@ where
             }
         }
 
-        self.run_path(full_path).await
+        self.run_path(&header_span, full_path).await
     }
 
-    async fn run_path(&self, groups: Vec<(&String, &Vec<T>)>) -> Result<PathRunResult> {
+    async fn run_path(
+        &self,
+        header_span: &Span,
+        groups: Vec<(&String, &Vec<T>)>,
+    ) -> Result<PathRunResult> {
         let mut skip_remaining = false;
         let mut run_result = PathRunResult {
             did_succeed: true,
@@ -88,104 +92,133 @@ where
         };
 
         for (group_name, actions) in groups {
-            Span::current().pb_inc(1);
+            header_span.pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
-            let group_span = info_span!("group", "indicatif.pb_show" = true);
+            let group_span = info_span!(parent: header_span, "group", "indicatif.pb_show" = true);
             group_span.pb_set_length(actions.len() as u64);
             group_span.pb_set_message(&format!("group {}", group_name));
-            let _span = group_span.enter();
+            {
+                let _span = group_span.enter();
 
-            if skip_remaining {
-                run_result.skipped_group.insert(group_name.to_string());
-            }
-            let mut has_failure = false;
-
-            for action in actions {
-                group_span.pb_inc(1);
                 if skip_remaining {
-                    info!(target: "user", "Check `{}/{}` was skipped.", group_name.bold(), action.name());
                     run_result.skipped_group.insert(group_name.to_string());
-                    continue;
                 }
+                let mut has_failure = false;
 
-                let action_result = action.run_action(&mut run_result.report).await?;
+                for action in actions {
+                    group_span.pb_inc(1);
+                    if skip_remaining {
+                        info!(target: "user", "Check `{}/{}` was skipped.", group_name.bold(), action.name());
+                        run_result.skipped_group.insert(group_name.to_string());
+                        continue;
+                    }
 
-                match action_result.status {
-                    ActionRunStatus::CheckSucceeded => {
-                        info!(target: "progress", group = group_name, name = action.name(), "Check was successful");
-                    }
-                    ActionRunStatus::NoCheckFixSucceeded => {
-                        info!(target: "progress", group = group_name, name = action.name(), "Fix ran successfully");
-                    }
-                    ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
-                        info!(target: "progress", group = group_name, name = action.name(), "Check initially failed, fix was successful");
-                    }
-                    ActionRunStatus::CheckFailedFixFailed => {
-                        error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
-                        print_pretty_result(group_name, &action.name(), &action_result)
-                            .await
-                            .ok();
-                    }
-                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
-                        error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
-                        print_pretty_result(group_name, &action.name(), &action_result)
-                            .await
-                            .ok();
-                    }
-                    ActionRunStatus::CheckFailedNoRunFix => {
-                        info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
-                    }
-                    ActionRunStatus::CheckFailedNoFixProvided => {
-                        error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");
-                        print_pretty_result(group_name, &action.name(), &action_result)
-                            .await
-                            .ok();
-                    }
-                    ActionRunStatus::CheckFailedFixFailedStop => {
-                        error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
-                        print_pretty_result(group_name, &action.name(), &action_result)
-                            .await
-                            .ok();
-                    }
-                }
+                    let action_span =
+                        info_span!(parent: &group_span, "action", "indicatif.pb_show" = true);
+                    action_span.pb_set_message(&format!(
+                        "action {} - {}",
+                        action.name(),
+                        action.description()
+                    ));
+                    action_span.pb_set_style(&progress_bar_without_pos());
 
-                if action_result.status.is_failure() {
-                    if let Some(help_text) = &action.help_text() {
-                        error!(target: "user", group = group_name, name = action.name(), "Action Help: {}", help_text);
-                    }
-                    if let Some(help_url) = &action.help_url() {
-                        error!(target: "user", group = group_name, name = action.name(), "For more help, please visit {}", help_url);
-                    }
-                }
+                    let action_result = action
+                        .run_action(&mut run_result.report)
+                        .instrument(action_span)
+                        .await?;
+                    // ignore the result, because reporting shouldn't cause app to crash
+                    report_action_output(group_name, action, &action_result)
+                        .await
+                        .ok();
 
-                match action_result.status {
-                    ActionRunStatus::CheckSucceeded
-                    | ActionRunStatus::NoCheckFixSucceeded
-                    | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
-                    ActionRunStatus::CheckFailedFixFailedStop => {
-                        skip_remaining = true;
-                        has_failure = true;
-                    }
-                    _ => {
-                        if action.required() {
+                    match action_result.status {
+                        ActionRunStatus::CheckSucceeded
+                        | ActionRunStatus::NoCheckFixSucceeded
+                        | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
+                        ActionRunStatus::CheckFailedFixFailedStop => {
                             skip_remaining = true;
+                            has_failure = true;
                         }
-                        has_failure = true;
+                        _ => {
+                            if action.required() {
+                                skip_remaining = true;
+                            }
+                            has_failure = true;
+                        }
                     }
                 }
-            }
 
-            if has_failure {
-                run_result.failed_group.insert(group_name.to_string());
-                run_result.did_succeed = false;
-            } else {
-                run_result.succeeded_groups.insert(group_name.to_string());
+                if has_failure {
+                    run_result.failed_group.insert(group_name.to_string());
+                    run_result.did_succeed = false;
+                } else {
+                    run_result.succeeded_groups.insert(group_name.to_string());
+                }
             }
         }
 
         Ok(run_result)
     }
+}
+
+async fn report_action_output<T>(
+    group_name: &str,
+    action: &T,
+    action_result: &ActionRunResult,
+) -> Result<()>
+where
+    T: DoctorActionRun,
+{
+    match action_result.status {
+        ActionRunStatus::CheckSucceeded => {
+            info!(target: "progress", group = group_name, name = action.name(), "Check was successful");
+        }
+        ActionRunStatus::NoCheckFixSucceeded => {
+            info!(target: "progress", group = group_name, name = action.name(), "Fix ran successfully");
+        }
+        ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
+            info!(target: "progress", group = group_name, name = action.name(), "Check initially failed, fix was successful");
+        }
+        ActionRunStatus::CheckFailedFixFailed => {
+            error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {}", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
+            error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedNoRunFix => {
+            info!(target: "progress", group = group_name, name = action.name(), "Check failed, fix was not run");
+        }
+        ActionRunStatus::CheckFailedNoFixProvided => {
+            error!(target: "user", group = group_name, name = action.name(), "Check failed, no fix provided");
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedFixFailedStop => {
+            error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+    }
+
+    if action_result.status.is_failure() {
+        if let Some(help_text) = &action.help_text() {
+            error!(target: "user", group = group_name, name = action.name(), "Action Help: {}", help_text);
+        }
+        if let Some(help_url) = &action.help_url() {
+            error!(target: "user", group = group_name, name = action.name(), "For more help, please visit {}", help_url);
+        }
+    }
+
+    Ok(())
 }
 
 async fn print_pretty_result(
@@ -428,6 +461,8 @@ mod tests {
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "foo".to_string());
         run.expect_required().return_const(true);
+        run.expect_description()
+            .returning(|| "description".to_string());
         vec![run]
     }
 
