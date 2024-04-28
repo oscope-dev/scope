@@ -253,21 +253,9 @@ impl OutputCapture {
         writeln!(&mut f, "```")?;
         writeln!(&mut f)?;
 
-        writeln!(
-            &mut f,
-            "- Exit code: `{}`",
-            self.exit_code.unwrap_or(-1)
-        )?;
-        writeln!(
-            &mut f,
-            "- Started at: `{}`",
-            self.start_time
-        )?;
-        writeln!(
-            &mut f,
-            "- Finished at: `{}`",
-            self.end_time
-        )?;
+        writeln!(&mut f, "- Exit code: `{}`", self.exit_code.unwrap_or(-1))?;
+        writeln!(&mut f, "- Started at: `{}`", self.start_time)?;
+        writeln!(&mut f, "- Finished at: `{}`", self.end_time)?;
 
         Ok(f)
     }
