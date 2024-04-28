@@ -101,7 +101,7 @@ impl<'a> ReportBuilder {
             .clone()
             .map_or("".to_string(), |m| format!("{}\n\n", m));
 
-        format!("{}## Captured Data\n\n{}", top, self.command_results)
+        format!("{}## Captured Data\n{}", top, self.command_results)
     }
 
     pub async fn distribute_report(&self, config: &'a FoundConfig) -> Result<()> {
