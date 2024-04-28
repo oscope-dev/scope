@@ -30,5 +30,5 @@ spec:
     nodeVersion: node -v
   template: |
     # There was an error!
-    
+
     When running `{{ command }}` scope ran into an error
