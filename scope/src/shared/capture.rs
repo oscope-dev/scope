@@ -106,6 +106,19 @@ pub enum CaptureError {
     },
 }
 
+impl CaptureError {
+    pub fn create_report_text(&self, command: &String) -> anyhow::Result<String> {
+        let mut f = String::new();
+        writeln!(&mut f, "### `{}`", command)?;
+        writeln!(&mut f)?;
+
+        writeln!(&mut f, "```text")?;
+        writeln!(&mut f, "CaptureError: {}", self)?;
+        writeln!(&mut f, "```")?;
+        Ok(f)
+    }
+}
+
 #[automock]
 #[async_trait]
 pub trait ExecutionProvider: Send + Sync {
