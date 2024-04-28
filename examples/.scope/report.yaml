@@ -24,7 +24,7 @@ metadata:
   name: template
 spec:
   additionalData:
-    username: id -u
+    username: id -nu
     ruby: which ruby
     node: which node
     nodeVersion: node -v
