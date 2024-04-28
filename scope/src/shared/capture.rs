@@ -115,7 +115,6 @@ impl CaptureError {
         writeln!(&mut f, "```text")?;
         writeln!(&mut f, "CaptureError: {}", self)?;
         writeln!(&mut f, "```")?;
-        writeln!(&mut f)?;
         Ok(f)
     }
 }
