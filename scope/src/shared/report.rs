@@ -1,4 +1,4 @@
-use super::capture::{CaptureOpts, OutputCapture, CaptureError};
+use super::capture::{CaptureError, CaptureOpts, OutputCapture};
 use super::config_load::FoundConfig;
 use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
@@ -50,20 +50,20 @@ impl<'a> ReportBuilder {
         }
     }
 
-    pub fn add_capture(&mut self, capture: &outputcapture) -> result<()> {
+    pub fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
         self.command_results.push('\n');
         self.command_results
             .push_str(&capture.create_report_text()?);
 
-        ok(())
+        Ok(())
     }
 
-    pub fn add_capture_error(&mut self, error: &CaptureError, command: &String) -> result<()> {
+    pub fn add_capture_error(&mut self, error: &CaptureError, command: &String) -> Result<()> {
         self.command_results.push('\n');
         self.command_results
             .push_str(&error.create_report_text(command)?);
 
-        ok(())
+        Ok(())
     }
 
     pub async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
@@ -80,9 +80,8 @@ impl<'a> ReportBuilder {
 
             match result {
                 Ok(capture) => self.add_capture(&capture)?,
-                Err(error) => self.add_capture_error(&error, command)?
+                Err(error) => self.add_capture_error(&error, command)?,
             }
-
         }
 
         Ok(())
