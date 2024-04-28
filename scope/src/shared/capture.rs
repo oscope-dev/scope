@@ -259,25 +259,18 @@ impl OutputCapture {
 
     pub fn create_report_text(&self) -> anyhow::Result<String> {
         let mut f = String::new();
-        writeln!(&mut f, "### Command Results\n")?;
-        writeln!(&mut f, "Ran command `/usr/bin/env -S {}`", self.command)?;
-        writeln!(
-            &mut f,
-            "Execution started: {}; finished: {}",
-            self.start_time, self.end_time
-        )?;
-        writeln!(
-            &mut f,
-            "Result of command: {}",
-            self.exit_code.unwrap_or(-1)
-        )?;
+        writeln!(&mut f, "### `{}`", self.command)?;
         writeln!(&mut f)?;
-        writeln!(&mut f, "#### Output")?;
-        writeln!(&mut f)?;
+
         writeln!(&mut f, "```text")?;
         writeln!(&mut f, "{}", self.generate_output().trim())?;
         writeln!(&mut f, "```")?;
         writeln!(&mut f)?;
+
+        writeln!(&mut f, "- Exit code: `{}`", self.exit_code.unwrap_or(-1))?;
+        writeln!(&mut f, "- Started at: `{}`", self.start_time)?;
+        writeln!(&mut f, "- Finished at: `{}`", self.end_time)?;
+
         Ok(f)
     }
 
