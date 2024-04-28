@@ -1,4 +1,4 @@
-use super::capture::{CaptureOpts, OutputCapture};
+use super::capture::{CaptureOpts, OutputCapture, CaptureError};
 use super::config_load::FoundConfig;
 use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
@@ -50,27 +50,39 @@ impl<'a> ReportBuilder {
         }
     }
 
-    pub fn add_capture(&mut self, capture: &OutputCapture) -> Result<()> {
+    pub fn add_capture(&mut self, capture: &outputcapture) -> result<()> {
         self.command_results.push('\n');
         self.command_results
             .push_str(&capture.create_report_text()?);
 
-        Ok(())
+        ok(())
+    }
+
+    pub fn add_capture_error(&mut self, error: &CaptureError, command: &String) -> result<()> {
+        self.command_results.push('\n');
+        self.command_results
+            .push_str(&error.create_report_text(command)?);
+
+        ok(())
     }
 
     pub async fn add_additional_data(&mut self, config: &'a FoundConfig) -> Result<()> {
         for command in config.get_report_definition().additional_data.values() {
             let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
-            let capture = OutputCapture::capture_output(CaptureOpts {
+            let result = OutputCapture::capture_output(CaptureOpts {
                 working_dir: &config.working_dir,
                 args: &args,
                 output_dest: OutputDestination::Null,
                 path: &config.bin_path,
                 env_vars: Default::default(),
             })
-            .await?;
+            .await;
 
-            self.add_capture(&capture)?;
+            match result {
+                Ok(capture) => self.add_capture(&capture)?,
+                Err(error) => self.add_capture_error(&error, command)?
+            }
+
         }
 
         Ok(())
