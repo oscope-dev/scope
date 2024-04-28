@@ -112,7 +112,6 @@ impl CaptureError {
         writeln!(&mut f, "### `{}`", command)?;
         writeln!(&mut f)?;
 
-        writeln!(&mut f, "*Error running command*")?;
         writeln!(&mut f, "```text")?;
         writeln!(&mut f, "{}", self)?;
         writeln!(&mut f, "```")?;
