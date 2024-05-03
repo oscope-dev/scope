@@ -2,15 +2,21 @@ use super::capture::{CaptureError, CaptureOpts, OutputCapture};
 use super::config_load::FoundConfig;
 use super::models::prelude::ReportUploadLocationDestination;
 use super::prelude::OutputDestination;
+use crate::prelude::ReportUploadLocation;
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use derive_builder::Builder;
 use jsonwebtoken::EncodingKey;
 use minijinja::{context, Environment};
 use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
 use octocrab::Octocrab;
 use secrecy::SecretString;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
+
 use tracing::{debug, info, warn};
 use url::Url;
 
@@ -263,4 +269,171 @@ pub fn write_to_report_file(prefix: &str, text: &str) -> Result<String> {
     file.write_all(text.as_bytes())?;
 
     Ok(file_path)
+}
+
+#[derive(Debug, Clone, Default, Builder)]
+#[builder(setter(into))]
+pub struct ActionTaskReport {
+    #[builder(default)]
+    pub command: String,
+    #[builder(default)]
+    pub output: Option<String>,
+    #[builder(default)]
+    pub exit_code: Option<i32>,
+    #[builder(default)]
+    pub start_time: DateTime<Utc>,
+    #[builder(default)]
+    pub end_time: DateTime<Utc>,
+}
+
+impl From<&OutputCapture> for ActionTaskReport {
+    fn from(value: &OutputCapture) -> Self {
+        ActionTaskReport {
+            exit_code: value.exit_code,
+            output: Some(value.generate_user_output()),
+            command: value.command.clone(),
+            start_time: value.start_time,
+            end_time: value.end_time,
+        }
+    }
+}
+
+impl ActionTaskReport {
+    pub fn get_output(&self) -> String {
+        match &self.output {
+            Some(body) => body.to_string(),
+            None => "No Output".to_string(),
+        }
+    }
+
+    fn write_output<T>(&self, f: &mut T) -> Result<()>
+    where
+        T: std::fmt::Write,
+    {
+        writeln!(f, "Command: `{}`\n", self.command)?;
+
+        writeln!(f, "Output:")?;
+        writeln!(f, "```text",)?;
+        writeln!(f, "{}", self.get_output())?;
+        writeln!(f, "```",)?;
+
+        writeln!(f, "- Exit code: `{}`", self.exit_code.unwrap_or(-1))?;
+        writeln!(f, "- Started at: `{}`", self.start_time)?;
+        writeln!(f, "- Finished at: `{}`", self.end_time)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default, Builder)]
+#[builder(setter(into))]
+pub struct ActionReport {
+    #[builder(default)]
+    pub action_name: String,
+    #[builder(default)]
+    pub check: Vec<ActionTaskReport>,
+    #[builder(default)]
+    pub fix: Vec<ActionTaskReport>,
+    #[builder(default)]
+    pub validate: Vec<ActionTaskReport>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupReport {
+    group_name: String,
+    action_result: Vec<ActionReport>,
+    additional_details: BTreeMap<String, String>,
+}
+
+impl GroupReport {
+    pub fn add_action(&mut self, action_report: &ActionReport) {
+        self.action_result.push(action_report.clone());
+    }
+
+    pub fn add_additional_details(&mut self, key: &str, value: &str) {
+        self.additional_details
+            .insert(key.to_string(), value.to_string());
+    }
+
+    pub fn new(group_name: &str) -> Self {
+        Self {
+            group_name: group_name.to_string(),
+            action_result: Vec::new(),
+            additional_details: BTreeMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+pub trait TemplatedReportBuilder {
+    fn create_group(&mut self, group_result: &GroupReport) -> Result<()>;
+
+    async fn add_additional_data(&mut self, commands: BTreeMap<String, String>) -> Result<()>;
+
+    async fn distribute_report(&self) -> Result<()>;
+}
+
+#[derive(Debug, Clone)]
+pub struct DefaultTemplatedReportBuilder {
+    title: String,
+    output: String,
+    destination: ReportUploadLocation,
+}
+
+impl DefaultTemplatedReportBuilder {
+    pub fn new(title: &str, dest: &ReportUploadLocation) -> Self {
+        Self {
+            title: title.to_string(),
+            output: format!("# {}\n", title),
+            destination: dest.clone(),
+        }
+    }
+}
+
+#[async_trait]
+impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
+    fn create_group(&mut self, group_result: &GroupReport) -> Result<()> {
+        use std::fmt::Write;
+
+        writeln!(self.output, "## {}\n", group_result.group_name)?;
+        for action in &group_result.action_result {
+            writeln!(self.output, "### {}", action.action_name)?;
+
+            for check in &action.check {
+                check.write_output(&mut self.output)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn add_additional_data(
+        &mut self,
+        additional_data: BTreeMap<String, String>,
+    ) -> Result<()> {
+        use std::fmt::Write;
+
+        writeln!(self.output, "## Additional Capture Data\n")?;
+        writeln!(self.output, "| Name | Value |")?;
+        writeln!(self.output, "|:---|:---|")?;
+
+        for (name, result) in additional_data {
+            writeln!(self.output, "|{}|<pre>{}</pre>|", name, result)?;
+        }
+
+        Ok(())
+    }
+
+    async fn distribute_report(&self) -> Result<()> {
+        if let Err(e) = &self
+            .destination
+            .destination
+            .upload(&self.title, &self.output)
+            .await
+        {
+            warn!(target: "user", "Unable to upload to {}: {}", self.destination.metadata.name(), e);
+        }
+
+        Ok(())
+    }
 }

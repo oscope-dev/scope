@@ -1,6 +1,7 @@
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::models::core::ModelMetadata;
 use crate::models::v1alpha::V1AlphaApiVersion;
@@ -96,6 +97,12 @@ pub struct DoctorGroupSpec {
     /// dependency.
     #[serde(default)]
     pub include: DoctorInclude,
+
+    /// defines additional data that needs to be pulled from the system when reporting a bug.
+    /// `additionalData` is a map of `string:string`, the value is a command that should be run.
+    /// When a report is built, the commands will be run and automatically included in the report.
+    #[serde(default)]
+    pub report_extra_details: BTreeMap<String, String>,
 }
 
 /// Configure how a groups will be used when determining the task graph.

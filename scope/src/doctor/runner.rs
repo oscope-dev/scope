@@ -1,5 +1,7 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
-use crate::prelude::{progress_bar_without_pos, ReportBuilder};
+use crate::prelude::{
+    progress_bar_without_pos, CaptureOpts, ExecutionProvider, GroupReport, OutputDestination,
+};
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
@@ -9,6 +11,8 @@ use petgraph::prelude::*;
 use petgraph::visit::{DfsPostOrder, Walker};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
+use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::{debug, error, info, info_span, warn, Instrument, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
@@ -18,7 +22,7 @@ pub struct PathRunResult {
     pub succeeded_groups: BTreeSet<String>,
     pub failed_group: BTreeSet<String>,
     pub skipped_group: BTreeSet<String>,
-    pub report: ReportBuilder,
+    pub group_reports: Vec<GroupReport>,
 }
 
 impl Display for PathRunResult {
@@ -48,11 +52,74 @@ impl Display for PathRunResult {
     }
 }
 
+impl PathRunResult {
+    fn process(&mut self, group: &GroupExecutionResult) {
+        let group_name = group.group_name.to_string();
+        if group.skip_remaining {
+            self.skipped_group.insert(group_name.clone());
+        }
+        if group.has_failure {
+            self.failed_group.insert(group_name);
+            self.did_succeed = false;
+        } else {
+            self.succeeded_groups.insert(group_name);
+        }
+
+        self.group_reports.push(group.group_report.clone());
+    }
+}
+
+#[derive(Debug)]
+struct GroupExecutionResult {
+    group_name: String,
+    has_failure: bool,
+    skip_remaining: bool,
+    group_report: GroupReport,
+}
+
+pub struct GroupActionContainer<T>
+where
+    T: DoctorActionRun,
+{
+    pub group_name: String,
+    pub actions: Vec<T>,
+    pub additional_report_details: BTreeMap<String, String>,
+    pub exec_provider: Arc<dyn ExecutionProvider>,
+    pub exec_working_dir: PathBuf,
+    pub sys_path: String,
+}
+
+impl<T> GroupActionContainer<T>
+where
+    T: DoctorActionRun,
+{
+    pub async fn execute_command(&self, command: &str) -> Result<String> {
+        let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
+        let result = self
+            .exec_provider
+            .run_command(CaptureOpts {
+                working_dir: &self.exec_working_dir,
+                args: &args,
+                output_dest: OutputDestination::Null,
+                path: &self.sys_path,
+                env_vars: Default::default(),
+            })
+            .await;
+
+        let body = match result {
+            Ok(capture) => capture.generate_user_output(),
+            Err(error) => error.to_string(),
+        };
+
+        Ok(body)
+    }
+}
+
 pub struct RunGroups<T>
 where
     T: DoctorActionRun,
 {
-    pub(crate) group_actions: BTreeMap<String, Vec<T>>,
+    pub(crate) group_actions: BTreeMap<String, GroupActionContainer<T>>,
     pub(crate) all_paths: Vec<String>,
 }
 
@@ -61,104 +128,120 @@ where
     T: DoctorActionRun,
 {
     pub async fn execute(&self) -> Result<PathRunResult> {
+        let mut full_path = Vec::new();
+        for path in &self.all_paths {
+            if let Some(group_container) = self.group_actions.get(path) {
+                full_path.push(group_container);
+            }
+        }
+
+        self.run_path(full_path).await
+    }
+
+    async fn run_path(&self, groups: Vec<&GroupActionContainer<T>>) -> Result<PathRunResult> {
         let header_span = info_span!("doctor run", "indicatif.pb_show" = true);
         header_span.pb_set_length(self.all_paths.len() as u64);
         header_span.pb_set_message("scope doctor run");
 
         let _span = header_span.enter();
 
-        let mut full_path = Vec::new();
-        for path in &self.all_paths {
-            if let Some(actions) = self.group_actions.get(path) {
-                full_path.push((path, actions));
-            }
-        }
-
-        self.run_path(&header_span, full_path).await
-    }
-
-    async fn run_path(
-        &self,
-        header_span: &Span,
-        groups: Vec<(&String, &Vec<T>)>,
-    ) -> Result<PathRunResult> {
         let mut skip_remaining = false;
         let mut run_result = PathRunResult {
             did_succeed: true,
             succeeded_groups: BTreeSet::new(),
             failed_group: BTreeSet::new(),
             skipped_group: BTreeSet::new(),
-            report: ReportBuilder::new_blank("Scope bug report: `scope doctor run`".to_string()),
+            group_reports: Vec::new(),
         };
 
-        for (group_name, actions) in groups {
+        for group_container in groups {
+            let group_name = group_container.group_name.clone();
             header_span.pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
-            let group_span = info_span!(parent: header_span, "group", "indicatif.pb_show" = true);
-            group_span.pb_set_length(actions.len() as u64);
+            if skip_remaining {
+                run_result.skipped_group.insert(group_name.to_string());
+                continue;
+            }
+
+            let group_span = info_span!(parent: &header_span, "group", "indicatif.pb_show" = true);
+            group_span.pb_set_length(group_container.actions.len() as u64);
             group_span.pb_set_message(&format!("group {}", group_name));
-            {
-                let _span = group_span.enter();
+            let _span = group_span.enter();
 
-                if skip_remaining {
-                    run_result.skipped_group.insert(group_name.to_string());
+            let group_result = self.execute_group(&group_span, group_container).await?;
+            run_result.process(&group_result);
+
+            skip_remaining |= group_result.skip_remaining;
+        }
+
+        Ok(run_result)
+    }
+
+    async fn execute_group(
+        &self,
+        group_span: &Span,
+        container: &GroupActionContainer<T>,
+    ) -> Result<GroupExecutionResult> {
+        let mut results = GroupExecutionResult {
+            group_name: container.group_name.to_string(),
+            has_failure: false,
+            skip_remaining: false,
+            group_report: GroupReport::new(&container.group_name),
+        };
+
+        for action in &container.actions {
+            group_span.pb_inc(1);
+            if results.skip_remaining {
+                info!(target: "user", "Check `{}/{}` was skipped.", container.group_name.bold(), action.name());
+                continue;
+            }
+
+            let action_span = info_span!(parent: group_span, "action", "indicatif.pb_show" = true);
+            action_span.pb_set_message(&format!(
+                "action {} - {}",
+                action.name(),
+                action.description()
+            ));
+            action_span.pb_set_style(&progress_bar_without_pos());
+
+            let action_result = action.run_action().instrument(action_span).await?;
+
+            results
+                .group_report
+                .add_action(&action_result.action_report);
+
+            // ignore the result, because reporting shouldn't cause app to crash
+            report_action_output(&container.group_name, action, &action_result)
+                .await
+                .ok();
+
+            match action_result.status {
+                ActionRunStatus::CheckSucceeded
+                | ActionRunStatus::NoCheckFixSucceeded
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
+                ActionRunStatus::CheckFailedFixFailedStop => {
+                    results.skip_remaining = true;
+                    results.has_failure = true;
                 }
-                let mut has_failure = false;
-
-                for action in actions {
-                    group_span.pb_inc(1);
-                    if skip_remaining {
-                        info!(target: "user", "Check `{}/{}` was skipped.", group_name.bold(), action.name());
-                        run_result.skipped_group.insert(group_name.to_string());
-                        continue;
+                _ => {
+                    if action.required() {
+                        results.skip_remaining = true;
                     }
-
-                    let action_span =
-                        info_span!(parent: &group_span, "action", "indicatif.pb_show" = true);
-                    action_span.pb_set_message(&format!(
-                        "action {} - {}",
-                        action.name(),
-                        action.description()
-                    ));
-                    action_span.pb_set_style(&progress_bar_without_pos());
-
-                    let action_result = action
-                        .run_action(&mut run_result.report)
-                        .instrument(action_span)
-                        .await?;
-                    // ignore the result, because reporting shouldn't cause app to crash
-                    report_action_output(group_name, action, &action_result)
-                        .await
-                        .ok();
-
-                    match action_result.status {
-                        ActionRunStatus::CheckSucceeded
-                        | ActionRunStatus::NoCheckFixSucceeded
-                        | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
-                        ActionRunStatus::CheckFailedFixFailedStop => {
-                            skip_remaining = true;
-                            has_failure = true;
-                        }
-                        _ => {
-                            if action.required() {
-                                skip_remaining = true;
-                            }
-                            has_failure = true;
-                        }
-                    }
-                }
-
-                if has_failure {
-                    run_result.failed_group.insert(group_name.to_string());
-                    run_result.did_succeed = false;
-                } else {
-                    run_result.succeeded_groups.insert(group_name.to_string());
+                    results.has_failure = true;
                 }
             }
         }
 
-        Ok(run_result)
+        for (name, command) in &container.additional_report_details {
+            let output = container.execute_command(command).await.ok();
+            results.group_report.add_additional_details(
+                name,
+                &output.unwrap_or_else(|| "Unable to capture output".to_string()),
+            );
+        }
+
+        Ok(results)
     }
 }
 
@@ -226,13 +309,22 @@ async fn print_pretty_result(
     action_name: &str,
     result: &ActionRunResult,
 ) -> Result<()> {
-    if let Some(text) = &result.error_output {
-        let line_prefix = format!("{}/{}", group_name, action_name);
-        for line in text.lines() {
-            let output_line = format!("{}:  {}", line_prefix.dimmed(), line);
-            report_stdout!("{}", output_line);
+    let action_report = &result.action_report;
+    let task_reports = if !action_report.check.is_empty() {
+        action_report.check.clone()
+    } else {
+        action_report.validate.clone()
+    };
+    for task in task_reports {
+        if let Some(text) = task.output {
+            let line_prefix = format!("{}/{}", group_name, action_name);
+            for line in text.lines() {
+                let output_line = format!("{}:  {}", line_prefix.dimmed(), line);
+                report_stdout!("{}", output_line);
+            }
         }
     }
+
     Ok(())
 }
 
@@ -289,11 +381,15 @@ pub fn compute_group_order(
 #[cfg(test)]
 mod tests {
     use crate::doctor::check::tests::build_run_fail_fix_succeed_action;
-    use crate::doctor::check::{ActionRunResult, ActionRunStatus, MockDoctorActionRun};
-    use crate::doctor::runner::{compute_group_order, RunGroups};
+    use crate::doctor::check::{
+        ActionRunResult, ActionRunStatus, DoctorActionRun, MockDoctorActionRun,
+    };
+    use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
+    use crate::prelude::MockExecutionProvider;
     use anyhow::Result;
     use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_compute_group_order_with_no_dep_will_have_no_tasks() -> Result<()> {
@@ -456,10 +552,10 @@ mod tests {
     fn make_action_run(result: ActionRunStatus) -> Vec<MockDoctorActionRun> {
         let mut run = MockDoctorActionRun::new();
         run.expect_run_action()
-            .returning(move |_| Ok(ActionRunResult::from(result.clone())));
+            .returning(move || Ok(ActionRunResult::from_status("a_name", result.clone())));
         run.expect_help_text().return_const(None);
         run.expect_help_url().return_const(None);
-        run.expect_name().returning(|| "foo".to_string());
+        run.expect_name().returning(|| "step name".to_string());
         run.expect_required().return_const(true);
         run.expect_description()
             .returning(|| "description".to_string());
@@ -467,33 +563,49 @@ mod tests {
     }
 
     fn will_not_run() -> Vec<MockDoctorActionRun> {
-        let run = MockDoctorActionRun::new();
+        let mut run = MockDoctorActionRun::new();
+        run.expect_run_action().never();
+        run.expect_help_text().return_const(None);
+        run.expect_help_url().return_const(None);
+        run.expect_name()
+            .returning(|| "step name not run".to_string());
+        run.expect_required().return_const(true);
+        run.expect_description()
+            .returning(|| "description".to_string());
         vec![run]
+    }
+
+    fn make_group_action<T: DoctorActionRun>(
+        name: &str,
+        result: Vec<T>,
+    ) -> (String, GroupActionContainer<T>) {
+        (
+            name.to_string(),
+            GroupActionContainer {
+                group_name: name.to_string(),
+                actions: result,
+                additional_report_details: Default::default(),
+                exec_provider: Arc::new(MockExecutionProvider::new()),
+                exec_working_dir: Default::default(),
+                sys_path: "".to_string(),
+            },
+        )
     }
 
     #[tokio::test]
     async fn test_execute_run_with_multiple_paths_only_run_group_once() -> Result<()> {
-        let mut group_actions = BTreeMap::new();
-
-        group_actions.insert(
-            "step_1".to_string(),
-            make_action_run(ActionRunStatus::CheckSucceeded),
-        );
-        group_actions.insert(
-            "step_2".to_string(),
-            make_action_run(ActionRunStatus::CheckSucceeded),
-        );
-        group_actions.insert(
-            "step_3".to_string(),
-            make_action_run(ActionRunStatus::CheckSucceeded),
-        );
+        let group_actions = BTreeMap::from([
+            make_group_action("group_1", make_action_run(ActionRunStatus::CheckSucceeded)),
+            make_group_action("group_2", make_action_run(ActionRunStatus::CheckSucceeded)),
+            make_group_action("group_3", make_action_run(ActionRunStatus::CheckSucceeded)),
+        ]);
 
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                "step_1".to_string(),
-                "step_2".to_string(),
-                "step_3".to_string(),
+                "group_1".to_string(),
+                "group_2".to_string(),
+                "group_3".to_string(),
             ],
         };
 
@@ -505,20 +617,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dep_fails_wont_run_others() -> Result<()> {
-        let mut group_actions = BTreeMap::new();
-        group_actions.insert(
-            "step_1".to_string(),
-            make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
-        );
-        group_actions.insert("step_2".to_string(), will_not_run());
-        group_actions.insert("step_3".to_string(), will_not_run());
+        let group_actions = BTreeMap::from([
+            make_group_action(
+                "group_1",
+                make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
+            ),
+            make_group_action("group_2", will_not_run()),
+            make_group_action("group_3", will_not_run()),
+        ]);
 
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                "step_1".to_string(),
-                "step_2".to_string(),
-                "step_3".to_string(),
+                "group_1".to_string(),
+                "group_2".to_string(),
+                "group_3".to_string(),
             ],
         };
 
@@ -530,28 +643,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_branch_fails_but_other_branch_continues() -> Result<()> {
-        let mut group_actions = BTreeMap::new();
-        group_actions.insert(
-            "step_1".to_string(),
-            make_action_run(ActionRunStatus::CheckSucceeded),
-        );
-        group_actions.insert(
-            "step_2".to_string(),
-            make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
-        );
-        group_actions.insert("step_3".to_string(), will_not_run());
-        group_actions.insert(
-            "step_4".to_string(),
-            make_action_run(ActionRunStatus::CheckSucceeded),
-        );
+        let group_actions = BTreeMap::from([
+            make_group_action("group_1", make_action_run(ActionRunStatus::CheckSucceeded)),
+            make_group_action(
+                "group_2",
+                make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
+            ),
+            make_group_action("group_3", will_not_run()),
+            make_group_action("group_4", make_action_run(ActionRunStatus::CheckSucceeded)),
+        ]);
 
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                "step_1".to_string(),
-                "step_2".to_string(),
-                "step_3".to_string(),
-                "step_4".to_string(),
+                "group_1".to_string(),
+                "group_2".to_string(),
+                "group_3".to_string(),
+                "group_4".to_string(),
             ],
         };
 

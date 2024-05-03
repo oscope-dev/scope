@@ -26,7 +26,8 @@ where
         .actions(actions)
         .metadata(metadata)
         .requires(Vec::new())
-        .run_by_default(true);
+        .run_by_default(true)
+        .extra_report_args(BTreeMap::new());
 
     edit_group(group_builder).build().unwrap()
 }

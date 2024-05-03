@@ -42,9 +42,9 @@ pub struct OutputCapture {
     #[builder(default)]
     pub exit_code: Option<i32>,
     #[builder(default)]
-    start_time: DateTime<Utc>,
+    pub start_time: DateTime<Utc>,
     #[builder(default)]
-    end_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
     #[builder(default)]
     pub command: String,
 }

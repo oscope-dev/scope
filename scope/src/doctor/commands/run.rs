@@ -8,7 +8,8 @@ use tracing::{info, instrument, warn};
 
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
-use crate::doctor::runner::{compute_group_order, RunGroups};
+use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
+use crate::prelude::{DefaultTemplatedReportBuilder, TemplatedReportBuilder};
 use crate::report_stdout;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
@@ -79,14 +80,26 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             .prompt();
 
         if let Ok(true) = ans {
-            let mut report = result.report.clone();
+            for location in found_config.report_upload.values() {
+                let mut builder = DefaultTemplatedReportBuilder::new(
+                    "Scope bug report: `scope doctor run`",
+                    location,
+                );
 
-            if let Err(e) = report.add_additional_data(found_config).await {
-                warn!(target: "user", "Unable to add additional data to bug report: {}", e);
-            }
+                if let Some(rd) = &found_config.report_definition {
+                    builder
+                        .add_additional_data(rd.additional_data.clone())
+                        .await
+                        .ok();
+                }
 
-            if let Err(e) = report.distribute_report(found_config).await {
-                warn!(target: "user", "Unable to upload report: {}", e);
+                for group_report in &result.group_reports {
+                    builder.create_group(group_report).ok();
+                }
+
+                if let Err(e) = builder.distribute_report().await {
+                    warn!(target: "user", "Unable to upload report: {}", e);
+                }
             }
         }
     }
@@ -99,7 +112,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 }
 
 struct RunTransform {
-    groups: BTreeMap<String, Vec<DefaultDoctorActionRun>>,
+    groups: BTreeMap<String, GroupActionContainer<DefaultDoctorActionRun>>,
     desired_groups: BTreeSet<String>,
     file_cache: Arc<dyn FileCache>,
 }
@@ -112,17 +125,17 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
     let exec_runner = Arc::new(DefaultExecutionProvider::default());
     let glob_walker = Arc::new(DefaultGlobWalker::default());
 
-    for check in found_config.doctor_group.values() {
+    for group in found_config.doctor_group.values() {
         let should_group_run = match &args.only {
-            None => check.run_by_default,
-            Some(names) => names.contains(&check.metadata.name().to_string()),
+            None => group.run_by_default,
+            Some(names) => names.contains(&group.metadata.name().to_string()),
         };
 
         let mut action_runs = Vec::new();
 
-        for action in &check.actions {
+        for action in &group.actions {
             let run = DefaultDoctorActionRun {
-                model: check.clone(),
+                model: group.clone(),
                 action: action.clone(),
                 working_dir: found_config.working_dir.clone(),
                 file_cache: file_cache.clone(),
@@ -134,10 +147,19 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
             action_runs.push(run);
         }
 
-        groups.insert(check.metadata.name().to_string(), action_runs);
+        let container = GroupActionContainer {
+            group_name: group.metadata.name().to_string(),
+            actions: action_runs,
+            additional_report_details: group.extra_report_args.clone(),
+            exec_provider: exec_runner.clone(),
+            exec_working_dir: found_config.working_dir.clone(),
+            sys_path: found_config.bin_path.clone(),
+        };
+
+        groups.insert(group.metadata.name().to_string(), container);
 
         if should_group_run {
-            desired_groups.insert(check.metadata.name().to_string());
+            desired_groups.insert(group.metadata.name().to_string());
         }
     }
 
