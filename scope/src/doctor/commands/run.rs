@@ -9,7 +9,7 @@ use tracing::{info, instrument, warn};
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
-use crate::prelude::{DefaultTemplatedReportBuilder, TemplatedReportBuilder};
+use crate::prelude::{DefaultTemplatedReportBuilder, ExecutionProvider, TemplatedReportBuilder};
 use crate::report_stdout;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
@@ -27,6 +27,9 @@ pub struct DoctorRunArgs {
     /// When set cache will be disabled, forcing all file based checks to run.
     #[arg(long, short, default_value = "false")]
     pub no_cache: bool,
+    /// Do not ask, create report on failure
+    #[arg(long, default_value = "false", env = "SCOPE_DOCTOR_AUTO_PUBLISH")]
+    pub auto_publish_report: bool,
 }
 
 fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
@@ -72,14 +75,19 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
     if !result.did_succeed && !found_config.report_upload.is_empty() {
         println!();
-        let ans = inquire::Confirm::new("Do you want to upload a bug report?")
-            .with_default(true)
-            .with_help_message(
-                "This will allow you to share the error with other engineers for support.",
-            )
-            .prompt();
+        let create_report = if args.auto_publish_report {
+            true
+        } else {
+            inquire::Confirm::new("Do you want to upload a bug report?")
+                .with_default(true)
+                .with_help_message(
+                    "This will allow you to share the error with other engineers for support.",
+                )
+                .prompt()
+                .unwrap_or(false)
+        };
 
-        if let Ok(true) = ans {
+        if create_report {
             for location in found_config.report_upload.values() {
                 let mut builder = DefaultTemplatedReportBuilder::new(
                     "Scope bug report: `scope doctor run`",
@@ -87,10 +95,21 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 );
 
                 if let Some(rd) = &found_config.report_definition {
-                    builder
-                        .add_additional_data(rd.additional_data.clone())
-                        .await
-                        .ok();
+                    let mut additional_report_data = BTreeMap::new();
+                    for (name, command) in &rd.additional_data {
+                        let output = transform
+                            .exec_runner
+                            .run_for_output(
+                                &found_config.bin_path,
+                                &found_config.working_dir,
+                                command,
+                            )
+                            .await;
+                        additional_report_data.insert(name.to_string(), output);
+                    }
+                    if !additional_report_data.is_empty() {
+                        builder.add_additional_data(additional_report_data).ok();
+                    }
                 }
 
                 for group_report in &result.group_reports {
@@ -115,6 +134,7 @@ struct RunTransform {
     groups: BTreeMap<String, GroupActionContainer<DefaultDoctorActionRun>>,
     desired_groups: BTreeSet<String>,
     file_cache: Arc<dyn FileCache>,
+    exec_runner: Arc<dyn ExecutionProvider>,
 }
 
 fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTransform {
@@ -167,6 +187,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
         groups,
         desired_groups,
         file_cache,
+        exec_runner,
     }
 }
 

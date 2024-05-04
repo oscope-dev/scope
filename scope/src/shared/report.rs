@@ -9,13 +9,16 @@ use chrono::{DateTime, Utc};
 use derive_builder::Builder;
 use jsonwebtoken::EncodingKey;
 use minijinja::{context, Environment};
+use normpath::PathExt;
 use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
 use octocrab::Octocrab;
 use secrecy::SecretString;
 use std::collections::BTreeMap;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 
 use tracing::{debug, info, warn};
 use url::Url;
@@ -152,12 +155,17 @@ impl ReportUploadLocationDestination {
             }
             ReportUploadLocationDestination::Local { destination } => {
                 let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
-
+                fs::create_dir_all(destination)?;
                 let file_path = format!("{}/scope-{}.md", destination, id);
                 let mut file = File::create(&file_path)?;
                 file.write_all(report.as_bytes())?;
 
-                info!(target: "always", "Report was created at {}.", file_path);
+                // make this path nicer
+                let file_path = PathBuf::from(&file_path)
+                    .normalize()
+                    .map(|x| x.into_path_buf().display().to_string())
+                    .unwrap_or(file_path);
+                info!(target: "always", "Report was created at {}", file_path);
 
                 Ok(())
             }
@@ -321,16 +329,19 @@ impl ActionTaskReport {
     where
         T: std::fmt::Write,
     {
+        writeln!(f)?;
+        writeln!(f, "---")?;
         writeln!(f, "Command: `{}`\n", self.command)?;
 
-        writeln!(f, "Output:")?;
+        writeln!(f, "Output:\n")?;
         writeln!(f, "```text",)?;
-        writeln!(f, "{}", self.get_output())?;
-        writeln!(f, "```",)?;
+        writeln!(f, "{}", self.get_output().trim())?;
+        writeln!(f, "```\n",)?;
 
-        writeln!(f, "- Exit code: `{}`", self.exit_code.unwrap_or(-1))?;
-        writeln!(f, "- Started at: `{}`", self.start_time)?;
-        writeln!(f, "- Finished at: `{}`", self.end_time)?;
+        writeln!(f, "|:---|:---|")?;
+        writeln!(f, "| Exit code| `{}` |", self.exit_code.unwrap_or(-1))?;
+        writeln!(f, "| Started at| `{}` |", self.start_time)?;
+        writeln!(f, "| Finished at| `{}` |", self.end_time)?;
 
         Ok(())
     }
@@ -379,7 +390,7 @@ impl GroupReport {
 pub trait TemplatedReportBuilder {
     fn create_group(&mut self, group_result: &GroupReport) -> Result<()>;
 
-    async fn add_additional_data(&mut self, commands: BTreeMap<String, String>) -> Result<()>;
+    fn add_additional_data(&mut self, commands: BTreeMap<String, String>) -> Result<()>;
 
     async fn distribute_report(&self) -> Result<()>;
 }
@@ -406,25 +417,31 @@ impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
     fn create_group(&mut self, group_result: &GroupReport) -> Result<()> {
         use std::fmt::Write;
 
-        writeln!(self.output, "## {}\n", group_result.group_name)?;
+        writeln!(self.output)?;
+        writeln!(self.output, "## Group `{}`\n", group_result.group_name)?;
         for action in &group_result.action_result {
-            writeln!(self.output, "### {}", action.action_name)?;
+            writeln!(
+                self.output,
+                "### Action `{}/{}`",
+                group_result.group_name, action.action_name
+            )?;
 
             for check in &action.check {
                 check.write_output(&mut self.output)?;
             }
         }
 
+        if !group_result.additional_details.is_empty() {
+            self.add_additional_data(group_result.additional_details.clone())?
+        }
+
         Ok(())
     }
 
-    async fn add_additional_data(
-        &mut self,
-        additional_data: BTreeMap<String, String>,
-    ) -> Result<()> {
+    fn add_additional_data(&mut self, additional_data: BTreeMap<String, String>) -> Result<()> {
         use std::fmt::Write;
 
-        writeln!(self.output, "## Additional Capture Data\n")?;
+        writeln!(self.output, "\n**Additional Capture Data**\n")?;
         writeln!(self.output, "| Name | Value |")?;
         writeln!(self.output, "|:---|:---|")?;
 

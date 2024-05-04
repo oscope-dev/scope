@@ -1,6 +1,6 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
 use crate::prelude::{
-    progress_bar_without_pos, CaptureOpts, ExecutionProvider, GroupReport, OutputDestination,
+    progress_bar_without_pos, ExecutionProvider, GroupReport,
 };
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
@@ -94,24 +94,10 @@ where
     T: DoctorActionRun,
 {
     pub async fn execute_command(&self, command: &str) -> Result<String> {
-        let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
-        let result = self
+        Ok(self
             .exec_provider
-            .run_command(CaptureOpts {
-                working_dir: &self.exec_working_dir,
-                args: &args,
-                output_dest: OutputDestination::Null,
-                path: &self.sys_path,
-                env_vars: Default::default(),
-            })
-            .await;
-
-        let body = match result {
-            Ok(capture) => capture.generate_user_output(),
-            Err(error) => error.to_string(),
-        };
-
-        Ok(body)
+            .run_for_output(&self.sys_path, &self.exec_working_dir, command)
+            .await)
     }
 }
 

@@ -123,6 +123,26 @@ impl CaptureError {
 #[async_trait]
 pub trait ExecutionProvider: Send + Sync {
     async fn run_command<'a>(&self, opts: CaptureOpts<'a>) -> Result<OutputCapture, CaptureError>;
+
+    async fn run_for_output(&self, path: &str, workdir: &Path, command: &str) -> String {
+        let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
+        let result = self
+            .run_command(CaptureOpts {
+                working_dir: &workdir,
+                args: &args,
+                output_dest: OutputDestination::Null,
+                path: &path,
+                env_vars: Default::default(),
+            })
+            .await;
+
+        let body = match result {
+            Ok(capture) => capture.generate_user_output(),
+            Err(error) => error.to_string(),
+        };
+
+        body
+    }
 }
 
 #[derive(Default, Debug)]

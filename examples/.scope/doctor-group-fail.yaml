@@ -1,0 +1,18 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: fail
+  description: Sleep then fail
+spec:
+  include: when-required
+  reportExtraDetails:
+    who am i: id
+  actions:
+    - name: file-exists
+      check:
+        commands:
+          - echo "found file {{ working_dir }}/file-mod.txt"
+          - test -f {{ working_dir }}/file-mod.txt
+      fix:
+        commands:
+          - echo {{ working_dir }}/file-mod.txt
