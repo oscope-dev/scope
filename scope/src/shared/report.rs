@@ -338,6 +338,7 @@ impl ActionTaskReport {
         writeln!(f, "{}", self.get_output().trim())?;
         writeln!(f, "```\n",)?;
 
+        writeln!(f, "|Name|Value|")?;
         writeln!(f, "|:---|:---|")?;
         writeln!(f, "| Exit code| `{}` |", self.exit_code.unwrap_or(-1))?;
         writeln!(f, "| Started at| `{}` |", self.start_time)?;

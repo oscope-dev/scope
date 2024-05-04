@@ -128,20 +128,18 @@ pub trait ExecutionProvider: Send + Sync {
         let args: Vec<String> = command.split(' ').map(|x| x.to_string()).collect();
         let result = self
             .run_command(CaptureOpts {
-                working_dir: &workdir,
+                working_dir: workdir,
                 args: &args,
                 output_dest: OutputDestination::Null,
-                path: &path,
+                path,
                 env_vars: Default::default(),
             })
             .await;
 
-        let body = match result {
+        match result {
             Ok(capture) => capture.generate_user_output(),
             Err(error) => error.to_string(),
-        };
-
-        body
+        }
     }
 }
 

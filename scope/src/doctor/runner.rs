@@ -1,7 +1,5 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
-use crate::prelude::{
-    progress_bar_without_pos, ExecutionProvider, GroupReport,
-};
+use crate::prelude::{progress_bar_without_pos, ExecutionProvider, GroupReport};
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
