@@ -99,7 +99,7 @@ pub struct DoctorGroupSpec {
     pub include: DoctorInclude,
 
     /// defines additional data that needs to be pulled from the system when reporting a bug.
-    /// `additionalData` is a map of `string:string`, the value is a command that should be run.
+    /// `reportExtraDetails` is a map of `string:string`, the value is a command that should be run.
     /// When a report is built, the commands will be run and automatically included in the report.
     #[serde(default)]
     pub report_extra_details: BTreeMap<String, String>,
