@@ -150,6 +150,17 @@ impl ReportUploadLocationDestination {
                 )
                 .await
             }
+            ReportUploadLocationDestination::Local { destination } => {
+                let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
+
+                let file_path = format!("{}/scope-{}.md", destination, id);
+                let mut file = File::create(&file_path)?;
+                file.write_all(report.as_bytes())?;
+
+                info!(target: "always", "Report was created at {}.", file_path);
+
+                Ok(())
+            }
         }
     }
 
