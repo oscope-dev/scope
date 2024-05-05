@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -122,6 +123,7 @@ pub struct DoctorGroup {
     pub requires: Vec<String>,
     pub run_by_default: bool,
     pub actions: Vec<DoctorGroupAction>,
+    pub extra_report_args: BTreeMap<String, String>,
 }
 
 impl HelpMetadata for DoctorGroup {
@@ -158,6 +160,7 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
             actions,
             requires: model.spec.needs,
             run_by_default: model.spec.include == DoctorInclude::ByDefault,
+            extra_report_args: model.spec.report_extra_details,
         })
     }
 }

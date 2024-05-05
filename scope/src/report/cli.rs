@@ -1,8 +1,10 @@
-use crate::shared::prelude::{
-    CaptureOpts, FoundConfig, OutputCapture, OutputDestination, ReportBuilder,
+use crate::prelude::{
+    DefaultExecutionProvider, DefaultTemplatedReportBuilder, TemplatedReportBuilder,
 };
+use crate::shared::prelude::{CaptureOpts, FoundConfig, OutputCapture, OutputDestination};
 use anyhow::Result;
 use clap::Args;
+use std::sync::Arc;
 use tracing::{instrument, warn};
 
 #[derive(Debug, Args)]
@@ -29,15 +31,28 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
     let exit_code = capture.exit_code.unwrap_or(-1);
 
     let title = format!("Scope bug report: `{:?}`", args.command);
-    let report_builder = ReportBuilder::new_from_error(title, &capture, found_config).await?;
+    let exec_runner = Arc::new(DefaultExecutionProvider::default());
+    let report_definition = found_config.get_report_definition();
 
-    if found_config.report_upload.is_empty() {
-        report_builder.write_local_report()?;
-        return Ok(exit_code);
-    }
+    for location in found_config.report_upload.values() {
+        let mut builder = DefaultTemplatedReportBuilder::from_capture(
+            &title,
+            &capture,
+            &report_definition,
+            location,
+        )?;
+        builder
+            .run_and_capture_additional_data(
+                &report_definition.additional_data,
+                found_config,
+                exec_runner.clone(),
+            )
+            .await
+            .ok();
 
-    if let Err(e) = report_builder.distribute_report(found_config).await {
-        warn!(target: "user", "Unable to upload report: {}", e);
+        if let Err(e) = builder.distribute_report().await {
+            warn!(target: "user", "Unable to upload report: {}", e);
+        }
     }
 
     Ok(exit_code)

@@ -25,7 +25,10 @@ pub mod prelude {
     pub use super::logging::{progress_bar_without_pos, LoggingOpts, STDERR_WRITER, STDOUT_WRITER};
     pub use super::models::prelude::*;
     pub use super::print_details;
-    pub use super::report::ReportBuilder;
+    pub use super::report::{
+        ActionReport, ActionReportBuilder, ActionTaskReport, ActionTaskReportBuilder,
+        DefaultTemplatedReportBuilder, GroupReport, TemplatedReportBuilder,
+    };
     pub use super::{CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 }
 

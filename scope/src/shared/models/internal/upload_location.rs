@@ -1,5 +1,6 @@
 use crate::models::prelude::{ModelMetadata, V1AlphaReportLocation};
 use crate::models::HelpMetadata;
+use crate::prelude::ReportDestinationSpec;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReportUploadLocationDestination {
@@ -10,6 +11,9 @@ pub enum ReportUploadLocationDestination {
         owner: String,
         repo: String,
         tags: Vec<String>,
+    },
+    Local {
+        destination: String,
     },
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -34,18 +38,21 @@ impl TryFrom<V1AlphaReportLocation> for ReportUploadLocation {
 
     fn try_from(value: V1AlphaReportLocation) -> Result<Self, Self::Error> {
         let destination = match value.spec.destination {
-            crate::models::prelude::ReportDestinationSpec::RustyPaste(ref def) => {
+            ReportDestinationSpec::RustyPaste(ref def) => {
                 ReportUploadLocationDestination::RustyPaste {
                     url: def.url.to_string(),
                 }
             }
-            crate::models::prelude::ReportDestinationSpec::GithubIssue(ref github_issue) => {
+            ReportDestinationSpec::GithubIssue(ref github_issue) => {
                 ReportUploadLocationDestination::GithubIssue {
                     owner: github_issue.owner.to_string(),
                     repo: github_issue.repo.to_string(),
                     tags: github_issue.tags.clone(),
                 }
             }
+            ReportDestinationSpec::Local(ref loc) => ReportUploadLocationDestination::Local {
+                destination: loc.directory.clone(),
+            },
         };
         Ok(ReportUploadLocation {
             full_name: value.full_name(),

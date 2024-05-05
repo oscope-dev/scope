@@ -30,12 +30,22 @@ pub struct ReportDestinationRustyPasteSpec {
     pub url: String,
 }
 
+/// Create a report that is only local
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct ReportDestinationLocalSpec {
+    /// Directory to put the report into
+    pub directory: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub enum ReportDestinationSpec {
     RustyPaste(ReportDestinationRustyPasteSpec),
     GithubIssue(ReportDestinationGithubIssueSpec),
+    Local(ReportDestinationLocalSpec),
 }
 
 /// Define where to upload the report to

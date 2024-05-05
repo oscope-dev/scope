@@ -172,6 +172,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "reportExtraDetails": {
+          "description": "defines additional data that needs to be pulled from the system when reporting a bug. `reportExtraDetails` is a map of `string:string`, the value is a command that should be run. When a report is built, the commands will be run and automatically included in the report.",
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -331,6 +339,20 @@
       },
       "additionalProperties": false
     },
+    "ReportDestinationLocalSpec": {
+      "description": "Create a report that is only local",
+      "type": "object",
+      "required": [
+        "directory"
+      ],
+      "properties": {
+        "directory": {
+          "description": "Directory to put the report into",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ReportDestinationRustyPasteSpec": {
       "description": "How to upload a report to RustyPaste",
       "type": "object",
@@ -367,6 +389,18 @@
           "properties": {
             "githubIssue": {
               "$ref": "#/definitions/ReportDestinationGithubIssueSpec"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "local"
+          ],
+          "properties": {
+            "local": {
+              "$ref": "#/definitions/ReportDestinationLocalSpec"
             }
           },
           "additionalProperties": false
