@@ -2,6 +2,7 @@ use clap::Parser;
 use dev_scope::prelude::*;
 use human_panic::setup_panic;
 use std::env;
+use std::sync::Arc;
 use tracing::{debug, enabled, error, info, warn, Level};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
@@ -110,14 +111,31 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         )
         .prompt();
 
-    let title = format!("Scope bug report: `{:?}`", command);
-    let report_builder = ReportBuilder::new_from_error(title, &capture, &found_config).await?;
     if let Ok(true) = ans {
-        if let Err(e) = report_builder.distribute_report(&found_config).await {
-            warn!(target: "user", "Unable to upload report: {}", e);
+        let title = format!("Scope bug report: `{:?}`", command);
+        let exec_runner = Arc::new(DefaultExecutionProvider::default());
+        let report_definition = found_config.get_report_definition();
+
+        for location in found_config.report_upload.values() {
+            let mut builder = DefaultTemplatedReportBuilder::from_capture(
+                &title,
+                &capture,
+                &report_definition,
+                location,
+            )?;
+            builder
+                .run_and_capture_additional_data(
+                    &report_definition.additional_data,
+                    &found_config,
+                    exec_runner.clone(),
+                )
+                .await
+                .ok();
+
+            if let Err(e) = builder.distribute_report().await {
+                warn!(target: "user", "Unable to upload report: {}", e);
+            }
         }
-    } else {
-        report_builder.write_local_report().ok();
     }
     Ok(exit_code)
 }

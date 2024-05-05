@@ -95,21 +95,14 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
                 );
 
                 if let Some(rd) = &found_config.report_definition {
-                    let mut additional_report_data = BTreeMap::new();
-                    for (name, command) in &rd.additional_data {
-                        let output = transform
-                            .exec_runner
-                            .run_for_output(
-                                &found_config.bin_path,
-                                &found_config.working_dir,
-                                command,
-                            )
-                            .await;
-                        additional_report_data.insert(name.to_string(), output);
-                    }
-                    if !additional_report_data.is_empty() {
-                        builder.add_additional_data(additional_report_data).ok();
-                    }
+                    builder
+                        .run_and_capture_additional_data(
+                            &rd.additional_data,
+                            found_config,
+                            transform.exec_runner.clone(),
+                        )
+                        .await
+                        .ok();
                 }
 
                 for group_report in &result.group_reports {
