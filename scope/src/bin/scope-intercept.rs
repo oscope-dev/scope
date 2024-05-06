@@ -112,13 +112,13 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         .prompt();
 
     if let Ok(true) = ans {
-        let title = format!("Scope bug report: `{:?}`", command);
+        let entrypoint = format!("{:?}", command.join(" "));
         let exec_runner = Arc::new(DefaultExecutionProvider::default());
         let report_definition = found_config.get_report_definition();
 
         for location in found_config.report_upload.values() {
             let mut builder = DefaultTemplatedReportBuilder::from_capture(
-                &title,
+                &entrypoint,
                 &capture,
                 &report_definition,
                 location,

@@ -283,32 +283,71 @@ pub trait TemplatedReportBuilder {
 
 #[derive(Debug, Clone)]
 pub struct DefaultTemplatedReportBuilder {
-    title: String,
+    entrypoint: String,
+    message: Option<String>,
     output: String,
     destination: ReportUploadLocation,
 }
 
 impl DefaultTemplatedReportBuilder {
-    pub fn new(title: &str, dest: &ReportUploadLocation) -> Self {
+    pub fn new(entrypoint: &str, dest: &ReportUploadLocation) -> Self {
         Self {
-            title: title.to_string(),
-            output: format!("# {}\n", title),
+            entrypoint: entrypoint.to_string(),
+            message: None,
+            output: "".to_string(),
             destination: dest.clone(),
         }
     }
 
     pub fn from_capture(
-        title: &str,
+        entrypoint: &str,
         capture: &OutputCapture,
         report_template: &ReportDefinition,
         dest: &ReportUploadLocation,
     ) -> Result<Self> {
+        let mut this = Self::new(entrypoint, dest);
         let message = render_template(&capture.command, &report_template.template)?;
-        let mut this = Self::new(title, dest);
-        this.append(&message)?;
+        this.message = Some(message);
         this.append(&capture.create_report_text()?)?;
 
         Ok(this)
+    }
+
+    fn get_title_template(_dest: &ReportUploadLocation) -> &str {
+        // TODO: override from dest
+        "Scope bug report: `{{ entrypoint }}`"
+    }
+
+    fn render_title(&self) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("title", Self::get_title_template(&self.destination))?;
+
+        let template = env.get_template("title")?;
+        let rendered = template.render(context! { entrypoint => self.entrypoint })?;
+
+        Ok(rendered)
+    }
+
+    // TODO: add padding after message if message or output length > 0
+    fn get_body_template() -> &'static str {
+        "{{ message }}
+{{ output }}"
+    }
+
+    fn render_body(&self) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("body", Self::get_body_template())?;
+
+
+        let message = self.message.clone().unwrap_or("".to_string());
+
+        let template = env.get_template("body")?;
+        let rendered = template.render(context! {
+            message => message,
+            output => self.output
+         })?;
+
+        Ok(rendered)
     }
 }
 
@@ -390,10 +429,14 @@ impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
     }
 
     async fn distribute_report(&self) -> Result<()> {
+        // TODO: this functionality could be grouped into a ReportRenderer trait?
+        let title = self.render_title()?;
+        let body = self.render_body()?;
+
         if let Err(e) = &self
             .destination
             .destination
-            .upload(&self.title, &self.output)
+            .upload(&title, &body)
             .await
         {
             warn!(target: "user", "Unable to upload to {}: {}", self.destination.metadata.name(), e);

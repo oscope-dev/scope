@@ -90,7 +90,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         if create_report {
             for location in found_config.report_upload.values() {
                 let mut builder = DefaultTemplatedReportBuilder::new(
-                    "Scope bug report: `scope doctor run`",
+                    "scope doctor run",
                     location,
                 );
 

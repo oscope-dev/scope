@@ -30,13 +30,13 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
     .await?;
     let exit_code = capture.exit_code.unwrap_or(-1);
 
-    let title = format!("Scope bug report: `{:?}`", args.command);
+    let entrypoint = format!("{:?}", args.command.join(" "));
     let exec_runner = Arc::new(DefaultExecutionProvider::default());
     let report_definition = found_config.get_report_definition();
 
     for location in found_config.report_upload.values() {
         let mut builder = DefaultTemplatedReportBuilder::from_capture(
-            &title,
+            &entrypoint,
             &capture,
             &report_definition,
             location,
