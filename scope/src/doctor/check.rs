@@ -172,18 +172,39 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
-            return Ok(self.result_without_output(ActionRunStatus::CheckSucceeded));
+            // return Ok(self.result_without_output(ActionRunStatus::CheckSucceeded));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckSucceeded,
+                check_results.output,
+                None,
+                None
+            ));
         }
 
         if !self.run_fix {
-            return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoRunFix));
+            // return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoRunFix));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedNoRunFix,
+                check_results.output,
+                None,
+                None
+            ));
         }
 
         let (fix_result, fix_output) = self.run_fixes().await?;
 
         match fix_result {
             i32::MIN..=-1 => {
-                return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoFixProvided));
+                // return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoFixProvided));
+                return Ok(ActionRunResult::new(
+                    &self.name(),
+                    ActionRunStatus::CheckFailedNoFixProvided,
+                    check_results.output,
+                    None,
+                    None
+                ));
             }
             0 => {}
             1...100 => {
@@ -208,7 +229,14 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
         if check_status == CacheStatus::CacheNotDefined {
             self.update_caches().await;
-            return Ok(self.result_without_output(ActionRunStatus::NoCheckFixSucceeded));
+            // return Ok(self.result_without_output(ActionRunStatus::NoCheckFixSucceeded));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::NoCheckFixSucceeded,
+                check_results.output,
+                Some(fix_output),
+                None
+            ));
         }
 
         if let Some(validate_result) = self.evaluate_command_checks().await? {
@@ -225,7 +253,16 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
         self.update_caches().await;
 
-        Ok(self.result_without_output(ActionRunStatus::CheckFailedFixSucceedVerifySucceed))
+        // Ok(self.result_without_output(ActionRunStatus::CheckFailedFixSucceedVerifySucceed))
+        return Ok(ActionRunResult::new(
+            &self.name(),
+            ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+            check_results.output,
+            Some(fix_output),
+            // TODO: there should be some verify results here...
+            None,
+            // validate_result.output,
+        ));
     }
 
     fn required(&self) -> bool {
@@ -250,9 +287,9 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 }
 
 impl DefaultDoctorActionRun {
-    fn result_without_output(&self, action_run_status: ActionRunStatus) -> ActionRunResult {
-        ActionRunResult::from_status(&self.name(), action_run_status)
-    }
+    // fn result_without_output(&self, action_run_status: ActionRunStatus) -> ActionRunResult {
+    //     ActionRunResult::from_status(&self.name(), action_run_status)
+    // }
 
     async fn update_caches(&self) {
         if let Some(cache_path) = &self.action.check.files {
@@ -346,10 +383,17 @@ impl DefaultDoctorActionRun {
             command_check = Some(results);
         }
 
+        // TODO: the merge is losing the results!
         match (path_check, command_check) {
             (None, None) => Ok(CacheStatus::CacheNotDefined.into()),
             (Some(p), None) if p.is_success() => Ok(CacheStatus::FixNotRequired.into()),
-            (None, Some(c)) if c.status.is_success() => Ok(CacheStatus::FixNotRequired.into()),
+            (None, Some(c)) if c.status.is_success() => {
+                // Ok(CacheStatus::FixNotRequired.into())
+                Ok(CacheResults {
+                    status: CacheStatus::FixNotRequired,
+                    output: c.output,
+                })
+            },
             (Some(p), Some(c)) if p.is_success() && c.status.is_success() => {
                 Ok(CacheStatus::FixNotRequired.into())
             }
@@ -438,6 +482,7 @@ impl DefaultDoctorActionRun {
         }
 
         let status = result.unwrap_or(CacheStatus::FixRequired);
+        println!("run_check_command action_reports: {:?}", &action_reports);
         Ok(CacheResults {
             status,
             output: Some(action_reports),

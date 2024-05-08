@@ -167,6 +167,7 @@ where
         group_span: &Span,
         container: &GroupActionContainer<T>,
     ) -> Result<GroupExecutionResult> {
+        println!("execute_group for {}", &container.group_name);
         let mut results = GroupExecutionResult {
             group_name: container.group_name.to_string(),
             has_failure: false,
@@ -175,6 +176,7 @@ where
         };
 
         for action in &container.actions {
+            println!("starting action {}", &action.name());
             group_span.pb_inc(1);
             if results.skip_remaining {
                 info!(target: "user", "Check `{}/{}` was skipped.", container.group_name.bold(), action.name());
@@ -189,6 +191,8 @@ where
             ));
             action_span.pb_set_style(&progress_bar_without_pos());
 
+            println!("here");
+
             let action_result = action.run_action().instrument(action_span).await?;
 
             results
@@ -199,6 +203,8 @@ where
             report_action_output(&container.group_name, action, &action_result)
                 .await
                 .ok();
+
+            println!("action_report for {}: {:?}", &action.name(), &action_result.action_report);
 
             match action_result.status {
                 ActionRunStatus::CheckSucceeded

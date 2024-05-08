@@ -19,6 +19,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use tracing::{debug, info, warn};
 use url::Url;
@@ -193,37 +194,6 @@ impl From<&OutputCapture> for ActionTaskReport {
     }
 }
 
-impl ActionTaskReport {
-    pub fn get_output(&self) -> String {
-        match &self.output {
-            Some(body) => body.to_string(),
-            None => "No Output".to_string(),
-        }
-    }
-
-    fn write_output<T>(&self, f: &mut T) -> Result<()>
-    where
-        T: std::fmt::Write,
-    {
-        writeln!(f)?;
-        writeln!(f, "---")?;
-        writeln!(f, "Command: `{}`\n", self.command)?;
-
-        writeln!(f, "Output:\n")?;
-        writeln!(f, "```text",)?;
-        writeln!(f, "{}", self.get_output().trim())?;
-        writeln!(f, "```\n",)?;
-
-        writeln!(f, "|Name|Value|")?;
-        writeln!(f, "|:---|:---|")?;
-        writeln!(f, "| Exit code| `{}` |", self.exit_code.unwrap_or(-1))?;
-        writeln!(f, "| Started at| `{}` |", self.start_time)?;
-        writeln!(f, "| Finished at| `{}` |", self.end_time)?;
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Default, Builder)]
 #[builder(setter(into))]
 pub struct ActionReport {
@@ -283,9 +253,13 @@ pub trait TemplatedReportBuilder {
 
 #[derive(Debug, Clone)]
 pub struct DefaultTemplatedReportBuilder {
+    // This looks a lot like our context object
     entrypoint: String,
     message: Option<String>,
-    output: String,
+    groups: Vec<GroupReport>,
+    additional_data: BTreeMap<String, String>,
+
+    // Not like the context object
     destination: ReportUploadLocation,
 }
 
@@ -294,11 +268,13 @@ impl DefaultTemplatedReportBuilder {
         Self {
             entrypoint: entrypoint.to_string(),
             message: None,
-            output: "".to_string(),
+            groups: vec![],
+            additional_data: BTreeMap::new(),
             destination: dest.clone(),
         }
     }
 
+    // TODO: refactor this to not accept an Output Capture. This needs to be a GroupReport
     pub fn from_capture(
         entrypoint: &str,
         capture: &OutputCapture,
@@ -306,9 +282,11 @@ impl DefaultTemplatedReportBuilder {
         dest: &ReportUploadLocation,
     ) -> Result<Self> {
         let mut this = Self::new(entrypoint, dest);
-        let message = render_template(&capture.command, &report_template.template)?;
+
+        let mut message = render_template(&capture.command, &report_template.template)?;
+        message += "\n\n";
+        message += &capture.create_report_text()?;
         this.message = Some(message);
-        this.append(&capture.create_report_text()?)?;
 
         Ok(this)
     }
@@ -328,26 +306,116 @@ impl DefaultTemplatedReportBuilder {
         Ok(rendered)
     }
 
-    // TODO: add padding after message if message or output length > 0
-    fn get_body_template() -> &'static str {
-        "{{ message }}
-{{ output }}"
+    fn get_body_template(_dest: &ReportUploadLocation) -> &'static str {
+        // TODO: override from dest
+        include_str!("body_template.jinja")
     }
 
     fn render_body(&self) -> Result<String> {
         let mut env = Environment::new();
-        let _ = env.add_template("body", Self::get_body_template())?;
-
+        let _ = env.add_template("body", Self::get_body_template(&self.destination))?;
 
         let message = self.message.clone().unwrap_or("".to_string());
 
         let template = env.get_template("body")?;
-        let rendered = template.render(context! {
+        let ctx = context! {
             message => message,
-            output => self.output
-         })?;
+            entrypoint => self.entrypoint,
+            // convert to vec[vec[]] because minijinja does not suppport items on Dict
+            // https://github.com/mitsuhiko/minijinja/issues/32
+            additionalData => Vec::from_iter(self.additional_data.iter()),
+            groups => self.get_groups_context(),
+         };
+        println!("{:?}", ctx);
+        let rendered = template.render(ctx)?;
 
         Ok(rendered)
+    }
+
+    fn get_groups_context(&self) -> minijinja::value::Value {
+        let mut output = vec![];
+
+        for group in &self.groups {
+            output.push(ReportGroupItemContext::from(&group));
+        }
+
+        minijinja::value::Value::from_serialize(&output)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportCommandResultContext {
+    command: String,
+
+    #[serde(rename = "exitCode")]
+    exit_code: i32,
+
+    #[serde(rename = "startTime")]
+    start_time: String,
+
+    #[serde(rename = "endTime")]
+    end_time: String,
+}
+
+impl ReportCommandResultContext {
+    fn from(report: &ActionTaskReport) -> Self {
+        Self {
+            command: report.command.to_string(),
+            exit_code: report.exit_code.unwrap_or(-1),
+            start_time: report.start_time.to_string(),
+            end_time: report.end_time.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportGroupItemContext {
+    name: String,
+
+    #[serde(default)]
+    actions: Vec<ReportActionItemContext>,
+}
+
+impl ReportGroupItemContext {
+    fn from(report: &GroupReport) -> Self {
+        Self {
+            name: report.group_name.to_string(),
+            actions: (&report.action_result).into_iter().map(|action| ReportActionItemContext::from(&action)).collect::<Vec<_>>()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportActionItemContext {
+    name: String,
+
+    #[serde(default)]
+    check: Vec<ReportCommandResultContext>,
+
+    #[serde(default)]
+    fix: Vec<ReportCommandResultContext>,
+
+    #[serde(default)]
+    verify: Vec<ReportCommandResultContext>,
+}
+
+impl ReportActionItemContext {
+    fn from(report: &ActionReport) -> Self {
+        Self {
+            name: report.action_name.to_string(),
+            check: (&report.check)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+            fix: (&report.fix)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+            verify: (&report.validate)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+         }
     }
 }
 
@@ -363,38 +431,16 @@ fn render_template(command: &str, template: &str) -> Result<String> {
 #[async_trait]
 impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
     fn create_group(&mut self, group_result: &GroupReport) -> Result<()> {
-        use std::fmt::Write;
+        self.groups.push(group_result.clone());
 
-        writeln!(self.output)?;
-        writeln!(self.output, "## Group `{}`\n", group_result.group_name)?;
-        for action in &group_result.action_result {
-            writeln!(
-                self.output,
-                "### Action `{}/{}`",
-                group_result.group_name, action.action_name
-            )?;
-
-            for check in &action.check {
-                check.write_output(&mut self.output)?;
-            }
-        }
-
-        if !group_result.additional_details.is_empty() {
-            self.add_additional_data(group_result.additional_details.clone())?
-        }
+        println!("{:?}", &self.groups);
 
         Ok(())
     }
 
     fn add_additional_data(&mut self, additional_data: BTreeMap<String, String>) -> Result<()> {
-        use std::fmt::Write;
-
-        writeln!(self.output, "\n**Additional Capture Data**\n")?;
-        writeln!(self.output, "| Name | Value |")?;
-        writeln!(self.output, "|:---|:---|")?;
-
-        for (name, result) in additional_data {
-            writeln!(self.output, "|{}|<pre>{}</pre>|", name, result)?;
+        for (key, value) in additional_data.into_iter() {
+            self.additional_data.insert(key, value);
         }
 
         Ok(())
@@ -421,9 +467,14 @@ impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
     }
 
     fn append(&mut self, body: &str) -> Result<()> {
-        use std::fmt::Write;
-
-        writeln!(self.output, "{}", body)?;
+        match &self.message {
+            None => {
+                self.message = Some(body.to_string());
+            }
+            Some(message) => {
+                self.message = Some(format!("{}\n{}", message, body));
+            }
+        }
 
         Ok(())
     }
