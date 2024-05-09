@@ -682,6 +682,7 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
+        assert!(result.action_report.check.len() == 1);
 
         Ok(())
     }
@@ -703,6 +704,10 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
+        assert!(result.action_report.validate.len() == 1);
+
         Ok(())
     }
 
@@ -723,6 +728,10 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
+        assert!(result.action_report.validate.len() == 1);
+
         Ok(())
     }
 
@@ -739,6 +748,9 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
+
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
 
         Ok(())
     }
@@ -768,6 +780,8 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.fix.len() == 1);
+
         Ok(())
     }
 
@@ -796,6 +810,8 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.fix.len() == 1);
+
         Ok(())
     }
 
@@ -817,6 +833,8 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
+
+        assert!(result.action_report.fix.len() == 1);
 
         Ok(())
     }
