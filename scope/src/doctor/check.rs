@@ -60,15 +60,6 @@ pub struct CacheResults {
     pub output: Option<Vec<ActionTaskReport>>,
 }
 
-impl From<CacheStatus> for CacheResults {
-    fn from(value: CacheStatus) -> Self {
-        Self {
-            status: value,
-            output: None,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum ActionRunStatus {
@@ -117,10 +108,6 @@ impl ActionRunResult {
                 .build()
                 .expect("report builder to have all values set"),
         }
-    }
-
-    pub fn from_status(name: &str, status: ActionRunStatus) -> Self {
-        Self::new(name, status, None, None, None)
     }
 }
 
@@ -287,10 +274,6 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 }
 
 impl DefaultDoctorActionRun {
-    // fn result_without_output(&self, action_run_status: ActionRunStatus) -> ActionRunResult {
-    //     ActionRunResult::from_status(&self.name(), action_run_status)
-    // }
-
     async fn update_caches(&self) {
         if let Some(cache_path) = &self.action.check.files {
             let result = self
@@ -370,7 +353,7 @@ impl DefaultDoctorActionRun {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
-                return Ok(result.into());
+                return Ok( CacheResults { status: result, output: None } );
             }
 
             path_check = Some(result);
@@ -383,22 +366,20 @@ impl DefaultDoctorActionRun {
             command_check = Some(results);
         }
 
-        // TODO: the merge is losing the results!
-        match (path_check, command_check) {
-            (None, None) => Ok(CacheStatus::CacheNotDefined.into()),
-            (Some(p), None) if p.is_success() => Ok(CacheStatus::FixNotRequired.into()),
-            (None, Some(c)) if c.status.is_success() => {
-                // Ok(CacheStatus::FixNotRequired.into())
-                Ok(CacheResults {
-                    status: CacheStatus::FixNotRequired,
-                    output: c.output,
-                })
-            },
-            (Some(p), Some(c)) if p.is_success() && c.status.is_success() => {
-                Ok(CacheStatus::FixNotRequired.into())
-            }
-            _ => Ok(CacheStatus::FixRequired.into()),
-        }
+        let status = match (&path_check, &command_check) {
+            (None, None) => CacheStatus::CacheNotDefined,
+            (Some(p), None) if p.is_success() => CacheStatus::FixNotRequired,
+            (None, Some(c)) if c.status.is_success() => CacheStatus::FixNotRequired,
+            (Some(p), Some(c)) if p.is_success() && c.status.is_success() => CacheStatus::FixNotRequired,
+            _ => CacheStatus::FixRequired,
+        };
+
+        let output = match command_check {
+            Some(c) => c.output.clone(),
+            None => None
+        };
+
+        Ok(CacheResults { status, output })
     }
 
     async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
