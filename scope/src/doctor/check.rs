@@ -60,15 +60,6 @@ pub struct CacheResults {
     pub output: Option<Vec<ActionTaskReport>>,
 }
 
-impl From<CacheStatus> for CacheResults {
-    fn from(value: CacheStatus) -> Self {
-        Self {
-            status: value,
-            output: None,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum ActionRunStatus {
@@ -117,10 +108,6 @@ impl ActionRunResult {
                 .build()
                 .expect("report builder to have all values set"),
         }
-    }
-
-    pub fn from_status(name: &str, status: ActionRunStatus) -> Self {
-        Self::new(name, status, None, None, None)
     }
 }
 
@@ -172,18 +159,36 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
-            return Ok(self.result_without_output(ActionRunStatus::CheckSucceeded));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckSucceeded,
+                check_results.output,
+                None,
+                None,
+            ));
         }
 
         if !self.run_fix {
-            return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoRunFix));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedNoRunFix,
+                check_results.output,
+                None,
+                None,
+            ));
         }
 
         let (fix_result, fix_output) = self.run_fixes().await?;
 
         match fix_result {
             i32::MIN..=-1 => {
-                return Ok(self.result_without_output(ActionRunStatus::CheckFailedNoFixProvided));
+                return Ok(ActionRunResult::new(
+                    &self.name(),
+                    ActionRunStatus::CheckFailedNoFixProvided,
+                    check_results.output,
+                    None,
+                    None,
+                ));
             }
             0 => {}
             1...100 => {
@@ -208,24 +213,38 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
         if check_status == CacheStatus::CacheNotDefined {
             self.update_caches().await;
-            return Ok(self.result_without_output(ActionRunStatus::NoCheckFixSucceeded));
+            return Ok(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::NoCheckFixSucceeded,
+                check_results.output,
+                Some(fix_output),
+                None,
+            ));
         }
 
+        let mut validate_output = None;
         if let Some(validate_result) = self.evaluate_command_checks().await? {
+            validate_output = validate_result.output;
             if validate_result.status != CacheStatus::FixNotRequired {
                 return Ok(ActionRunResult::new(
                     &self.name(),
                     ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
                     check_results.output,
                     Some(fix_output),
-                    validate_result.output,
+                    validate_output,
                 ));
             }
         }
 
         self.update_caches().await;
 
-        Ok(self.result_without_output(ActionRunStatus::CheckFailedFixSucceedVerifySucceed))
+        return Ok(ActionRunResult::new(
+            &self.name(),
+            ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+            check_results.output,
+            Some(fix_output),
+            validate_output,
+        ));
     }
 
     fn required(&self) -> bool {
@@ -250,10 +269,6 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 }
 
 impl DefaultDoctorActionRun {
-    fn result_without_output(&self, action_run_status: ActionRunStatus) -> ActionRunResult {
-        ActionRunResult::from_status(&self.name(), action_run_status)
-    }
-
     async fn update_caches(&self) {
         if let Some(cache_path) = &self.action.check.files {
             let result = self
@@ -333,7 +348,10 @@ impl DefaultDoctorActionRun {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
-                return Ok(result.into());
+                return Ok(CacheResults {
+                    status: result,
+                    output: None,
+                });
             }
 
             path_check = Some(result);
@@ -346,15 +364,22 @@ impl DefaultDoctorActionRun {
             command_check = Some(results);
         }
 
-        match (path_check, command_check) {
-            (None, None) => Ok(CacheStatus::CacheNotDefined.into()),
-            (Some(p), None) if p.is_success() => Ok(CacheStatus::FixNotRequired.into()),
-            (None, Some(c)) if c.status.is_success() => Ok(CacheStatus::FixNotRequired.into()),
+        let status = match (&path_check, &command_check) {
+            (None, None) => CacheStatus::CacheNotDefined,
+            (Some(p), None) if p.is_success() => CacheStatus::FixNotRequired,
+            (None, Some(c)) if c.status.is_success() => CacheStatus::FixNotRequired,
             (Some(p), Some(c)) if p.is_success() && c.status.is_success() => {
-                Ok(CacheStatus::FixNotRequired.into())
+                CacheStatus::FixNotRequired
             }
-            _ => Ok(CacheStatus::FixRequired.into()),
-        }
+            _ => CacheStatus::FixRequired,
+        };
+
+        let output = match command_check {
+            Some(c) => c.output.clone(),
+            None => None,
+        };
+
+        Ok(CacheResults { status, output })
     }
 
     async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
@@ -662,6 +687,7 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
+        assert!(result.action_report.check.len() == 1);
 
         Ok(())
     }
@@ -683,6 +709,10 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
+        assert!(result.action_report.validate.len() == 1);
+
         Ok(())
     }
 
@@ -703,6 +733,10 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
+        assert!(result.action_report.validate.len() == 1);
+
         Ok(())
     }
 
@@ -719,6 +753,9 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
+
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.len() == 1);
 
         Ok(())
     }
@@ -748,6 +785,8 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.fix.len() == 1);
+
         Ok(())
     }
 
@@ -776,6 +815,8 @@ pub(crate) mod tests {
             result.status
         );
 
+        assert!(result.action_report.fix.len() == 1);
+
         Ok(())
     }
 
@@ -797,6 +838,8 @@ pub(crate) mod tests {
 
         let result = run.run_action().await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
+
+        assert!(result.action_report.fix.len() == 1);
 
         Ok(())
     }

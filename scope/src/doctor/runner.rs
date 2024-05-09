@@ -535,8 +535,15 @@ mod tests {
 
     fn make_action_run(result: ActionRunStatus) -> Vec<MockDoctorActionRun> {
         let mut run = MockDoctorActionRun::new();
-        run.expect_run_action()
-            .returning(move || Ok(ActionRunResult::from_status("a_name", result.clone())));
+        run.expect_run_action().returning(move || {
+            Ok(ActionRunResult::new(
+                "a_name",
+                result.clone(),
+                None,
+                None,
+                None,
+            ))
+        });
         run.expect_help_text().return_const(None);
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "step name".to_string());
