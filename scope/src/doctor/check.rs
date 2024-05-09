@@ -164,7 +164,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                 ActionRunStatus::CheckSucceeded,
                 check_results.output,
                 None,
-                None
+                None,
             ));
         }
 
@@ -174,7 +174,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                 ActionRunStatus::CheckFailedNoRunFix,
                 check_results.output,
                 None,
-                None
+                None,
             ));
         }
 
@@ -187,7 +187,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                     ActionRunStatus::CheckFailedNoFixProvided,
                     check_results.output,
                     None,
-                    None
+                    None,
                 ));
             }
             0 => {}
@@ -218,7 +218,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                 ActionRunStatus::NoCheckFixSucceeded,
                 check_results.output,
                 Some(fix_output),
-                None
+                None,
             ));
         }
 
@@ -348,7 +348,10 @@ impl DefaultDoctorActionRun {
         if let Some(cache_path) = &self.action.check.files {
             let result = self.evaluate_path_check(cache_path).await?;
             if !result.is_success() {
-                return Ok( CacheResults { status: result, output: None } );
+                return Ok(CacheResults {
+                    status: result,
+                    output: None,
+                });
             }
 
             path_check = Some(result);
@@ -365,13 +368,15 @@ impl DefaultDoctorActionRun {
             (None, None) => CacheStatus::CacheNotDefined,
             (Some(p), None) if p.is_success() => CacheStatus::FixNotRequired,
             (None, Some(c)) if c.status.is_success() => CacheStatus::FixNotRequired,
-            (Some(p), Some(c)) if p.is_success() && c.status.is_success() => CacheStatus::FixNotRequired,
+            (Some(p), Some(c)) if p.is_success() && c.status.is_success() => {
+                CacheStatus::FixNotRequired
+            }
             _ => CacheStatus::FixRequired,
         };
 
         let output = match command_check {
             Some(c) => c.output.clone(),
-            None => None
+            None => None,
         };
 
         Ok(CacheResults { status, output })
