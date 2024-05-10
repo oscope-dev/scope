@@ -112,27 +112,17 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         .prompt();
 
     if let Ok(true) = ans {
-        let title = format!("Scope bug report: `{:?}`", command);
+        let entrypoint = command.join(" ");
         let exec_runner = Arc::new(DefaultExecutionProvider::default());
         let report_definition = found_config.get_report_definition();
 
-        for location in found_config.report_upload.values() {
-            let mut builder = DefaultTemplatedReportBuilder::from_capture(
-                &title,
-                &capture,
-                &report_definition,
-                location,
-            )?;
-            builder
-                .run_and_capture_additional_data(
-                    &report_definition.additional_data,
-                    &found_config,
-                    exec_runner.clone(),
-                )
-                .await
-                .ok();
+        let mut builder = DefaultUnstructuredReportBuilder::new(&report_definition, &entrypoint, &capture);
+        builder.run_and_append_additional_data(&found_config, exec_runner, &report_definition.additional_data).await.ok();
 
-            if let Err(e) = builder.distribute_report().await {
+        for location in found_config.report_upload.values() {
+            let report = builder.render(&location)?;
+
+            if let Err(e) = report.distribute().await {
                 warn!(target: "user", "Unable to upload report: {}", e);
             }
         }

@@ -1,0 +1,13 @@
+{%- if message -%}
+{{message}}
+{%- endif %}
+
+{%- if additionalData -%}
+**Additional Capture Data**
+
+| Name | Value |
+|---|---|
+{%- for data in additionalData %}
+{{ data[0] }}|<pre>{{ data[1] }}</pre>|
+{%- endfor %}
+{%- endif %}

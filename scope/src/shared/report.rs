@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_builder::Builder;
+use itertools::Itertools;
 use jsonwebtoken::EncodingKey;
 use minijinja::{context, Environment};
 use normpath::PathExt;
@@ -19,6 +20,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use tracing::{debug, info, warn};
 use url::Url;
@@ -263,142 +265,313 @@ impl GroupReport {
     }
 }
 
-#[async_trait]
-pub trait TemplatedReportBuilder {
-    fn create_group(&mut self, group_result: &GroupReport) -> Result<()>;
-
-    fn add_additional_data(&mut self, commands: BTreeMap<String, String>) -> Result<()>;
-
-    async fn run_and_capture_additional_data(
-        &mut self,
-        commands: &BTreeMap<String, String>,
-        found_config: &FoundConfig,
-        exec_provider: Arc<dyn ExecutionProvider>,
-    ) -> Result<()>;
-
-    fn append(&mut self, body: &str) -> Result<()>;
-
-    async fn distribute_report(&self) -> Result<()>;
-}
-
-#[derive(Debug, Clone)]
-pub struct DefaultTemplatedReportBuilder {
+// Shared
+pub struct Report {
     title: String,
-    output: String,
+    body: String,
     destination: ReportUploadLocation,
 }
 
-impl DefaultTemplatedReportBuilder {
-    pub fn new(title: &str, dest: &ReportUploadLocation) -> Self {
-        Self {
-            title: title.to_string(),
-            output: format!("# {}\n", title),
-            destination: dest.clone(),
-        }
-    }
-
-    pub fn from_capture(
-        title: &str,
-        capture: &OutputCapture,
-        report_template: &ReportDefinition,
-        dest: &ReportUploadLocation,
-    ) -> Result<Self> {
-        let message = render_template(&capture.command, &report_template.template)?;
-        let mut this = Self::new(title, dest);
-        this.append(&message)?;
-        this.append(&capture.create_report_text()?)?;
-
-        Ok(this)
-    }
-}
-
-fn render_template(command: &str, template: &str) -> Result<String> {
-    let mut env = Environment::new();
-    env.add_template("tmpl", template)?;
-    let template = env.get_template("tmpl")?;
-    let template = template.render(context! { command => command })?;
-
-    Ok(template)
-}
-
-#[async_trait]
-impl TemplatedReportBuilder for DefaultTemplatedReportBuilder {
-    fn create_group(&mut self, group_result: &GroupReport) -> Result<()> {
-        use std::fmt::Write;
-
-        writeln!(self.output)?;
-        writeln!(self.output, "## Group `{}`\n", group_result.group_name)?;
-        for action in &group_result.action_result {
-            writeln!(
-                self.output,
-                "### Action `{}/{}`",
-                group_result.group_name, action.action_name
-            )?;
-
-            for check in &action.check {
-                check.write_output(&mut self.output)?;
-            }
-        }
-
-        if !group_result.additional_details.is_empty() {
-            self.add_additional_data(group_result.additional_details.clone())?
-        }
-
-        Ok(())
-    }
-
-    fn add_additional_data(&mut self, additional_data: BTreeMap<String, String>) -> Result<()> {
-        use std::fmt::Write;
-
-        writeln!(self.output, "\n**Additional Capture Data**\n")?;
-        writeln!(self.output, "| Name | Value |")?;
-        writeln!(self.output, "|:---|:---|")?;
-
-        for (name, result) in additional_data {
-            writeln!(self.output, "|{}|<pre>{}</pre>|", name, result)?;
-        }
-
-        Ok(())
-    }
-
-    async fn run_and_capture_additional_data(
-        &mut self,
-        commands: &BTreeMap<String, String>,
-        found_config: &FoundConfig,
-        exec_provider: Arc<dyn ExecutionProvider>,
-    ) -> Result<()> {
-        let mut additional_report_data = BTreeMap::new();
-        for (name, command) in commands {
-            let output = exec_provider
-                .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
-                .await;
-            additional_report_data.insert(name.to_string(), output);
-        }
-        if !additional_report_data.is_empty() {
-            self.add_additional_data(additional_report_data)?;
-        }
-
-        Ok(())
-    }
-
-    fn append(&mut self, body: &str) -> Result<()> {
-        use std::fmt::Write;
-
-        writeln!(self.output, "{}", body)?;
-
-        Ok(())
-    }
-
-    async fn distribute_report(&self) -> Result<()> {
+impl Report {
+    pub async fn distribute(&self) -> Result<()> {
         if let Err(e) = &self
             .destination
             .destination
-            .upload(&self.title, &self.output)
+            .upload(&self.title, &self.body)
             .await
         {
             warn!(target: "user", "Unable to upload to {}: {}", self.destination.metadata.name(), e);
         }
 
         Ok(())
+    }
+}
+
+pub trait ReportRenderer {
+    fn render(&self, destination: &ReportUploadLocation) -> Result<Report>;
+}
+
+
+// Unstructured reports
+#[async_trait]
+pub trait UnstructuredReportBuilder {
+    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_runner: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()>;
+}
+
+pub struct DefaultUnstructuredReportBuilder {
+    entrypoint: String,
+    // TODO: accept capture output for generic report builder
+    _capture: OutputCapture,
+    additional_data: BTreeMap<String, String>,
+    message_template: String,
+}
+
+impl DefaultUnstructuredReportBuilder {
+    pub fn new(report: &ReportDefinition, entrypoint: &str, capture: &OutputCapture) -> Self {
+        Self {
+            message_template: report.template.clone(),
+            entrypoint: entrypoint.to_string(),
+            _capture: capture.clone(),
+            additional_data: BTreeMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl UnstructuredReportBuilder for DefaultUnstructuredReportBuilder {
+    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()> {
+        for (name, command) in commands {
+            let output = exec_provider
+                .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
+                .await;
+            self.additional_data.insert(name.to_string(), output);
+        }
+
+        Ok(())
+    }
+}
+
+impl ReportRenderer for DefaultUnstructuredReportBuilder {
+    fn render(&self, destination: &ReportUploadLocation) -> Result<Report> {
+        let title = self.render_title(destination)?;
+        let body = self.render_body(destination)?;
+
+        Ok(Report { title, body, destination: destination.clone() })
+    }
+}
+
+impl DefaultUnstructuredReportBuilder {
+    fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("title", self.get_title_template())?;
+
+        let template = env.get_template("title")?;
+        let rendered = template.render(context! { entrypoint => self.entrypoint })?;
+
+        Ok(rendered)
+    }
+
+    fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("body", self.get_body_template())?;
+        let template = env.get_template("body")?;
+
+        let message = self.render_message()?;
+
+        let ctx = context! {
+            message => message,
+            entrypoint => self.entrypoint,
+            // convert to vec[vec[]] because minijinja does not suppport items on Dict
+            // https://github.com/mitsuhiko/minijinja/issues/32
+            additionalData => Vec::from_iter(self.additional_data.iter()),
+         };
+        println!("{:?}", ctx);
+        let rendered = template.render(ctx)?;
+
+        Ok(rendered)
+    }
+
+    fn render_message(&self) -> Result<String> {
+        let mut env = Environment::new();
+        env.add_template("message", &self.message_template)?;
+        let template = env.get_template("message")?;
+        let template = template.render(context! { command => self.entrypoint })?;
+
+        Ok(template)
+    }
+
+    fn get_body_template(&self) -> &str {
+        include_str!("unstructured_body.jinja")
+    }
+
+    fn get_title_template(&self) -> &str {
+        "Scope bug report: `{{ entrypoint }}`"
+    }
+}
+
+// Grouped reports
+#[async_trait]
+pub trait GroupedReportBuilder {
+    fn append_group(&mut self, group_result: &GroupReport) -> Result<()>;
+
+    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()>;
+}
+
+pub struct DefaultGroupedReportBuilder {
+    entrypoint: String,
+    groups: Vec<GroupReport>,
+    additional_data: BTreeMap<String, String>,
+    message_template: Option<String>,
+}
+
+impl DefaultGroupedReportBuilder {
+    pub fn new(report: &Option<ReportDefinition>, entrypoint: &str) -> Self {
+        Self {
+            entrypoint: entrypoint.to_string(),
+            groups: vec![],
+            additional_data: BTreeMap::new(),
+            message_template: report.as_ref().map(|report| report.template.clone()),
+        }
+    }
+}
+
+#[async_trait]
+impl GroupedReportBuilder for DefaultGroupedReportBuilder {
+    fn append_group(&mut self, group_result: &GroupReport) -> Result<()> {
+        self.groups.push(group_result.clone());
+
+        Ok(())
+    }
+
+    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()> {
+        for (name, command) in commands {
+            let output = exec_provider
+                .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
+                .await;
+            self.additional_data.insert(name.to_string(), output);
+        }
+
+        Ok(())
+    }
+}
+
+impl ReportRenderer for DefaultGroupedReportBuilder {
+    fn render(&self, destination: &ReportUploadLocation) -> Result<Report> {
+        let title = self.render_title(destination)?;
+        let body = self.render_body(destination)?;
+
+        Ok(Report { title, body, destination: destination.clone() })
+    }
+}
+
+impl DefaultGroupedReportBuilder {
+    fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("title", self.get_title_template())?;
+
+        let template = env.get_template("title")?;
+        let rendered = template.render(context! { entrypoint => self.entrypoint })?;
+
+        Ok(rendered)
+    }
+
+    fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
+        let mut env = Environment::new();
+        let _ = env.add_template("body", self.get_body_template())?;
+        let template = env.get_template("body")?;
+
+        let message = self.render_message()?;
+
+        let ctx = context! {
+            entrypoint => self.entrypoint,
+            message => message,
+            groups => (&self.groups).into_iter().map(|group| ReportGroupItemContext::from(&group)).collect_vec(),
+            // convert to vec[vec[]] because minijinja does not suppport items on Dict
+            // https://github.com/mitsuhiko/minijinja/issues/32
+            additionalData => Vec::from_iter(self.additional_data.iter()),
+         };
+        let rendered = template.render(ctx)?;
+
+        Ok(rendered)
+    }
+
+    fn render_message(&self) -> Result<String> {
+        match &self.message_template {
+            Some(template) => {
+                let mut env = Environment::new();
+                env.add_template("message", &template)?;
+                let template = env.get_template("message")?;
+                let template = template.render(context! { command => self.entrypoint })?;
+
+                Ok(template)
+            }
+            // Assumption: empty string results in a falsy "if message" in the body template
+            None => Ok("".to_string())
+        }
+    }
+
+    fn get_body_template(&self) -> &str {
+        include_str!("grouped_body.jinja")
+    }
+
+    fn get_title_template(&self) -> &str {
+        "Scope bug report: `{{ entrypoint }}`"
+    }
+}
+
+// Rendering objects
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportCommandResultContext {
+    command: String,
+
+    #[serde(rename = "exitCode")]
+    exit_code: i32,
+
+    #[serde(rename = "startTime")]
+    start_time: String,
+
+    #[serde(rename = "endTime")]
+    end_time: String,
+}
+
+impl ReportCommandResultContext {
+    fn from(report: &ActionTaskReport) -> Self {
+        Self {
+            command: report.command.to_string(),
+            exit_code: report.exit_code.unwrap_or(-1),
+            start_time: report.start_time.to_string(),
+            end_time: report.end_time.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportGroupItemContext {
+    name: String,
+
+    #[serde(default)]
+    actions: Vec<ReportActionItemContext>,
+}
+
+impl ReportGroupItemContext {
+    fn from(report: &GroupReport) -> Self {
+        Self {
+            name: report.group_name.to_string(),
+            actions: (&report.action_result).into_iter().map(|action| ReportActionItemContext::from(&action)).collect::<Vec<_>>()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReportActionItemContext {
+    name: String,
+
+    #[serde(default)]
+    check: Vec<ReportCommandResultContext>,
+
+    #[serde(default)]
+    fix: Vec<ReportCommandResultContext>,
+
+    #[serde(default)]
+    verify: Vec<ReportCommandResultContext>,
+}
+
+impl ReportActionItemContext {
+    fn from(report: &ActionReport) -> Self {
+        Self {
+            name: report.action_name.to_string(),
+            check: (&report.check)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+            fix: (&report.fix)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+            verify: (&report.validate)
+                .into_iter()
+                .map(|check| ReportCommandResultContext::from(&check) )
+                .collect::<Vec<_>>(),
+         }
     }
 }

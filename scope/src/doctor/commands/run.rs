@@ -9,7 +9,7 @@ use tracing::{info, instrument, warn};
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
-use crate::prelude::{DefaultTemplatedReportBuilder, ExecutionProvider, TemplatedReportBuilder};
+use crate::prelude::{DefaultGroupedReportBuilder, ExecutionProvider, GroupedReportBuilder, ReportRenderer};
 use crate::report_stdout;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
@@ -88,28 +88,30 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         };
 
         if create_report {
+            let mut builder = DefaultGroupedReportBuilder::new(
+                &found_config.report_definition,
+                "scope doctor run"
+            );
+
+            if let Some(rd) = &found_config.report_definition {
+                builder
+                    .run_and_append_additional_data(
+                        found_config,
+                        transform.exec_runner.clone(),
+                        &rd.additional_data,
+                    )
+                    .await
+                    .ok();
+            }
+
+            for group_report in &result.group_reports {
+                builder.append_group(group_report).ok();
+            }
+
             for location in found_config.report_upload.values() {
-                let mut builder = DefaultTemplatedReportBuilder::new(
-                    "Scope bug report: `scope doctor run`",
-                    location,
-                );
+                let report = builder.render(&location)?;
 
-                if let Some(rd) = &found_config.report_definition {
-                    builder
-                        .run_and_capture_additional_data(
-                            &rd.additional_data,
-                            found_config,
-                            transform.exec_runner.clone(),
-                        )
-                        .await
-                        .ok();
-                }
-
-                for group_report in &result.group_reports {
-                    builder.create_group(group_report).ok();
-                }
-
-                if let Err(e) = builder.distribute_report().await {
+                if let Err(e) = report.distribute().await {
                     warn!(target: "user", "Unable to upload report: {}", e);
                 }
             }
