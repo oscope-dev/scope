@@ -347,7 +347,6 @@ impl DefaultUnstructuredReportBuilder {
            // https://github.com/mitsuhiko/minijinja/issues/32
            additionalData => Vec::from_iter(self.additional_data.iter()),
         };
-        println!("{:?}", ctx);
         let rendered = template.render(ctx)?;
 
         Ok(rendered)
