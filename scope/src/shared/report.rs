@@ -335,6 +335,8 @@ impl DefaultUnstructuredReportBuilder {
 
     fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
+        env.set_trim_blocks(true);
+        env.set_lstrip_blocks(true);
         env.add_template("body", self.get_body_template())?;
         let template = env.get_template("body")?;
 
@@ -480,7 +482,6 @@ impl DefaultGroupedReportBuilder {
 
                 Ok(template)
             }
-            // Assumption: empty string results in a falsy "if message" in the body template
             None => Ok("".to_string()),
         }
     }
