@@ -1,5 +1,6 @@
 use crate::prelude::{
-    DefaultExecutionProvider, DefaultUnstructuredReportBuilder, ReportRenderer, UnstructuredReportBuilder
+    DefaultExecutionProvider, DefaultUnstructuredReportBuilder, ReportRenderer,
+    UnstructuredReportBuilder,
 };
 use crate::shared::prelude::{CaptureOpts, FoundConfig, OutputCapture, OutputDestination};
 use anyhow::Result;
@@ -34,11 +35,19 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
     let exec_runner = Arc::new(DefaultExecutionProvider::default());
     let report_definition = found_config.get_report_definition();
 
-    let mut builder = DefaultUnstructuredReportBuilder::new(&report_definition, &entrypoint, &capture);
-    builder.run_and_append_additional_data(found_config, exec_runner, &report_definition.additional_data).await.ok();
+    let mut builder =
+        DefaultUnstructuredReportBuilder::new(&report_definition, &entrypoint, &capture);
+    builder
+        .run_and_append_additional_data(
+            found_config,
+            exec_runner,
+            &report_definition.additional_data,
+        )
+        .await
+        .ok();
 
     for location in found_config.report_upload.values() {
-        let report = builder.render(&location)?;
+        let report = builder.render(location)?;
 
         if let Err(e) = report.distribute().await {
             warn!(target: "user", "Unable to upload report: {}", e);

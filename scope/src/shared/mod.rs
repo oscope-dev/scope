@@ -27,10 +27,8 @@ pub mod prelude {
     pub use super::print_details;
     pub use super::report::{
         ActionReport, ActionReportBuilder, ActionTaskReport, ActionTaskReportBuilder,
-        GroupReport,
-        DefaultGroupedReportBuilder, GroupedReportBuilder,
-        DefaultUnstructuredReportBuilder, UnstructuredReportBuilder,
-        ReportRenderer, Report,
+        DefaultGroupedReportBuilder, DefaultUnstructuredReportBuilder, GroupReport,
+        GroupedReportBuilder, Report, ReportRenderer, UnstructuredReportBuilder,
     };
     pub use super::{CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
 }

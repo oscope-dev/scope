@@ -14,13 +14,13 @@ use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
 use octocrab::Octocrab;
 use secrecy::SecretString;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 
 use tracing::{debug, info, warn};
 use url::Url;
@@ -195,37 +195,6 @@ impl From<&OutputCapture> for ActionTaskReport {
     }
 }
 
-impl ActionTaskReport {
-    pub fn get_output(&self) -> String {
-        match &self.output {
-            Some(body) => body.to_string(),
-            None => "No Output".to_string(),
-        }
-    }
-
-    fn write_output<T>(&self, f: &mut T) -> Result<()>
-    where
-        T: std::fmt::Write,
-    {
-        writeln!(f)?;
-        writeln!(f, "---")?;
-        writeln!(f, "Command: `{}`\n", self.command)?;
-
-        writeln!(f, "Output:\n")?;
-        writeln!(f, "```text",)?;
-        writeln!(f, "{}", self.get_output().trim())?;
-        writeln!(f, "```\n",)?;
-
-        writeln!(f, "|Name|Value|")?;
-        writeln!(f, "|:---|:---|")?;
-        writeln!(f, "| Exit code| `{}` |", self.exit_code.unwrap_or(-1))?;
-        writeln!(f, "| Started at| `{}` |", self.start_time)?;
-        writeln!(f, "| Finished at| `{}` |", self.end_time)?;
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Default, Builder)]
 #[builder(setter(into))]
 pub struct ActionReport {
@@ -291,11 +260,15 @@ pub trait ReportRenderer {
     fn render(&self, destination: &ReportUploadLocation) -> Result<Report>;
 }
 
-
 // Unstructured reports
 #[async_trait]
 pub trait UnstructuredReportBuilder {
-    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_runner: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()>;
+    async fn run_and_append_additional_data(
+        &mut self,
+        found_config: &FoundConfig,
+        exec_runner: Arc<dyn ExecutionProvider>,
+        commands: &BTreeMap<String, String>,
+    ) -> Result<()>;
 }
 
 pub struct DefaultUnstructuredReportBuilder {
@@ -319,7 +292,12 @@ impl DefaultUnstructuredReportBuilder {
 
 #[async_trait]
 impl UnstructuredReportBuilder for DefaultUnstructuredReportBuilder {
-    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()> {
+    async fn run_and_append_additional_data(
+        &mut self,
+        found_config: &FoundConfig,
+        exec_provider: Arc<dyn ExecutionProvider>,
+        commands: &BTreeMap<String, String>,
+    ) -> Result<()> {
         for (name, command) in commands {
             let output = exec_provider
                 .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
@@ -336,14 +314,18 @@ impl ReportRenderer for DefaultUnstructuredReportBuilder {
         let title = self.render_title(destination)?;
         let body = self.render_body(destination)?;
 
-        Ok(Report { title, body, destination: destination.clone() })
+        Ok(Report {
+            title,
+            body,
+            destination: destination.clone(),
+        })
     }
 }
 
 impl DefaultUnstructuredReportBuilder {
     fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
-        let _ = env.add_template("title", self.get_title_template())?;
+        env.add_template("title", self.get_title_template())?;
 
         let template = env.get_template("title")?;
         let rendered = template.render(context! { entrypoint => self.entrypoint })?;
@@ -353,18 +335,18 @@ impl DefaultUnstructuredReportBuilder {
 
     fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
-        let _ = env.add_template("body", self.get_body_template())?;
+        env.add_template("body", self.get_body_template())?;
         let template = env.get_template("body")?;
 
         let message = self.render_message()?;
 
         let ctx = context! {
-            message => message,
-            entrypoint => self.entrypoint,
-            // convert to vec[vec[]] because minijinja does not suppport items on Dict
-            // https://github.com/mitsuhiko/minijinja/issues/32
-            additionalData => Vec::from_iter(self.additional_data.iter()),
-         };
+           message => message,
+           entrypoint => self.entrypoint,
+           // convert to vec[vec[]] because minijinja does not suppport items on Dict
+           // https://github.com/mitsuhiko/minijinja/issues/32
+           additionalData => Vec::from_iter(self.additional_data.iter()),
+        };
         println!("{:?}", ctx);
         let rendered = template.render(ctx)?;
 
@@ -394,7 +376,12 @@ impl DefaultUnstructuredReportBuilder {
 pub trait GroupedReportBuilder {
     fn append_group(&mut self, group_result: &GroupReport) -> Result<()>;
 
-    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()>;
+    async fn run_and_append_additional_data(
+        &mut self,
+        found_config: &FoundConfig,
+        exec_provider: Arc<dyn ExecutionProvider>,
+        commands: &BTreeMap<String, String>,
+    ) -> Result<()>;
 }
 
 pub struct DefaultGroupedReportBuilder {
@@ -423,7 +410,12 @@ impl GroupedReportBuilder for DefaultGroupedReportBuilder {
         Ok(())
     }
 
-    async fn run_and_append_additional_data(&mut self, found_config: &FoundConfig, exec_provider: Arc<dyn ExecutionProvider>, commands: &BTreeMap<String, String>) -> Result<()> {
+    async fn run_and_append_additional_data(
+        &mut self,
+        found_config: &FoundConfig,
+        exec_provider: Arc<dyn ExecutionProvider>,
+        commands: &BTreeMap<String, String>,
+    ) -> Result<()> {
         for (name, command) in commands {
             let output = exec_provider
                 .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
@@ -440,14 +432,18 @@ impl ReportRenderer for DefaultGroupedReportBuilder {
         let title = self.render_title(destination)?;
         let body = self.render_body(destination)?;
 
-        Ok(Report { title, body, destination: destination.clone() })
+        Ok(Report {
+            title,
+            body,
+            destination: destination.clone(),
+        })
     }
 }
 
 impl DefaultGroupedReportBuilder {
     fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
-        let _ = env.add_template("title", self.get_title_template())?;
+        env.add_template("title", self.get_title_template())?;
 
         let template = env.get_template("title")?;
         let rendered = template.render(context! { entrypoint => self.entrypoint })?;
@@ -457,19 +453,19 @@ impl DefaultGroupedReportBuilder {
 
     fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
-        let _ = env.add_template("body", self.get_body_template())?;
+        env.add_template("body", self.get_body_template())?;
         let template = env.get_template("body")?;
 
         let message = self.render_message()?;
 
         let ctx = context! {
-            entrypoint => self.entrypoint,
-            message => message,
-            groups => (&self.groups).into_iter().map(|group| ReportGroupItemContext::from(&group)).collect_vec(),
-            // convert to vec[vec[]] because minijinja does not suppport items on Dict
-            // https://github.com/mitsuhiko/minijinja/issues/32
-            additionalData => Vec::from_iter(self.additional_data.iter()),
-         };
+           entrypoint => self.entrypoint,
+           message => message,
+           groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
+           // convert to vec[vec[]] because minijinja does not suppport items on Dict
+           // https://github.com/mitsuhiko/minijinja/issues/32
+           additionalData => Vec::from_iter(self.additional_data.iter()),
+        };
         let rendered = template.render(ctx)?;
 
         Ok(rendered)
@@ -479,14 +475,14 @@ impl DefaultGroupedReportBuilder {
         match &self.message_template {
             Some(template) => {
                 let mut env = Environment::new();
-                env.add_template("message", &template)?;
+                env.add_template("message", template)?;
                 let template = env.get_template("message")?;
                 let template = template.render(context! { command => self.entrypoint })?;
 
                 Ok(template)
             }
             // Assumption: empty string results in a falsy "if message" in the body template
-            None => Ok("".to_string())
+            None => Ok("".to_string()),
         }
     }
 
@@ -537,7 +533,11 @@ impl ReportGroupItemContext {
     fn from(report: &GroupReport) -> Self {
         Self {
             name: report.group_name.to_string(),
-            actions: (&report.action_result).into_iter().map(|action| ReportActionItemContext::from(&action)).collect::<Vec<_>>()
+            actions: report
+                .action_result
+                .iter()
+                .map(ReportActionItemContext::from)
+                .collect::<Vec<_>>(),
         }
     }
 }
@@ -560,18 +560,21 @@ impl ReportActionItemContext {
     fn from(report: &ActionReport) -> Self {
         Self {
             name: report.action_name.to_string(),
-            check: (&report.check)
-                .into_iter()
-                .map(|check| ReportCommandResultContext::from(&check) )
+            check: report
+                .check
+                .iter()
+                .map(ReportCommandResultContext::from)
                 .collect::<Vec<_>>(),
-            fix: (&report.fix)
-                .into_iter()
-                .map(|check| ReportCommandResultContext::from(&check) )
+            fix: report
+                .fix
+                .iter()
+                .map(ReportCommandResultContext::from)
                 .collect::<Vec<_>>(),
-            verify: (&report.validate)
-                .into_iter()
-                .map(|check| ReportCommandResultContext::from(&check) )
+            verify: report
+                .validate
+                .iter()
+                .map(ReportCommandResultContext::from)
                 .collect::<Vec<_>>(),
-         }
+        }
     }
 }

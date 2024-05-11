@@ -9,7 +9,9 @@ use tracing::{info, instrument, warn};
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
 use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
-use crate::prelude::{DefaultGroupedReportBuilder, ExecutionProvider, GroupedReportBuilder, ReportRenderer};
+use crate::prelude::{
+    DefaultGroupedReportBuilder, ExecutionProvider, GroupedReportBuilder, ReportRenderer,
+};
 use crate::report_stdout;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
@@ -90,7 +92,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         if create_report {
             let mut builder = DefaultGroupedReportBuilder::new(
                 &found_config.report_definition,
-                "scope doctor run"
+                "scope doctor run",
             );
 
             if let Some(rd) = &found_config.report_definition {
@@ -109,7 +111,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             }
 
             for location in found_config.report_upload.values() {
-                let report = builder.render(&location)?;
+                let report = builder.render(location)?;
 
                 if let Err(e) = report.distribute().await {
                     warn!(target: "user", "Unable to upload report: {}", e);
