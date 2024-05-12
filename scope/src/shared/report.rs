@@ -170,6 +170,19 @@ async fn get_octocrab(repo: &str) -> Result<Octocrab> {
 
 #[derive(Debug, Clone, Default, Builder)]
 #[builder(setter(into))]
+pub struct AdditionalDataReport {
+    #[builder(default)]
+    pub name: String,
+
+    #[builder(default)]
+    pub command: String,
+
+    #[builder(default)]
+    pub output: String,
+}
+
+#[derive(Debug, Clone, Default, Builder)]
+#[builder(setter(into))]
 pub struct ActionTaskReport {
     #[builder(default)]
     pub command: String,
@@ -212,7 +225,7 @@ pub struct ActionReport {
 pub struct GroupReport {
     group_name: String,
     action_result: Vec<ActionReport>,
-    additional_details: BTreeMap<String, String>,
+    additional_data: Vec<AdditionalDataReport>,
 }
 
 impl GroupReport {
@@ -220,16 +233,19 @@ impl GroupReport {
         self.action_result.push(action_report.clone());
     }
 
-    pub fn add_additional_details(&mut self, key: &str, value: &str) {
-        self.additional_details
-            .insert(key.to_string(), value.to_string());
+    pub fn add_additional_details(&mut self, name: &str, command: &str, value: &str) {
+        self.additional_data.push(AdditionalDataReport {
+            name: name.to_string(),
+            command: command.to_string(),
+            output: value.to_string(),
+        });
     }
 
     pub fn new(group_name: &str) -> Self {
         Self {
             group_name: group_name.to_string(),
             action_result: Vec::new(),
-            additional_details: BTreeMap::new(),
+            additional_data: Vec::new(),
         }
     }
 }
@@ -275,7 +291,7 @@ pub struct DefaultUnstructuredReportBuilder {
     entrypoint: String,
     // TODO: accept capture output for generic report builder
     _capture: OutputCapture,
-    additional_data: BTreeMap<String, String>,
+    additional_data: Vec<AdditionalDataReport>,
     message_template: String,
 }
 
@@ -285,7 +301,7 @@ impl DefaultUnstructuredReportBuilder {
             message_template: report.template.clone(),
             entrypoint: entrypoint.to_string(),
             _capture: capture.clone(),
-            additional_data: BTreeMap::new(),
+            additional_data: vec![],
         }
     }
 }
@@ -302,7 +318,11 @@ impl UnstructuredReportBuilder for DefaultUnstructuredReportBuilder {
             let output = exec_provider
                 .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
                 .await;
-            self.additional_data.insert(name.to_string(), output);
+            self.additional_data.push(AdditionalDataReport {
+                name: name.to_string(),
+                command: command.to_string(),
+                output,
+            });
         }
 
         Ok(())
@@ -345,9 +365,7 @@ impl DefaultUnstructuredReportBuilder {
         let ctx = context! {
            message => message,
            entrypoint => self.entrypoint,
-           // convert to vec[vec[]] because minijinja does not suppport items on Dict
-           // https://github.com/mitsuhiko/minijinja/issues/32
-           additionalData => Vec::from_iter(self.additional_data.iter()),
+           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
         let rendered = template.render(ctx)?;
 
@@ -388,7 +406,7 @@ pub trait GroupedReportBuilder {
 pub struct DefaultGroupedReportBuilder {
     entrypoint: String,
     groups: Vec<GroupReport>,
-    additional_data: BTreeMap<String, String>,
+    additional_data: Vec<AdditionalDataReport>,
     message_template: Option<String>,
 }
 
@@ -396,8 +414,8 @@ impl DefaultGroupedReportBuilder {
     pub fn new(report: &Option<ReportDefinition>, entrypoint: &str) -> Self {
         Self {
             entrypoint: entrypoint.to_string(),
-            groups: vec![],
-            additional_data: BTreeMap::new(),
+            groups: Vec::new(),
+            additional_data: Vec::new(),
             message_template: report.as_ref().map(|report| report.template.clone()),
         }
     }
@@ -421,7 +439,11 @@ impl GroupedReportBuilder for DefaultGroupedReportBuilder {
             let output = exec_provider
                 .run_for_output(&found_config.bin_path, &found_config.working_dir, command)
                 .await;
-            self.additional_data.insert(name.to_string(), output);
+            self.additional_data.push(AdditionalDataReport {
+                name: name.to_string(),
+                command: command.to_string(),
+                output,
+            });
         }
 
         Ok(())
@@ -465,9 +487,7 @@ impl DefaultGroupedReportBuilder {
            entrypoint => self.entrypoint,
            message => message,
            groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
-           // convert to vec[vec[]] because minijinja does not suppport items on Dict
-           // https://github.com/mitsuhiko/minijinja/issues/32
-           additionalData => Vec::from_iter(self.additional_data.iter()),
+           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
         let rendered = template.render(ctx)?;
 
@@ -511,7 +531,6 @@ struct ReportCommandResultContext {
     #[serde(rename = "endTime")]
     end_time: String,
 
-    #[serde(rename = "output")]
     output: String,
 }
 
@@ -528,11 +547,31 @@ impl ReportCommandResultContext {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct ReportAdditionalDataContext {
+    name: String,
+    command: String,
+    output: String,
+}
+
+impl ReportAdditionalDataContext {
+    fn from(report: &AdditionalDataReport) -> Self {
+        Self {
+            name: report.name.to_string(),
+            command: report.command.to_string(),
+            output: report.output.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct ReportGroupItemContext {
     name: String,
 
     #[serde(default)]
     actions: Vec<ReportActionItemContext>,
+
+    #[serde(default, rename = "additionalData")]
+    additional_data: Vec<ReportAdditionalDataContext>,
 }
 
 impl ReportGroupItemContext {
@@ -543,7 +582,12 @@ impl ReportGroupItemContext {
                 .action_result
                 .iter()
                 .map(ReportActionItemContext::from)
-                .collect::<Vec<_>>(),
+                .collect(),
+            additional_data: report
+                .additional_data
+                .iter()
+                .map(ReportAdditionalDataContext::from)
+                .collect(),
         }
     }
 }
@@ -570,17 +614,17 @@ impl ReportActionItemContext {
                 .check
                 .iter()
                 .map(ReportCommandResultContext::from)
-                .collect::<Vec<_>>(),
+                .collect(),
             fix: report
                 .fix
                 .iter()
                 .map(ReportCommandResultContext::from)
-                .collect::<Vec<_>>(),
+                .collect(),
             verify: report
                 .validate
                 .iter()
                 .map(ReportCommandResultContext::from)
-                .collect::<Vec<_>>(),
+                .collect(),
         }
     }
 }

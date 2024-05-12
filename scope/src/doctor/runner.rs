@@ -221,6 +221,7 @@ where
             let output = container.execute_command(command).await.ok();
             results.group_report.add_additional_details(
                 name,
+                command,
                 &output.unwrap_or_else(|| "Unable to capture output".to_string()),
             );
         }

@@ -8,6 +8,6 @@
 | Name | Value |
 |---|---|
 {% for data in additionalData %}
-{{ data[0] }}|<pre>{{ data[1] }}</pre>|
+|{{ data.name }}|`{{ data.output }}`|
 {% endfor %}
 {% endif %}

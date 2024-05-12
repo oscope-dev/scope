@@ -8,7 +8,7 @@
 | Name | Value |
 |---|---|
 {% for data in additionalData %}
-|{{ data[0] }}|`{{ data[1] }}`|
+|{{ data.name }}|`{{ data.output }}`|
 {% endfor %}
 {% endif %}
 
@@ -73,12 +73,12 @@ Output
 {% endfor %}
 
 {% if group.additionalData %}
-**Additional Capture Data**
+### Additional Capture Data
 
 | Name | Value |
 |---|---|
-{% for key,value in group.additionalData.items() %}
-|{{ key }}|`{{ value }}`|
+{% for data in group.additionalData %}
+|{{ data.name }}|`{{ data.output }}`|
 {% endfor %}
 {% endif %}
 {% endfor %}
