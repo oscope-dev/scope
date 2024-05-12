@@ -1,34 +1,34 @@
-{%- if message -%}
+{% if message %}
 {{message}}
-{%- endif %}
+{% endif %}
 
-{%- if additionalData -%}
+{% if additionalData %}
 **Additional Capture Data**
 
 | Name | Value |
 |---|---|
-{%- for data in additionalData %}
-{{ data[0] }}|<pre>{{ data[1] }}</pre>|
-{%- endfor %}
-{%- endif %}
+{% for data in additionalData %}
+|{{ data[0] }}|`{{ data[1] }}`|
+{% endfor %}
+{% endif %}
 
-{% for group in groups -%}
+{% for group in groups %}
 ## Group {{ group.name }}
 
-{%- for action in group.actions %}
+{% for action in group.actions %}
 ### Action {{group.name}}/{{action.name}}
 
-{%- for check in action.check %}
+{% for check in action.check %}
 ---
 Check Command: `{{ check.command }}`
 
-{%- if check.output %}
+{% if check.output %}
 Output
-`text
+```text
 {{ check.output }}
-`
-{%- endif %}
+```
 
+{% endif %}
 |Name|Value|
 |:---|:---|
 | Exit code| `{{ check.exitCode }}` |
@@ -36,17 +36,17 @@ Output
 | Finished at| `{{ check.endTime }}` |
 {% endfor %}
 
-{%- for fix in action.fix %}
+{% for fix in action.fix %}
 ---
 Fix Command: `{{ fix.command }}`
 
-{%- if fix.output %}
+{% if fix.output %}
 Output
-`text
+```text
 {{ fix.output }}
-`
-{%- endif %}
+```
 
+{% endif %}
 |Name|Value|
 |:---|:---|
 | Exit code| `{{ fix.exitCode }}` |
@@ -54,17 +54,17 @@ Output
 | Finished at| `{{ fix.endTime }}` |
 {% endfor %}
 
-{%- for verify in action.verify %}
+{% for verify in action.verify %}
 ---
 Verify Command: `{{ verify.command }}`
 
-{%- if verify.output %}
+{% if verify.output %}
 Output
-`text
+```text
 {{ verify.output }}
-`
-{%- endif %}
+```
 
+{% endif %}
 |Name|Value|
 |:---|:---|
 | Exit code| `{{ verify.exitCode }}` |
@@ -72,14 +72,14 @@ Output
 | Finished at| `{{ verify.endTime }}` |
 {% endfor %}
 
-{%- if group.additionalData %}
+{% if group.additionalData %}
 **Additional Capture Data**
 
 | Name | Value |
 |---|---|
-{%- for key,value in group.additionalData.items() %}
-{{ key }}|<pre>{{ value }}</pre>|
-{%- endfor %}
-{%- endif %}
-{%- endfor %}
-{%- endfor %}
+{% for key,value in group.additionalData.items() %}
+|{{ key }}|`{{ value }}`|
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endfor %}

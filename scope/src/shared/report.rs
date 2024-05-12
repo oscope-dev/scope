@@ -454,6 +454,8 @@ impl DefaultGroupedReportBuilder {
 
     fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
         let mut env = Environment::new();
+        env.set_trim_blocks(true);
+        env.set_lstrip_blocks(true);
         env.add_template("body", self.get_body_template())?;
         let template = env.get_template("body")?;
 
@@ -508,6 +510,9 @@ struct ReportCommandResultContext {
 
     #[serde(rename = "endTime")]
     end_time: String,
+
+    #[serde(rename = "output")]
+    output: String,
 }
 
 impl ReportCommandResultContext {
@@ -517,6 +522,7 @@ impl ReportCommandResultContext {
             exit_code: report.exit_code.unwrap_or(-1),
             start_time: report.start_time.to_string(),
             end_time: report.end_time.to_string(),
+            output: report.output.clone().unwrap_or("".to_string()),
         }
     }
 }
