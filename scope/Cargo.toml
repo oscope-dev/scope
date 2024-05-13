@@ -88,4 +88,4 @@ predicates = "3.1.0"
 
 [build-dependencies]
 vergen = { version = "8.3", features = ["build", "git", "git2"] }
-anyhow = "1.0.82"
+anyhow = "1.0.83"
