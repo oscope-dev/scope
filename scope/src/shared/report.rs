@@ -628,3 +628,89 @@ impl ReportActionItemContext {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::collections::BTreeMap;
+
+    use anyhow::Result;
+    use chrono::DateTime;
+
+    use crate::prelude::{
+        ActionReport, ActionTaskReport, DefaultGroupedReportBuilder, GroupReport,
+        GroupedReportBuilder, ModelMetadata, ReportDefinition, ReportRenderer,
+        ReportUploadLocation, ReportUploadLocationDestination,
+    };
+
+    #[tokio::test]
+    async fn test_grouped_report_builder() -> Result<()> {
+        let report_definition = ReportDefinition {
+            full_name: "ReportDefintion/test".to_string(),
+            metadata: ModelMetadata::new("test"),
+            additional_data: BTreeMap::from([("foo".to_string(), "echo bar".to_string())]),
+            template: "# Error\nAn error occured with {{ command }}".to_string(),
+        };
+
+        let report_destination = ReportUploadLocation {
+            full_name: "ReportUploadLocation/test".to_string(),
+            metadata: ModelMetadata::new("test"),
+            destination: ReportUploadLocationDestination::Local {
+                destination: "/tmp/test".to_string(),
+            },
+        };
+
+        let mut group = GroupReport::new("g_first");
+        group.add_action(&ActionReport {
+            action_name: "a_first".to_string(),
+            check: vec![ActionTaskReport {
+                command: "action first".to_string(),
+                output: Some("first line\nsecond line\n".to_string()),
+                exit_code: Some(0),
+                start_time: DateTime::from_timestamp(1715612600, 0).unwrap(),
+                end_time: DateTime::from_timestamp(1715612699, 0).unwrap(),
+            }],
+            fix: vec![],
+            validate: vec![],
+        });
+
+        let mut builder = DefaultGroupedReportBuilder::new(&Some(report_definition), "hello world");
+        builder.append_group(&group)?;
+
+        let report = builder.render(&report_destination)?;
+
+        let expected_title = "Scope bug report: `hello world`".to_string();
+        assert_eq!(expected_title, report.title);
+
+        let expected_body = "# Error
+An error occured with hello world
+
+
+## Group g_first
+
+### Action g_first/a_first
+
+---
+Check Command: `action first`
+
+Output
+```text
+first line
+second line
+
+```
+
+|Name|Value|
+|:---|:---|
+| Exit code| `0` |
+| Started at| `2024-05-13 15:03:20 UTC` |
+| Finished at| `2024-05-13 15:04:59 UTC` |
+
+
+
+"
+        .to_string();
+        assert_eq!(expected_body, report.body);
+
+        Ok(())
+    }
+}
