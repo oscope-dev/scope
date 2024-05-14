@@ -637,9 +637,10 @@ pub(crate) mod tests {
     use chrono::DateTime;
 
     use crate::prelude::{
-        ActionReport, ActionTaskReport, DefaultGroupedReportBuilder, GroupReport,
-        GroupedReportBuilder, ModelMetadata, ReportDefinition, ReportRenderer,
-        ReportUploadLocation, ReportUploadLocationDestination,
+        ActionReport, ActionTaskReport, DefaultGroupedReportBuilder,
+        DefaultUnstructuredReportBuilder, GroupReport, GroupedReportBuilder, ModelMetadata,
+        OutputCaptureBuilder, ReportDefinition, ReportRenderer, ReportUploadLocation,
+        ReportUploadLocationDestination,
     };
 
     #[tokio::test]
@@ -706,6 +707,56 @@ second line
 | Finished at| `2024-05-13 15:04:59 UTC` |
 
 
+
+"
+        .to_string();
+        assert_eq!(expected_body, report.body);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_unstructured_report_builder() -> Result<()> {
+        let report_definition = ReportDefinition {
+            full_name: "ReportDefintion/test".to_string(),
+            metadata: ModelMetadata::new("test"),
+            additional_data: BTreeMap::from([("foo".to_string(), "echo bar".to_string())]),
+            template: "# Error\nAn error occured with {{ command }}".to_string(),
+        };
+
+        let report_destination = ReportUploadLocation {
+            full_name: "ReportUploadLocation/test".to_string(),
+            metadata: ModelMetadata::new("test"),
+            destination: ReportUploadLocationDestination::Local {
+                destination: "/tmp/test".to_string(),
+            },
+        };
+
+        let capture = OutputCaptureBuilder::default()
+            .command("hello world")
+            .stdout(vec![(
+                DateTime::from_timestamp(1715612600, 0).unwrap(),
+                "stdout".to_string(),
+            )])
+            .stderr(vec![(
+                DateTime::from_timestamp(1715612601, 0).unwrap(),
+                "stderr".to_string(),
+            )])
+            .exit_code(1)
+            .start_time(DateTime::from_timestamp(1715612599, 0).unwrap())
+            .end_time(DateTime::from_timestamp(1715612602, 0).unwrap())
+            .build()?;
+
+        let builder =
+            DefaultUnstructuredReportBuilder::new(&report_definition, "hello world", &capture);
+
+        let report = builder.render(&report_destination)?;
+
+        let expected_title = "Scope bug report: `hello world`".to_string();
+        assert_eq!(expected_title, report.title);
+
+        let expected_body = "# Error
+An error occured with hello world
 
 "
         .to_string();
