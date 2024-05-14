@@ -22,7 +22,6 @@
       "properties": {
         "commands": {
           "description": "A list of commands to execute to check the environment.",
-          "default": null,
           "type": [
             "array",
             "null"
@@ -34,7 +33,6 @@
         },
         "paths": {
           "description": "A list of globs to check for changes. When the glob matches a new file, or the contents of the file change, the check will require a fix.\n\nRelative paths are relative to the scope config directory containing the config file.\n\nShared configs can use the template string `{{ working_dir }}` to access the working directory.",
-          "default": null,
           "type": [
             "array",
             "null"
@@ -61,7 +59,6 @@
         },
         "helpText": {
           "description": "Text to display when no command is provided / fails to fix the env.",
-          "default": null,
           "type": [
             "string",
             "null"
@@ -70,7 +67,6 @@
         },
         "helpUrl": {
           "description": "Link to documentation to fix the issue.",
-          "default": null,
           "type": [
             "string",
             "null"
