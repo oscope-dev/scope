@@ -631,16 +631,17 @@ impl ReportActionItemContext {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
     use anyhow::Result;
     use chrono::DateTime;
 
     use crate::prelude::{
         ActionReport, ActionTaskReport, DefaultGroupedReportBuilder,
-        DefaultUnstructuredReportBuilder, GroupReport, GroupedReportBuilder, ModelMetadata,
-        OutputCaptureBuilder, ReportDefinition, ReportRenderer, ReportUploadLocation,
-        ReportUploadLocationDestination,
+        DefaultUnstructuredReportBuilder, FoundConfig, GroupReport, GroupedReportBuilder,
+        MockExecutionProvider, ModelMetadata, OutputCaptureBuilder, ReportDefinition,
+        ReportRenderer, ReportUploadLocation, ReportUploadLocationDestination,
+        UnstructuredReportBuilder,
     };
 
     #[tokio::test]
@@ -717,6 +718,9 @@ second line
 
     #[tokio::test]
     async fn test_unstructured_report_builder() -> Result<()> {
+        let found_config = FoundConfig::empty(PathBuf::from("/tmp"));
+        let mut exec_provider = MockExecutionProvider::new();
+
         let report_definition = ReportDefinition {
             full_name: "ReportDefintion/test".to_string(),
             metadata: ModelMetadata::new("test"),
@@ -731,6 +735,14 @@ second line
                 destination: "/tmp/test".to_string(),
             },
         };
+
+        let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
+
+        exec_provider
+            .expect_run_for_output()
+            .times(1)
+            .withf(move |_, _, command| command.eq("baz"))
+            .returning(move |_, _, _| "qux".to_string());
 
         let capture = OutputCaptureBuilder::default()
             .command("hello world")
@@ -747,8 +759,15 @@ second line
             .end_time(DateTime::from_timestamp(1715612602, 0).unwrap())
             .build()?;
 
-        let builder =
+        let mut builder =
             DefaultUnstructuredReportBuilder::new(&report_definition, "hello world", &capture);
+        builder
+            .run_and_append_additional_data(
+                &found_config,
+                Arc::new(exec_provider),
+                &additional_data,
+            )
+            .await?;
 
         let report = builder.render(&report_destination)?;
 
@@ -758,6 +777,11 @@ second line
         let expected_body = "# Error
 An error occured with hello world
 
+**Additional Capture Data**
+
+| Name | Value |
+|---|---|
+|baz|`qux`|
 "
         .to_string();
         assert_eq!(expected_body, report.body);
