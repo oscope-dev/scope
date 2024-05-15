@@ -646,6 +646,9 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn test_grouped_report_builder() -> Result<()> {
+        let found_config = FoundConfig::empty(PathBuf::from("/tmp"));
+        let mut exec_provider = MockExecutionProvider::new();
+
         let report_definition = ReportDefinition {
             full_name: "ReportDefintion/test".to_string(),
             metadata: ModelMetadata::new("test"),
@@ -660,6 +663,14 @@ pub(crate) mod tests {
                 destination: "/tmp/test".to_string(),
             },
         };
+
+        let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
+
+        exec_provider
+            .expect_run_for_output()
+            .times(1)
+            .withf(move |_, _, command| command.eq("baz"))
+            .returning(move |_, _, _| "qux".to_string());
 
         let mut group = GroupReport::new("g_first");
         group.add_action(&ActionReport {
@@ -677,6 +688,13 @@ pub(crate) mod tests {
 
         let mut builder = DefaultGroupedReportBuilder::new(&Some(report_definition), "hello world");
         builder.append_group(&group)?;
+        builder
+            .run_and_append_additional_data(
+                &found_config,
+                Arc::new(exec_provider),
+                &additional_data,
+            )
+            .await?;
 
         let report = builder.render(&report_destination)?;
 
@@ -686,6 +704,11 @@ pub(crate) mod tests {
         let expected_body = "# Error
 An error occured with hello world
 
+**Additional Capture Data**
+
+| Name | Value |
+|---|---|
+|baz|`qux`|
 
 ## Group g_first
 
