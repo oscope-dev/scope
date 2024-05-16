@@ -289,8 +289,7 @@ pub trait UnstructuredReportBuilder {
 
 pub struct DefaultUnstructuredReportBuilder {
     entrypoint: String,
-    // TODO: accept capture output for generic report builder
-    _capture: OutputCapture,
+    capture: OutputCapture,
     additional_data: Vec<AdditionalDataReport>,
     message_template: String,
 }
@@ -300,7 +299,7 @@ impl DefaultUnstructuredReportBuilder {
         Self {
             message_template: report.template.clone(),
             entrypoint: entrypoint.to_string(),
-            _capture: capture.clone(),
+            capture: capture.clone(),
             additional_data: vec![],
         }
     }
@@ -365,6 +364,7 @@ impl DefaultUnstructuredReportBuilder {
         let ctx = context! {
            message => message,
            entrypoint => self.entrypoint,
+           result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
            additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
         let rendered = template.render(ctx)?;
@@ -748,7 +748,7 @@ second line
             full_name: "ReportDefintion/test".to_string(),
             metadata: ModelMetadata::new("test"),
             additional_data: BTreeMap::from([("foo".to_string(), "echo bar".to_string())]),
-            template: "# Error\nAn error occured with {{ command }}".to_string(),
+            template: "# Error\nAn error occured with `{{ command }}`.".to_string(),
         };
 
         let report_destination = ReportUploadLocation {
@@ -798,7 +798,21 @@ second line
         assert_eq!(expected_title, report.title);
 
         let expected_body = "# Error
-An error occured with hello world
+An error occured with `hello world`.
+
+## Command `hello world`
+
+Output
+```text
+stdout
+stderr
+```
+
+|Name|Value|
+|:---|:---|
+| Exit code| `1` |
+| Started at| `2024-05-13 15:03:19 UTC` |
+| Finished at| `2024-05-13 15:03:22 UTC` |
 
 **Additional Capture Data**
 
