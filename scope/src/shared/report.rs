@@ -717,7 +717,7 @@ An error occured with hello world
 ---
 Check Command: `action first`
 
-Output
+Output:
 ```text
 first line
 second line
@@ -802,7 +802,7 @@ An error occured with `hello world`.
 
 ## Command `hello world`
 
-Output
+Output:
 ```text
 stdout
 stderr
