@@ -128,10 +128,15 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
             .ok();
 
         for location in found_config.report_upload.values() {
-            let report = builder.render(location)?;
+            let report = builder.render(location);
 
-            if let Err(e) = report.distribute().await {
-                warn!(target: "user", "Unable to upload report: {}", e);
+            match report {
+                Err(e) => warn!(target: "user", "Unable to render report: {}", e),
+                Ok(report) => {
+                    if let Err(e) = report.distribute().await {
+                        warn!(target: "user", "Unable to upload report: {}", e);
+                    }
+                }
             }
         }
     }

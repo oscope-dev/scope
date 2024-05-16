@@ -47,10 +47,15 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
         .ok();
 
     for location in found_config.report_upload.values() {
-        let report = builder.render(location)?;
+        let report = builder.render(location);
 
-        if let Err(e) = report.distribute().await {
-            warn!(target: "user", "Unable to upload report: {}", e);
+        match report {
+            Err(e) => warn!(target: "user", "Unable to render report: {}", e),
+            Ok(report) => {
+                if let Err(e) = report.distribute().await {
+                    warn!(target: "user", "Unable to upload report: {}", e);
+                }
+            }
         }
     }
 
