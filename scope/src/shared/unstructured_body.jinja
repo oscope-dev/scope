@@ -23,6 +23,6 @@ Output:
 | Name | Value |
 |---|---|
 {% for data in additionalData %}
-|{{ data.name }}|`{{ data.output }}`|
+|{{ data.name }}|{% if data.output %}`{{ data.output }}`{% endif %}|
 {% endfor %}
 {% endif %}
