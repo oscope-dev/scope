@@ -6,7 +6,6 @@ use derive_builder::Builder;
 use mockall::automock;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::fmt::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -30,7 +29,7 @@ impl RwLockOutput {
     }
 }
 
-#[derive(Default, Builder)]
+#[derive(Clone, Default, Builder)]
 #[builder(setter(into))]
 pub struct OutputCapture {
     #[builder(default)]
@@ -104,19 +103,6 @@ pub enum CaptureError {
         #[from]
         error: std::string::FromUtf8Error,
     },
-}
-
-impl CaptureError {
-    pub fn create_report_text(&self, command: &String) -> anyhow::Result<String> {
-        let mut f = String::new();
-        writeln!(&mut f, "### `{}`", command)?;
-        writeln!(&mut f)?;
-
-        writeln!(&mut f, "```text")?;
-        writeln!(&mut f, "CaptureError: {}", self)?;
-        writeln!(&mut f, "```")?;
-        Ok(f)
-    }
 }
 
 #[automock]
@@ -272,23 +258,6 @@ impl OutputCapture {
             .map(|(_, line)| line.clone())
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    pub fn create_report_text(&self) -> anyhow::Result<String> {
-        let mut f = String::new();
-        writeln!(&mut f, "### `{}`", self.command)?;
-        writeln!(&mut f)?;
-
-        writeln!(&mut f, "```text")?;
-        writeln!(&mut f, "{}", self.generate_output().trim())?;
-        writeln!(&mut f, "```")?;
-        writeln!(&mut f)?;
-
-        writeln!(&mut f, "- Exit code: `{}`", self.exit_code.unwrap_or(-1))?;
-        writeln!(&mut f, "- Started at: `{}`", self.start_time)?;
-        writeln!(&mut f, "- Finished at: `{}`", self.end_time)?;
-
-        Ok(f)
     }
 
     pub fn get_stdout(&self) -> String {

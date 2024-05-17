@@ -1,0 +1,28 @@
+{% if message %}
+{{message}}
+{% endif %}
+
+## Command `{{ result.command }}`
+
+{% if result.output %}
+Output:
+```text
+{{ result.output }}
+```
+
+{% endif %}
+|Name|Value|
+|:---|:---|
+| Exit code| `{{ result.exitCode }}` |
+| Started at| `{{ result.startTime }}` |
+| Finished at| `{{ result.endTime }}` |
+
+{% if additionalData %}
+**Additional Capture Data**
+
+| Name | Value |
+|---|---|
+{% for data in additionalData %}
+|{{ data.name }}|{% if data.output %}`{{ data.output }}`{% endif %}|
+{% endfor %}
+{% endif %}
