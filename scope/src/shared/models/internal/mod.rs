@@ -1,5 +1,5 @@
 use crate::models::prelude::{
-    ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError, V1AlphaReportDefinition,
+    ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError,
     V1AlphaReportLocation,
 };
 use crate::models::InternalScopeModel;
@@ -12,23 +12,20 @@ use std::path::Path;
 
 mod doctor_group;
 mod known_error;
-mod report_definition;
 mod upload_location;
 
 use self::known_error::KnownError;
-use self::report_definition::ReportDefinition;
 use self::upload_location::ReportUploadLocation;
 
 pub mod prelude {
     pub use super::ParsedConfig;
-    pub use super::{doctor_group::*, known_error::*, report_definition::*, upload_location::*};
+    pub use super::{doctor_group::*, known_error::*, upload_location::*};
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ParsedConfig {
     KnownError(KnownError),
     ReportUpload(ReportUploadLocation),
-    ReportDefinition(ReportDefinition),
     DoctorGroup(DoctorGroup),
 }
 
@@ -37,13 +34,6 @@ impl ParsedConfig {
     pub fn get_report_upload_spec(&self) -> Option<ReportUploadLocation> {
         match self {
             ParsedConfig::ReportUpload(root) => Some(root.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_report_def_spec(&self) -> Option<ReportDefinition> {
-        match self {
-            ParsedConfig::ReportDefinition(root) => Some(root.clone()),
             _ => None,
         }
     }
@@ -75,11 +65,6 @@ impl TryFrom<ModelRoot<Value>> for ParsedConfig {
         }
         if let Ok(Some(known)) = V1AlphaReportLocation::known_type(&value) {
             return Ok(ParsedConfig::ReportUpload(ReportUploadLocation::try_from(
-                known,
-            )?));
-        }
-        if let Ok(Some(known)) = V1AlphaReportDefinition::known_type(&value) {
-            return Ok(ParsedConfig::ReportDefinition(ReportDefinition::try_from(
                 known,
             )?));
         }

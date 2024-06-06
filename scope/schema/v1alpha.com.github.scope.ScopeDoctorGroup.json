@@ -407,6 +407,38 @@
         }
       ]
     },
+    "ReportDestinationTemplates": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "description": "Template to use when generating a bug without with analyze or intercept A Jinja2 style template, to be included. The text should be in Markdown format. Scope injects `command` as the command that was run.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "doctor": {
+          "description": "Template to use when generating a bug report with `scope doctor` A Jinja2 style template, to be included. The text should be in Markdown format. Scope injects `command` as the command that was run.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "title": {
+          "description": "Title to use when creating the issue. This is a Jinja2 style template. `entrypoint` is provided as a variable, which is the scope command run.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "ReportLocationKind": {
       "type": "string",
       "enum": [
@@ -420,9 +452,26 @@
         "destination"
       ],
       "properties": {
+        "additionalData": {
+          "description": "defines additional data that needs to be pulled from the system when reporting a bug. `additionalData` is a map of `string:string`, the value is a command that should be run. When a report is built, the commands will be run and automatically included in the report.",
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "destination": {
           "description": "Destination the report should be uploaded to",
           "$ref": "#/definitions/ReportDestinationSpec"
+        },
+        "templates": {
+          "description": "Templates to use when uploading a report",
+          "default": {
+            "command": null,
+            "doctor": null,
+            "title": null
+          },
+          "$ref": "#/definitions/ReportDestinationTemplates"
         }
       },
       "additionalProperties": false

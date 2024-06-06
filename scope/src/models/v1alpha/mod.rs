@@ -4,7 +4,6 @@ use strum::EnumString;
 
 mod doctor_group;
 mod known_error;
-mod report_definition;
 mod report_location;
 
 #[derive(
@@ -21,6 +20,5 @@ pub enum V1AlphaApiVersion {
 pub mod prelude {
     pub use super::doctor_group::*;
     pub use super::known_error::*;
-    pub use super::report_definition::*;
     pub use super::report_location::*;
 }

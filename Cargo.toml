@@ -46,11 +46,11 @@ chrono = "0.4"
 nanoid = "0.4"
 directories = "5"
 derivative = "2"
-reqwest = { version = "0.11", features = ["multipart", "rustls-tls", "hyper-tls", "native-tls-vendored" ] }
+reqwest = { version = "0.12", features = ["multipart", "rustls-tls", "native-tls-vendored" ] }
 time = { version = "0.3", features = ["macros", "formatting", "local-offset"] }
 json = "0.12"
-minijinja = "1.0"
-itertools = { version = "0.12", features = [] }
+minijinja = { version = "2.0", features = ["loader"] }
+itertools = { version = "0.13", features = [] }
 path-clean = "1.0.1"
 async-trait = "0.1.80"
 mockall = "0.12.1"
