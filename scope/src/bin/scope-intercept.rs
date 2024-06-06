@@ -115,8 +115,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
         let entrypoint = command.join(" ");
         let exec_runner = Arc::new(DefaultExecutionProvider::default());
 
-        let mut builder =
-            DefaultUnstructuredReportBuilder::new(&entrypoint, &capture);
+        let builder = DefaultUnstructuredReportBuilder::new(&entrypoint, &capture);
 
         for location in found_config.report_upload.values() {
             let mut builder = builder.clone();

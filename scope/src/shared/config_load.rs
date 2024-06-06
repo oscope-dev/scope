@@ -1,8 +1,6 @@
-use crate::models::prelude::{ModelMetadata, ModelRoot};
+use crate::models::prelude::ModelRoot;
 use crate::models::HelpMetadata;
-use crate::shared::models::prelude::{
-    DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation,
-};
+use crate::shared::models::prelude::{DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation};
 use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};

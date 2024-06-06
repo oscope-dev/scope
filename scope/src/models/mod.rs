@@ -84,22 +84,11 @@ where
     #[cfg(test)]
     fn create_and_validate(
         schema_gen: &mut schemars::gen::SchemaGenerator,
-        out_dir: &str,
+        _out_dir: &str,
         merged_schema: &str,
     ) -> anyhow::Result<()> {
         let schema = schema_gen.root_schema_for::<Self>();
         let schema_json = serde_json::to_string_pretty(&schema)?;
-
-        let path_prefix: String = Self::int_api_version()
-            .split(&['.', '/'])
-            .rev()
-            .collect::<Vec<_>>()
-            .join(".");
-
-        std::fs::write(
-            format!("{}/{}.{}.json", out_dir, path_prefix, Self::int_kind()),
-            &schema_json,
-        )?;
 
         for example in Self::examples() {
             validate_schema::<Self>(&schema_json, &example)?;
@@ -157,7 +146,6 @@ mod schema_gen {
     #[serde(untagged)]
     enum ScopeTypes {
         ReportLocation(V1AlphaReportLocation),
-        ReportDefinition(V1AlphaReportDefinition),
         KnownError(V1AlphaKnownError),
         DoctorGroup(V1AlphaDoctorGroup),
     }
@@ -175,12 +163,6 @@ mod schema_gen {
 
         V1AlphaReportLocation::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)
             .unwrap();
-        V1AlphaReportDefinition::create_and_validate(
-            &mut schema_gen,
-            &out_dir,
-            &merged_schema_json,
-        )
-        .unwrap();
         V1AlphaKnownError::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)
             .unwrap();
         V1AlphaDoctorGroup::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)

@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
 use crate::models::core::ModelMetadata;
 use crate::models::v1alpha::V1AlphaApiVersion;
 use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// How to load the report to GitHub Issue
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
@@ -71,7 +71,7 @@ pub struct ReportDestinationTemplates {
     /// Additional templates, when provided they will be available to `doctor` or `command` templates.
     /// Each template is a Jinja2 style template, to be included. The text should be in Markdown
     /// format. Scope injects `command` as the command that was run.
-    pub extra_definitions: BTreeMap<String, String>
+    pub extra_definitions: BTreeMap<String, String>,
 }
 
 /// Define where to upload the report to
@@ -156,6 +156,7 @@ impl InternalScopeModel<ReportLocationSpec, V1AlphaReportLocation> for V1AlphaRe
         vec![
             "v1alpha/ReportLocation.github.yaml".to_string(),
             "v1alpha/ReportLocation.rustyPaste.yaml".to_string(),
+            "v1alpha/ReportLocation.local.yaml".to_string(),
         ]
     }
 }

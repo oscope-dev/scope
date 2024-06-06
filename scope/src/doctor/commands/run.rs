@@ -90,9 +90,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         };
 
         if create_report {
-            let mut builder = DefaultGroupedReportBuilder::new(
-                "scope doctor run",
-            );
+            let mut builder = DefaultGroupedReportBuilder::new("scope doctor run");
 
             for group_report in &result.group_reports {
                 builder.append_group(group_report).ok();
@@ -100,14 +98,14 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
 
             for location in found_config.report_upload.values() {
                 let mut builder = builder.clone();
-                    builder
-                        .run_and_append_additional_data(
-                            found_config,
-                            transform.exec_runner.clone(),
-                            &location.additional_data,
-                        )
-                        .await
-                        .ok();
+                builder
+                    .run_and_append_additional_data(
+                        found_config,
+                        transform.exec_runner.clone(),
+                        &location.additional_data,
+                    )
+                    .await
+                    .ok();
 
                 let report = builder.render(location);
 

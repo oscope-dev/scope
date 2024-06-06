@@ -1,0 +1,24 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportLocation
+metadata:
+  name: local
+spec:
+  additionalData:
+    username: id -nu
+    ruby: which ruby
+    node: which node
+    nodeVersion: node -v
+  templates:
+    command: |
+      # There was an error!
+      
+      When running `{{ command }}` scope ran into an error
+    doctor: |
+      # Hi Doctor!
+    title: |
+      Hello!
+    extra: |
+      Another template
+  destination:
+    local:
+      directory: /tmp/scope/foo/

@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use derive_builder::Builder;
 use itertools::Itertools;
 use jsonwebtoken::EncodingKey;
-use minijinja::{context};
+use minijinja::context;
 use normpath::PathExt;
 use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
@@ -342,7 +342,9 @@ impl ReportRenderer for DefaultUnstructuredReportBuilder {
 
 impl DefaultUnstructuredReportBuilder {
     fn render_title(&self, destination: &ReportUploadLocation) -> Result<String> {
-        destination.templates.render_title(context! { entrypoint => self.entrypoint })
+        destination
+            .templates
+            .render_title(context! { entrypoint => self.entrypoint })
     }
 
     fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
@@ -432,7 +434,9 @@ impl ReportRenderer for DefaultGroupedReportBuilder {
 
 impl DefaultGroupedReportBuilder {
     fn render_title(&self, destination: &ReportUploadLocation) -> Result<String> {
-        destination.templates.render_title(context! { entrypoint => self.entrypoint })
+        destination
+            .templates
+            .render_title(context! { entrypoint => self.entrypoint })
     }
 
     fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
@@ -584,7 +588,7 @@ pub(crate) mod tests {
                 destination: "/tmp/test".to_string(),
             },
             templates,
-            additional_data: Default::default()
+            additional_data: Default::default(),
         };
 
         let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
@@ -677,7 +681,7 @@ second line
                 destination: "/tmp/test".to_string(),
             },
             templates,
-            additional_data: Default::default()
+            additional_data: Default::default(),
         };
 
         let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
@@ -703,8 +707,7 @@ second line
             .end_time(DateTime::from_timestamp(1715612602, 0).unwrap())
             .build()?;
 
-        let mut builder =
-            DefaultUnstructuredReportBuilder::new("hello world", &capture);
+        let mut builder = DefaultUnstructuredReportBuilder::new("hello world", &capture);
         builder
             .run_and_append_additional_data(
                 &found_config,

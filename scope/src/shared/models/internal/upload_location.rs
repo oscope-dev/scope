@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
-use derivative::Derivative;
-use minijinja::Environment;
-use serde::Serialize;
 use crate::models::prelude::{ModelMetadata, V1AlphaReportLocation};
 use crate::models::HelpMetadata;
 use crate::prelude::{ReportDestinationSpec, ReportDestinationTemplates};
+use derivative::Derivative;
+use minijinja::Environment;
+use serde::Serialize;
+use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ReportUploadLocationDestination {
@@ -35,7 +35,10 @@ pub struct ReportTemplates {
 impl Default for ReportTemplates {
     fn default() -> Self {
         let mut templates = BTreeMap::new();
-        templates.insert("message".to_string(), ReportTemplates::default_message_template());
+        templates.insert(
+            "message".to_string(),
+            ReportTemplates::default_message_template(),
+        );
         ReportTemplates {
             templates,
             title_template: ReportTemplates::default_title_template(),
@@ -65,7 +68,8 @@ impl ReportTemplates {
     }
 
     pub fn add_template(&mut self, name: &str, template: &str) {
-        self.templates.insert(name.to_string(), template.to_string());
+        self.templates
+            .insert(name.to_string(), template.to_string());
     }
 
     pub fn render_title<S: Serialize>(&self, ctx: S) -> anyhow::Result<String> {
@@ -89,19 +93,19 @@ impl ReportTemplates {
     }
 
     fn default_message_template() -> String {
-        return "== Error report for {{ command }}.".to_string()
+        "== Error report for {{ command }}.".to_string()
     }
 
     fn default_title_template() -> String {
-        return "Scope bug report: `{{ entrypoint }}`".to_string()
+        "Scope bug report: `{{ entrypoint }}`".to_string()
     }
 
     fn default_doctor_template() -> String {
-        return include_str!("../../grouped_body.jinja").to_string()
+        include_str!("../../grouped_body.jinja").to_string()
     }
 
     fn default_command_template() -> String {
-        return include_str!("../../unstructured_body.jinja").to_string()
+        include_str!("../../unstructured_body.jinja").to_string()
     }
 }
 
@@ -110,16 +114,25 @@ impl TryFrom<ReportDestinationTemplates> for ReportTemplates {
 
     fn try_from(inputs: ReportDestinationTemplates) -> Result<Self, Self::Error> {
         let mut templates = BTreeMap::new();
-        templates.insert("message".to_string(), ReportTemplates::default_message_template());
+        templates.insert(
+            "message".to_string(),
+            ReportTemplates::default_message_template(),
+        );
         for (name, template) in inputs.extra_definitions {
             templates.insert(name, template);
         }
 
         Ok(ReportTemplates {
             templates,
-            title_template: inputs.title.unwrap_or_else(|| ReportTemplates::default_title_template()),
-            doctor_template: inputs.doctor.unwrap_or_else(|| ReportTemplates::default_doctor_template()),
-            command_template: inputs.command.unwrap_or_else(|| ReportTemplates::default_command_template()),
+            title_template: inputs
+                .title
+                .unwrap_or_else(ReportTemplates::default_title_template),
+            doctor_template: inputs
+                .doctor
+                .unwrap_or_else(ReportTemplates::default_doctor_template),
+            command_template: inputs
+                .command
+                .unwrap_or_else(ReportTemplates::default_command_template),
         })
     }
 }
@@ -173,7 +186,7 @@ impl TryFrom<V1AlphaReportLocation> for ReportUploadLocation {
             metadata: value.metadata,
             destination,
             templates: report_templates,
-            additional_data: value.spec.additional_data
+            additional_data: value.spec.additional_data,
         })
     }
 }

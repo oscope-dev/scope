@@ -1,6 +1,5 @@
 use crate::models::prelude::{
-    ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError,
-    V1AlphaReportLocation,
+    ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError, V1AlphaReportLocation,
 };
 use crate::models::InternalScopeModel;
 use crate::shared::prelude::*;
