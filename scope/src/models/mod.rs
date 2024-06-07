@@ -84,11 +84,22 @@ where
     #[cfg(test)]
     fn create_and_validate(
         schema_gen: &mut schemars::gen::SchemaGenerator,
-        _out_dir: &str,
+        out_dir: &str,
         merged_schema: &str,
     ) -> anyhow::Result<()> {
         let schema = schema_gen.root_schema_for::<Self>();
         let schema_json = serde_json::to_string_pretty(&schema)?;
+
+        let path_prefix: String = Self::int_api_version()
+            .split(&['.', '/'])
+            .rev()
+            .collect::<Vec<_>>()
+            .join(".");
+
+        std::fs::write(
+            format!("{}/{}.{}.json", out_dir, path_prefix, Self::int_kind()),
+            &schema_json,
+        )?;
 
         for example in Self::examples() {
             validate_schema::<Self>(&schema_json, &example)?;
