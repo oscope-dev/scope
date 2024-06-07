@@ -8,9 +8,9 @@ pub mod cli {
 pub mod commands {
     use crate::prelude::UnstructuredReportBuilder;
     use crate::prelude::{
-        ActionReport, ActionTaskReport, ConfigOptions, DefaultExecutionProvider,
-        DefaultGroupedReportBuilder, DefaultUnstructuredReportBuilder, FoundConfig, GroupReport,
-        GroupedReportBuilder, LintArgs, OutputCaptureBuilder, ReportRenderer,
+        ActionReport, ActionTaskReport, DefaultExecutionProvider, DefaultGroupedReportBuilder,
+        DefaultUnstructuredReportBuilder, FoundConfig, GroupReport, GroupedReportBuilder, LintArgs,
+        OutputCaptureBuilder, ReportRenderer,
     };
     use anyhow::Result;
     use chrono::DateTime;
@@ -20,6 +20,12 @@ pub mod commands {
     use tracing::info;
 
     pub async fn lint_root(found_config: &FoundConfig, _args: &LintArgs) -> Result<i32> {
+        lint_locations(found_config).await?;
+
+        Ok(0)
+    }
+
+    async fn lint_locations(found_config: &FoundConfig) -> Result<()> {
         let unstructured = default_unstructured()?;
         let structured = default_structured()?;
         let exec_runner = Arc::new(DefaultExecutionProvider::default());
@@ -36,11 +42,7 @@ pub mod commands {
 
             let unstructured_report = unstructured_builder.render(location)?;
 
-            let unstructured_path = format!(
-                "{}-unstructured-{}.md",
-                name,
-                ConfigOptions::generate_run_id()
-            );
+            let unstructured_path = format!("{}-unstructured-{}.md", name, found_config.run_id);
             info!(target: "always", "Creating template at {}", unstructured_path);
 
             std::fs::write(
@@ -63,11 +65,7 @@ pub mod commands {
 
             let structured_report = structured_builder.render(location)?;
 
-            let structured_path = format!(
-                "{}-structured-{}.md",
-                name,
-                ConfigOptions::generate_run_id()
-            );
+            let structured_path = format!("{}-structured-{}.md", name, found_config.run_id);
 
             info!(target: "always", "Creating template at {}", structured_path);
 
@@ -81,8 +79,9 @@ pub mod commands {
             )?;
         }
 
-        Ok(0)
+        Ok(())
     }
+
     fn default_structured() -> Result<DefaultGroupedReportBuilder> {
         let mut builder = DefaultGroupedReportBuilder::new("sample command");
         builder.append_group(&make_group(1))?;
