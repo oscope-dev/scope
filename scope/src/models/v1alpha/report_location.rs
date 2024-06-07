@@ -4,6 +4,7 @@ use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// How to load the report to GitHub Issue
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
@@ -48,6 +49,31 @@ pub enum ReportDestinationSpec {
     Local(ReportDestinationLocalSpec),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, Default)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct ReportDestinationTemplates {
+    /// Title to use when creating the issue. This is a Jinja2 style template. `entrypoint` is
+    /// provided as a variable, which is the scope command run.
+    pub title: Option<String>,
+
+    /// Template to use when generating a bug report with `scope doctor`
+    /// A Jinja2 style template, to be included. The text should be in Markdown format. Scope
+    /// injects `command` as the command that was run.
+    pub doctor: Option<String>,
+
+    /// Template to use when generating a bug without with analyze or intercept
+    /// A Jinja2 style template, to be included. The text should be in Markdown format. Scope
+    /// injects `command` as the command that was run.
+    pub analyze: Option<String>,
+
+    #[serde(default, flatten)]
+    /// Additional templates, when provided they will be available to `doctor` or `command` templates.
+    /// Each template is a Jinja2 style template, to be included. The text should be in Markdown
+    /// format. Scope injects `command` as the command that was run.
+    pub extra_definitions: BTreeMap<String, String>,
+}
+
 /// Define where to upload the report to
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +83,16 @@ pub struct ReportLocationSpec {
     #[schemars(with = "ReportDestinationSpec")]
     /// Destination the report should be uploaded to
     pub destination: ReportDestinationSpec,
+
+    #[serde(default)]
+    /// Templates to use when uploading a report
+    pub templates: ReportDestinationTemplates,
+
+    #[serde(default)]
+    /// defines additional data that needs to be pulled from the system when reporting a bug.
+    /// `additionalData` is a map of `string:string`, the value is a command that should be run.
+    /// When a report is built, the commands will be run and automatically included in the report.
+    pub additional_data: BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, JsonSchema)]
@@ -120,6 +156,7 @@ impl InternalScopeModel<ReportLocationSpec, V1AlphaReportLocation> for V1AlphaRe
         vec![
             "v1alpha/ReportLocation.github.yaml".to_string(),
             "v1alpha/ReportLocation.rustyPaste.yaml".to_string(),
+            "v1alpha/ReportLocation.local.yaml".to_string(),
         ]
     }
 }

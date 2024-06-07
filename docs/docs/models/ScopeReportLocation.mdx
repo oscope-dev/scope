@@ -10,7 +10,24 @@ import TabItem from '@theme/TabItem';
 
 # ScopeReportLocation
 
-Define where to upload the bug report to. Currently, only support `GitHubIssues` and `rustyPaste`.
+Define a report, what it includes, what it looks like, and where to upload to.
+
+## Templates
+
+By default, scope has 3 provided templates `title`, `analyze`, and `doctor`.
+
+`title` is used to determine the title of the issue (if supported), `analyze` is used when `scope analyze` is run,
+and `doctor` is used when `scope doctor` is run.
+
+Each of those templates are defined in a Jinja2 format, and they have different options available.
+
+| variable | description | example input | available in |
+|:---:|:---:|:---:|:---:|
+| `entrypoint` | The `scope` command run | `scope doctor run` | `title`, `analyze`, `doctor` |
+| `command` | The `scope` command run | `scope doctor run` | `analyze`, `doctor` |
+| `groups` | Output from each group run with doctor | `{ name: string, actions: []{ check: [], fix: [], validate: [] }, additional_data: [string]:string` | `doctor` |
+| `additionalData` | Additional data from location | `[]{ name: string, command: string, output: string }` | `doctor`, `analyze` |
+| `result` | Output from the command | `{command: string, exit_code: i32, start_time: string, end_time: string, output: string}` | `analyze` |
 
 ### GitHub Issues
 

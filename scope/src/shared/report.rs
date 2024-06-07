@@ -1,14 +1,14 @@
 use super::capture::OutputCapture;
 use super::config_load::FoundConfig;
 use super::models::prelude::ReportUploadLocationDestination;
-use crate::prelude::{ExecutionProvider, ReportDefinition, ReportUploadLocation};
+use crate::prelude::{ExecutionProvider, ReportUploadLocation};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use derive_builder::Builder;
 use itertools::Itertools;
 use jsonwebtoken::EncodingKey;
-use minijinja::{context, Environment};
+use minijinja::context;
 use normpath::PathExt;
 use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
@@ -258,6 +258,14 @@ pub struct Report {
 }
 
 impl Report {
+    pub fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    pub fn body(&self) -> String {
+        self.body.clone()
+    }
+
     pub async fn distribute(&self) -> Result<()> {
         if let Err(e) = &self
             .destination
@@ -287,17 +295,16 @@ pub trait UnstructuredReportBuilder {
     ) -> Result<()>;
 }
 
+#[derive(Clone, Debug)]
 pub struct DefaultUnstructuredReportBuilder {
     entrypoint: String,
     capture: OutputCapture,
     additional_data: Vec<AdditionalDataReport>,
-    message_template: String,
 }
 
 impl DefaultUnstructuredReportBuilder {
-    pub fn new(report: &ReportDefinition, entrypoint: &str, capture: &OutputCapture) -> Self {
+    pub fn new(entrypoint: &str, capture: &OutputCapture) -> Self {
         Self {
-            message_template: report.template.clone(),
             entrypoint: entrypoint.to_string(),
             capture: capture.clone(),
             additional_data: vec![],
@@ -342,51 +349,22 @@ impl ReportRenderer for DefaultUnstructuredReportBuilder {
 }
 
 impl DefaultUnstructuredReportBuilder {
-    fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
-        let mut env = Environment::new();
-        env.add_template("title", self.get_title_template())?;
-
-        let template = env.get_template("title")?;
-        let rendered = template.render(context! { entrypoint => self.entrypoint })?;
-
-        Ok(rendered)
+    fn render_title(&self, destination: &ReportUploadLocation) -> Result<String> {
+        destination
+            .templates
+            .render_title(context! { entrypoint => self.entrypoint })
     }
 
-    fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
-        let mut env = Environment::new();
-        env.set_trim_blocks(true);
-        env.set_lstrip_blocks(true);
-        env.add_template("body", self.get_body_template())?;
-        let template = env.get_template("body")?;
-
-        let message = self.render_message()?;
-
+    fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
         let ctx = context! {
-           message => message,
-           entrypoint => self.entrypoint,
-           result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
-           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
+            command => self.capture.command,
+            entrypoint => self.entrypoint,
+            result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
+            additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
-        let rendered = template.render(ctx)?;
+        let rendered = destination.templates.render_analyze(ctx)?;
 
         Ok(rendered)
-    }
-
-    fn render_message(&self) -> Result<String> {
-        let mut env = Environment::new();
-        env.add_template("message", &self.message_template)?;
-        let template = env.get_template("message")?;
-        let template = template.render(context! { command => self.entrypoint })?;
-
-        Ok(template)
-    }
-
-    fn get_body_template(&self) -> &str {
-        include_str!("unstructured_body.jinja")
-    }
-
-    fn get_title_template(&self) -> &str {
-        "Scope bug report: `{{ entrypoint }}`"
     }
 }
 
@@ -403,20 +381,19 @@ pub trait GroupedReportBuilder {
     ) -> Result<()>;
 }
 
+#[derive(Debug, Clone)]
 pub struct DefaultGroupedReportBuilder {
     entrypoint: String,
     groups: Vec<GroupReport>,
     additional_data: Vec<AdditionalDataReport>,
-    message_template: Option<String>,
 }
 
 impl DefaultGroupedReportBuilder {
-    pub fn new(report: &Option<ReportDefinition>, entrypoint: &str) -> Self {
+    pub fn new(entrypoint: &str) -> Self {
         Self {
             entrypoint: entrypoint.to_string(),
             groups: Vec::new(),
             additional_data: Vec::new(),
-            message_template: report.as_ref().map(|report| report.template.clone()),
         }
     }
 }
@@ -464,56 +441,22 @@ impl ReportRenderer for DefaultGroupedReportBuilder {
 }
 
 impl DefaultGroupedReportBuilder {
-    fn render_title(&self, _destination: &ReportUploadLocation) -> Result<String> {
-        let mut env = Environment::new();
-        env.add_template("title", self.get_title_template())?;
-
-        let template = env.get_template("title")?;
-        let rendered = template.render(context! { entrypoint => self.entrypoint })?;
-
-        Ok(rendered)
+    fn render_title(&self, destination: &ReportUploadLocation) -> Result<String> {
+        destination
+            .templates
+            .render_title(context! { entrypoint => self.entrypoint })
     }
 
-    fn render_body(&self, _destination: &ReportUploadLocation) -> Result<String> {
-        let mut env = Environment::new();
-        env.set_trim_blocks(true);
-        env.set_lstrip_blocks(true);
-        env.add_template("body", self.get_body_template())?;
-        let template = env.get_template("body")?;
-
-        let message = self.render_message()?;
-
+    fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
         let ctx = context! {
-           entrypoint => self.entrypoint,
-           message => message,
-           groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
-           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
+            command => self.entrypoint,
+            entrypoint => self.entrypoint,
+            groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
+            additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
-        let rendered = template.render(ctx)?;
+        let rendered = destination.templates.render_doctor(ctx)?;
 
         Ok(rendered)
-    }
-
-    fn render_message(&self) -> Result<String> {
-        match &self.message_template {
-            Some(template) => {
-                let mut env = Environment::new();
-                env.add_template("message", template)?;
-                let template = env.get_template("message")?;
-                let template = template.render(context! { command => self.entrypoint })?;
-
-                Ok(template)
-            }
-            None => Ok("".to_string()),
-        }
-    }
-
-    fn get_body_template(&self) -> &str {
-        include_str!("grouped_body.jinja")
-    }
-
-    fn get_title_template(&self) -> &str {
-        "Scope bug report: `{{ entrypoint }}`"
     }
 }
 
@@ -636,25 +579,15 @@ pub(crate) mod tests {
     use anyhow::Result;
     use chrono::DateTime;
 
-    use crate::prelude::{
-        ActionReport, ActionTaskReport, DefaultGroupedReportBuilder,
-        DefaultUnstructuredReportBuilder, FoundConfig, GroupReport, GroupedReportBuilder,
-        MockExecutionProvider, ModelMetadata, OutputCaptureBuilder, ReportDefinition,
-        ReportRenderer, ReportUploadLocation, ReportUploadLocationDestination,
-        UnstructuredReportBuilder,
-    };
+    use crate::prelude::*;
 
     #[tokio::test]
     async fn test_grouped_report_builder() -> Result<()> {
         let found_config = FoundConfig::empty(PathBuf::from("/tmp"));
         let mut exec_provider = MockExecutionProvider::new();
 
-        let report_definition = ReportDefinition {
-            full_name: "ReportDefintion/test".to_string(),
-            metadata: ModelMetadata::new("test"),
-            additional_data: BTreeMap::from([("foo".to_string(), "echo bar".to_string())]),
-            template: "# Error\nAn error occured with {{ command }}".to_string(),
-        };
+        let mut templates = ReportTemplates::default();
+        templates.add_template("message", "# Error\nAn error occured with {{ command }}");
 
         let report_destination = ReportUploadLocation {
             full_name: "ReportUploadLocation/test".to_string(),
@@ -662,6 +595,8 @@ pub(crate) mod tests {
             destination: ReportUploadLocationDestination::Local {
                 destination: "/tmp/test".to_string(),
             },
+            templates,
+            additional_data: Default::default(),
         };
 
         let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
@@ -686,7 +621,7 @@ pub(crate) mod tests {
             validate: vec![],
         });
 
-        let mut builder = DefaultGroupedReportBuilder::new(&Some(report_definition), "hello world");
+        let mut builder = DefaultGroupedReportBuilder::new("hello world");
         builder.append_group(&group)?;
         builder
             .run_and_append_additional_data(
@@ -744,12 +679,8 @@ second line
         let found_config = FoundConfig::empty(PathBuf::from("/tmp"));
         let mut exec_provider = MockExecutionProvider::new();
 
-        let report_definition = ReportDefinition {
-            full_name: "ReportDefintion/test".to_string(),
-            metadata: ModelMetadata::new("test"),
-            additional_data: BTreeMap::from([("foo".to_string(), "echo bar".to_string())]),
-            template: "# Error\nAn error occured with `{{ command }}`.".to_string(),
-        };
+        let mut templates = ReportTemplates::default();
+        templates.add_template("message", "# Error\nAn error occured with `{{ command }}`.");
 
         let report_destination = ReportUploadLocation {
             full_name: "ReportUploadLocation/test".to_string(),
@@ -757,6 +688,8 @@ second line
             destination: ReportUploadLocationDestination::Local {
                 destination: "/tmp/test".to_string(),
             },
+            templates,
+            additional_data: Default::default(),
         };
 
         let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
@@ -782,8 +715,7 @@ second line
             .end_time(DateTime::from_timestamp(1715612602, 0).unwrap())
             .build()?;
 
-        let mut builder =
-            DefaultUnstructuredReportBuilder::new(&report_definition, "hello world", &capture);
+        let mut builder = DefaultUnstructuredReportBuilder::new("hello world", &capture);
         builder
             .run_and_append_additional_data(
                 &found_config,

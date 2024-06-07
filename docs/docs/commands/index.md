@@ -24,7 +24,6 @@ Here is an example output of `scope list` run from the `examples/` directory.
  INFO - ScopeDoctorGroup/path-exists-fix-in-scope-dir  Check your shell for basic functionality                    .scope/doctor-group-in-scope-dir.yaml
  INFO - ScopeDoctorGroup/setup                         You need to run bin/setup                                   .scope/doctor-group-setup.yaml
  INFO - ScopeKnownError/error-exists                   Check if the word error is in the logs                      .scope/known-error.yaml
- INFO - ScopeReportDefinition/template                 Description not provided                                    .scope/report.yaml
  INFO - ScopeReportLocation/github                     Description not provided                                    .scope/report.yaml
  INFO - ScopeReportLocation/report                     Description not provided                                    .scope/report.yaml
  INFO

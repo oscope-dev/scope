@@ -33,20 +33,20 @@ pub async fn report_root(found_config: &FoundConfig, args: &ReportArgs) -> Resul
 
     let entrypoint = args.command.join(" ");
     let exec_runner = Arc::new(DefaultExecutionProvider::default());
-    let report_definition = found_config.get_report_definition();
 
-    let mut builder =
-        DefaultUnstructuredReportBuilder::new(&report_definition, &entrypoint, &capture);
-    builder
-        .run_and_append_additional_data(
-            found_config,
-            exec_runner,
-            &report_definition.additional_data,
-        )
-        .await
-        .ok();
+    let builder = DefaultUnstructuredReportBuilder::new(&entrypoint, &capture);
 
     for location in found_config.report_upload.values() {
+        let mut builder = builder.clone();
+        builder
+            .run_and_append_additional_data(
+                found_config,
+                exec_runner.clone(),
+                &location.additional_data,
+            )
+            .await
+            .ok();
+
         let report = builder.render(location);
 
         match report {

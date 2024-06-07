@@ -157,7 +157,6 @@ mod schema_gen {
     #[serde(untagged)]
     enum ScopeTypes {
         ReportLocation(V1AlphaReportLocation),
-        ReportDefinition(V1AlphaReportDefinition),
         KnownError(V1AlphaKnownError),
         DoctorGroup(V1AlphaDoctorGroup),
     }
@@ -175,12 +174,6 @@ mod schema_gen {
 
         V1AlphaReportLocation::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)
             .unwrap();
-        V1AlphaReportDefinition::create_and_validate(
-            &mut schema_gen,
-            &out_dir,
-            &merged_schema_json,
-        )
-        .unwrap();
         V1AlphaKnownError::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)
             .unwrap();
         V1AlphaDoctorGroup::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)

@@ -29,7 +29,7 @@ impl RwLockOutput {
     }
 }
 
-#[derive(Clone, Default, Builder)]
+#[derive(Clone, Default, Builder, Debug)]
 #[builder(setter(into))]
 pub struct OutputCapture {
     #[builder(default)]

@@ -1,8 +1,6 @@
-use crate::models::prelude::{ModelMetadata, ModelRoot};
+use crate::models::prelude::ModelRoot;
 use crate::models::HelpMetadata;
-use crate::shared::models::prelude::{
-    DoctorGroup, KnownError, ParsedConfig, ReportDefinition, ReportUploadLocation,
-};
+use crate::shared::models::prelude::{DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation};
 use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
@@ -110,7 +108,6 @@ pub struct FoundConfig {
     pub doctor_group: BTreeMap<String, DoctorGroup>,
     pub known_error: BTreeMap<String, KnownError>,
     pub report_upload: BTreeMap<String, ReportUploadLocation>,
-    pub report_definition: Option<ReportDefinition>,
     pub config_path: Vec<PathBuf>,
     pub bin_path: String,
     pub run_id: String,
@@ -126,7 +123,6 @@ impl FoundConfig {
             doctor_group: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
-            report_definition: None,
             config_path: Vec::new(),
             run_id: ConfigOptions::generate_run_id(),
             bin_path,
@@ -163,7 +159,6 @@ impl FoundConfig {
             doctor_group: BTreeMap::new(),
             known_error: BTreeMap::new(),
             report_upload: BTreeMap::new(),
-            report_definition: None,
             config_path,
             bin_path: [scope_path, default_path].join(":"),
             run_id: config_options.get_run_id(),
@@ -195,17 +190,6 @@ impl FoundConfig {
         Ok(file_path)
     }
 
-    pub fn get_report_definition(&self) -> ReportDefinition {
-        self.report_definition
-            .clone()
-            .unwrap_or_else(|| ReportDefinition {
-                full_name: "ReportDefinition/generated".to_string(),
-                metadata: ModelMetadata::new("generated"),
-                template: "== Error report for {{ command }}.".to_string(),
-                additional_data: Default::default(),
-            })
-    }
-
     fn add_model(&mut self, parsed_config: ParsedConfig) {
         match parsed_config {
             ParsedConfig::DoctorGroup(exec) => {
@@ -216,13 +200,6 @@ impl FoundConfig {
             }
             ParsedConfig::ReportUpload(report_upload) => {
                 insert_if_absent(&mut self.report_upload, report_upload);
-            }
-            ParsedConfig::ReportDefinition(report_definition) => {
-                if self.report_definition.is_none() {
-                    self.report_definition.replace(report_definition);
-                } else {
-                    info!(target: "user", "A ReportDefinition with duplicate name found, dropping ReportUpload {} in {}", report_definition.name(), report_definition.metadata().file_path());
-                }
             }
         }
     }

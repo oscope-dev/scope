@@ -6,10 +6,9 @@ sidebar_position: 2
 
 `scope report` is used to generate a bug report.
 
-To build a bug report, two different files are used:
+To build a bug report, one object is needed the [ScopeReportLocation](../models/ScopeReportLocation.mdx).
 
-- [ScopeReportDefinition](../models/ScopeReportDefinition.mdx) - is used to define what to include in the bug report. There can only be one report definition at one time.
-- [ScopeReportLocation](../models/ScopeReportLocation.mdx) - defines where to upload reports to.
+A [ScopeReportLocation](../models/ScopeReportLocation.mdx) defines where to upload the artifact to, what templates to use, and what additional data is needed when uploading the report.
 
 When reporting a bug, scope will auto redact well known keys and patterns to reduce sharing private information.
 
