@@ -86,9 +86,9 @@ impl ReportTemplates {
         Ok(title_template.render(ctx)?)
     }
 
-    pub fn render_command<S: Serialize>(&self, ctx: S) -> anyhow::Result<String> {
+    pub fn render_analyze<S: Serialize>(&self, ctx: S) -> anyhow::Result<String> {
         let env = self.make_env()?;
-        let title_template = env.get_template("command")?;
+        let title_template = env.get_template("analyze")?;
         Ok(title_template.render(ctx)?)
     }
 

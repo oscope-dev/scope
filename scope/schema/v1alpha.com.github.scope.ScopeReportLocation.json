@@ -382,7 +382,7 @@
     "ReportDestinationTemplates": {
       "type": "object",
       "properties": {
-        "command": {
+        "analyze": {
           "description": "Template to use when generating a bug without with analyze or intercept A Jinja2 style template, to be included. The text should be in Markdown format. Scope injects `command` as the command that was run.",
           "type": [
             "string",
@@ -439,7 +439,7 @@
         "templates": {
           "description": "Templates to use when uploading a report",
           "default": {
-            "command": null,
+            "analyze": null,
             "doctor": null,
             "title": null
           },

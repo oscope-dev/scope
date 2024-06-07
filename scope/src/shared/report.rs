@@ -362,7 +362,7 @@ impl DefaultUnstructuredReportBuilder {
             result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
             additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
-        let rendered = destination.templates.render_command(ctx)?;
+        let rendered = destination.templates.render_analyze(ctx)?;
 
         Ok(rendered)
     }
