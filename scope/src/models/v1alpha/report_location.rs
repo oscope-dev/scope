@@ -65,7 +65,7 @@ pub struct ReportDestinationTemplates {
     /// Template to use when generating a bug without with analyze or intercept
     /// A Jinja2 style template, to be included. The text should be in Markdown format. Scope
     /// injects `command` as the command that was run.
-    pub command: Option<String>,
+    pub analyze: Option<String>,
 
     #[serde(default, flatten)]
     /// Additional templates, when provided they will be available to `doctor` or `command` templates.

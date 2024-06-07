@@ -29,7 +29,7 @@ pub struct ReportTemplates {
     templates: BTreeMap<String, String>,
     doctor_template: String,
     title_template: String,
-    command_template: String,
+    analyze_template: String,
 }
 
 impl Default for ReportTemplates {
@@ -43,7 +43,7 @@ impl Default for ReportTemplates {
             templates,
             title_template: ReportTemplates::default_title_template(),
             doctor_template: ReportTemplates::default_doctor_template(),
-            command_template: ReportTemplates::default_command_template(),
+            analyze_template: ReportTemplates::default_command_template(),
         }
     }
 }
@@ -61,7 +61,7 @@ impl ReportTemplates {
         }
 
         env.add_template_owned("title".to_string(), self.title_template.clone())?;
-        env.add_template_owned("command".to_string(), self.command_template.clone())?;
+        env.add_template_owned("analyze".to_string(), self.analyze_template.clone())?;
         env.add_template_owned("doctor".to_string(), self.doctor_template.clone())?;
 
         Ok(env)
@@ -130,8 +130,8 @@ impl TryFrom<ReportDestinationTemplates> for ReportTemplates {
             doctor_template: inputs
                 .doctor
                 .unwrap_or_else(ReportTemplates::default_doctor_template),
-            command_template: inputs
-                .command
+            analyze_template: inputs
+                .analyze
                 .unwrap_or_else(ReportTemplates::default_command_template),
         })
     }

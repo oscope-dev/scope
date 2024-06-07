@@ -358,9 +358,9 @@ impl DefaultUnstructuredReportBuilder {
     fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
         let ctx = context! {
             command => self.capture.command,
-           entrypoint => self.entrypoint,
-           result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
-           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
+            entrypoint => self.entrypoint,
+            result => ReportCommandResultContext::from(&ActionTaskReport::from(&self.capture)),
+            additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
         let rendered = destination.templates.render_command(ctx)?;
 
@@ -450,9 +450,9 @@ impl DefaultGroupedReportBuilder {
     fn render_body(&self, destination: &ReportUploadLocation) -> Result<String> {
         let ctx = context! {
             command => self.entrypoint,
-           entrypoint => self.entrypoint,
-           groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
-           additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
+            entrypoint => self.entrypoint,
+            groups => self.groups.iter().map(ReportGroupItemContext::from).collect_vec(),
+            additionalData => self.additional_data.iter().map(ReportAdditionalDataContext::from).collect_vec(),
         };
         let rendered = destination.templates.render_doctor(ctx)?;
 
