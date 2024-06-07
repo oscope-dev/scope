@@ -15,8 +15,8 @@ pub mod commands {
     use anyhow::Result;
     use chrono::DateTime;
     use fake::faker::lorem::en::*;
-    use std::sync::Arc;
     use fake::Fake;
+    use std::sync::Arc;
     use tracing::info;
 
     pub async fn lint_root(found_config: &FoundConfig, _args: &LintArgs) -> Result<i32> {
@@ -26,13 +26,15 @@ pub mod commands {
 
         for (name, location) in &found_config.report_upload {
             let mut unstructured_builder = unstructured.clone();
-            unstructured_builder.run_and_append_additional_data(
-                found_config,
-                exec_runner.clone(),
-                &location.additional_data,
-            ).await?;
+            unstructured_builder
+                .run_and_append_additional_data(
+                    found_config,
+                    exec_runner.clone(),
+                    &location.additional_data,
+                )
+                .await?;
 
-            let unstructured_report = unstructured_builder.render(&location)?;
+            let unstructured_report = unstructured_builder.render(location)?;
 
             let unstructured_path = format!(
                 "{}-unstructured-{}.md",
@@ -41,7 +43,8 @@ pub mod commands {
             );
             info!(target: "always", "Creating template at {}", unstructured_path);
 
-            std::fs::write(unstructured_path,
+            std::fs::write(
+                unstructured_path,
                 format!(
                     "{}\n{}",
                     unstructured_report.title(),
@@ -50,13 +53,15 @@ pub mod commands {
             )?;
 
             let mut structured_builder = structured.clone();
-            structured_builder.run_and_append_additional_data(
-                found_config,
-                exec_runner.clone(),
-                &location.additional_data,
-            ).await?;
+            structured_builder
+                .run_and_append_additional_data(
+                    found_config,
+                    exec_runner.clone(),
+                    &location.additional_data,
+                )
+                .await?;
 
-            let structured_report = structured_builder.render(&location)?;
+            let structured_report = structured_builder.render(location)?;
 
             let structured_path = format!(
                 "{}-structured-{}.md",
@@ -66,7 +71,8 @@ pub mod commands {
 
             info!(target: "always", "Creating template at {}", structured_path);
 
-            std::fs::write(structured_path,
+            std::fs::write(
+                structured_path,
                 format!(
                     "{}\n{}",
                     structured_report.title(),
@@ -141,7 +147,10 @@ pub mod commands {
             .end_time(DateTime::from_timestamp(1715612600 + 20 * 10, 0).unwrap())
             .build()?;
 
-        Ok(DefaultUnstructuredReportBuilder::new("sample command", &capture))
+        Ok(DefaultUnstructuredReportBuilder::new(
+            "sample command",
+            &capture,
+        ))
     }
 
     fn make_line() -> String {
