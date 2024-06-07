@@ -29,7 +29,7 @@ spec:
     node: which node
     nodeVersion: node -v
   templates:
-    command: |
+    analyze: |
       # There was an error!
   
       When running `{{ command }}` scope ran into an error
