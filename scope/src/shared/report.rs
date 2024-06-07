@@ -258,6 +258,14 @@ pub struct Report {
 }
 
 impl Report {
+    pub fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    pub fn body(&self) -> String {
+        self.body.clone()
+    }
+
     pub async fn distribute(&self) -> Result<()> {
         if let Err(e) = &self
             .destination

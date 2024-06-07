@@ -79,6 +79,7 @@ opentelemetry_sdk.workspace = true
 tonic.workspace = true
 gethostname.workspace = true
 normpath.workspace = true
+fake.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.14"

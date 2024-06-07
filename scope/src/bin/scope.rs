@@ -47,6 +47,8 @@ enum Command {
     /// Analyze logs, output, etc for known errors.
     #[clap(alias("a"))]
     Analyze(AnalyzeArgs),
+    /// Validate inputs, providing recommendations about configuration
+    Lint(LintArgs),
     /// List the found config files, and resources detected
     #[clap(alias("l"))]
     List,
@@ -106,6 +108,7 @@ async fn handle_commands(found_config: &FoundConfig, command: &Command) -> Resul
         Command::Version(args) => print_version(args).await,
         Command::ExternalSubCommand(args) => exec_sub_command(found_config, args).await,
         Command::Analyze(args) => analyze_root(found_config, args).await,
+        Command::Lint(args) => lint_root(found_config, args).await,
     }
 }
 

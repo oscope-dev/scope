@@ -36,3 +36,17 @@ spec:
   destination:
     local:
       directory: /tmp/scope/foo/
+---
+apiVersion: scope.github.com/v1alpha
+kind: ScopeReportLocation
+metadata:
+  name: sample
+spec:
+  additionalData:
+    username: id -nu
+    ruby: which ruby
+    node: which node
+    nodeVersion: node -v
+  destination:
+    local:
+      directory: /tmp/scope/foo/
