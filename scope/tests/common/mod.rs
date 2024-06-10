@@ -66,6 +66,12 @@ impl<'a> ScopeTestHelper<'a> {
         self.run_command(&run_command)
     }
 
+    pub fn analyze_command(&self, command: &str) -> Assert {
+        let run_command = vec!["analyze", "command", command];
+
+        self.run_command(&run_command)
+    }
+
     pub fn clean_work_dir(self) {
         self.work_dir.close().unwrap();
     }
