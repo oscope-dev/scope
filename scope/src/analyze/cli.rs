@@ -1,15 +1,15 @@
 use super::error::AnalyzeError;
 use crate::models::HelpMetadata;
-use crate::prelude::{CaptureOpts, DefaultExecutionProvider, ExecutionProvider};
+use crate::prelude::{CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputDestination};
 use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use std::collections::BTreeMap;
 use std::env;
+use std::io::Cursor;
 use std::path::PathBuf;
 use tokio::fs::File;
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader, Stdin, Stdout};
-use tokio::process::ChildStdout;
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader, Stdin};
 use tracing::{debug, info, warn};
 
 #[derive(Debug, Args)]
@@ -24,7 +24,7 @@ enum AnalyzeCommands {
     #[clap(alias("log"))]
     Logs(AnalyzeLogsArgs),
 
-    /// Runs a command and detects errors in it's output
+    /// Runs a command and detects errors in the output
     #[clap()]
     Command(AnalyzeCommandArgs),
 }
@@ -37,8 +37,12 @@ struct AnalyzeLogsArgs {
 
 #[derive(Debug, Args)]
 struct AnalyzeCommandArgs {
-    /// Command to run
-    command: Vec<String>,
+    /// The command to run
+    #[arg(required = true)]
+    command: String,
+
+    /// Arguments passed to command
+    args: Vec<String>,
 }
 
 pub async fn analyze_root(found_config: &FoundConfig, args: &AnalyzeArgs) -> Result<i32> {
@@ -64,17 +68,21 @@ async fn analyze_logs(found_config: &FoundConfig, args: &AnalyzeLogsArgs) -> Res
 async fn analyze_command(found_config: &FoundConfig, args: &AnalyzeCommandArgs) -> Result<i32> {
     let exec_runner = DefaultExecutionProvider::default();
 
+    let mut command = vec![args.command.clone()];
+    command.extend(args.args.clone());
+    let path = env::var("PATH").unwrap_or_default();
+
     let capture_opts: CaptureOpts = CaptureOpts {
         working_dir: &found_config.working_dir,
         env_vars: Default::default(),
-        path: &env::var("PATH").unwrap_or_default(),
-        args: &args.command,
-        output_dest: crate::prelude::OutputDestination::StandardOut,
+        path: &path,
+        args: &command,
+        output_dest: OutputDestination::StandardOut,
     };
 
     let has_known_error = process_lines(
         found_config,
-        read_from_command(&capture_opts, &exec_runner).await?,
+        read_from_command(&exec_runner, capture_opts).await?,
     )
     .await?;
 
@@ -98,7 +106,6 @@ where
     let mut lines = input.lines();
 
     while let Some(line) = lines.next_line().await? {
-        println!("Line: {:?}", line);
         let mut known_errors_to_remove = Vec::new();
         for (name, ke) in &known_errors {
             debug!("Checking known error {}", ke.name());
@@ -126,13 +133,20 @@ where
 }
 
 async fn read_from_command(
-    capture_opts: &CaptureOpts<'_>,
     exec_runner: &DefaultExecutionProvider,
-) -> Result<BufReader<ChildStdout>, AnalyzeError> {
-    let (stdout, _) = exec_runner.run_command_async(capture_opts).await;
+    capture_opts: CaptureOpts<'_>,
+) -> Result<BufReader<Cursor<String>>, AnalyzeError> {
+    let output = exec_runner.run_command(capture_opts).await.map_err(|e| {
+        // TODO: map CaptureError to AnalyzeError
+        AnalyzeError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            e.to_string(),
+        ))
+    })?;
 
-    // TODO: combine stdout and stderr
-    Ok(BufReader::new(stdout))
+    let cursor = Cursor::new(output.generate_user_output());
+
+    Ok(BufReader::new(cursor))
 }
 
 async fn read_from_stdin() -> Result<BufReader<Stdin>, AnalyzeError> {
