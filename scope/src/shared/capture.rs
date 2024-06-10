@@ -139,6 +139,31 @@ impl ExecutionProvider for DefaultExecutionProvider {
     }
 }
 
+impl DefaultExecutionProvider {
+    pub async fn run_command_async(
+        &self,
+        opts: &CaptureOpts<'_>,
+    ) -> (tokio::process::ChildStdout, tokio::process::ChildStderr) {
+        let mut command = tokio::process::Command::new("/usr/bin/env");
+        let mut child = command
+            .arg("-S")
+            .args(opts.args)
+            .env("PATH", opts.path)
+            .envs(&opts.env_vars)
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .current_dir(opts.working_dir)
+            .spawn()
+            .expect("child to spawn");
+
+        // capture stdout
+        let stdout = child.stdout.take().expect("stdout to be available");
+        let stderr = child.stderr.take().expect("stderr to be available");
+
+        (stdout, stderr)
+    }
+}
+
 pub struct CaptureOpts<'a> {
     pub working_dir: &'a Path,
     pub env_vars: BTreeMap<String, String>,
@@ -184,7 +209,7 @@ impl OutputCapture {
         let stdout = stdout_stream.capture_output();
 
         // capture stderr
-        let stderr = child.stderr.take().expect("stdout to be available");
+        let stderr = child.stderr.take().expect("stderr to be available");
         let stderr_stream = StreamCapture {
             reader: stderr,
             writer: crate::shared::prelude::STDERR_WRITER.clone(),
