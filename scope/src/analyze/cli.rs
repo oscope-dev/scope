@@ -1,6 +1,8 @@
 use super::error::AnalyzeError;
 use crate::models::HelpMetadata;
-use crate::prelude::{CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputDestination};
+use crate::prelude::{
+    CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputDestination,
+};
 use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use clap::{Args, Subcommand};
@@ -135,14 +137,8 @@ where
 async fn read_from_command(
     exec_runner: &DefaultExecutionProvider,
     capture_opts: CaptureOpts<'_>,
-) -> Result<BufReader<Cursor<String>>, AnalyzeError> {
-    let output = exec_runner.run_command(capture_opts).await.map_err(|e| {
-        // TODO: map CaptureError to AnalyzeError
-        AnalyzeError::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            e.to_string(),
-        ))
-    })?;
+) -> Result<BufReader<Cursor<String>>, CaptureError> {
+    let output = exec_runner.run_command(capture_opts).await?;
 
     let cursor = Cursor::new(output.generate_user_output());
 
