@@ -3,7 +3,7 @@ use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 use opentelemetry::{global, KeyValue};
-use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
+use opentelemetry_otlp::{HttpExporterBuilder, TonicExporterBuilder, WithExportConfig};
 use opentelemetry_sdk::metrics::reader::{DefaultAggregationSelector, DefaultTemporalitySelector};
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::trace::Tracer;
@@ -160,7 +160,7 @@ impl LoggingOpts {
         }
     }
 
-    fn make_exporter(&self, id: &str) -> TonicExporterBuilder {
+    fn make_exporter(&self, id: &str) -> HttpExporterBuilder {
         let endpoint = self.otel_collector.clone().unwrap();
         let mut map = MetadataMap::with_capacity(2);
 
@@ -175,10 +175,10 @@ impl LoggingOpts {
         map.insert("scope.id", id.parse().unwrap());
 
         opentelemetry_otlp::new_exporter()
-            .tonic()
+            .http()
             .with_endpoint(endpoint)
             .with_timeout(Duration::from_secs(3))
-            .with_metadata(map)
+        // .with_metadata(map)
     }
 
     fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
