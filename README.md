@@ -56,8 +56,9 @@ Often the responding team wants the output that failed, and some other useful de
 
 By using `scope report some-command.sh`, scope will capture all the output with timestamps and then generate a "report" that can be uploaded to multiple destinations.
 
-IMPORTANT: `scope` will redact anything it finds as "sensitive".
-This allows you to fetch env-vars, and no leak GH API tokens for example.
+> [!IMPORTANT]
+> `scope` will redact anything it finds as "sensitive".
+> This allows you to fetch env-vars, and no leak GH API tokens for example.
 
 ### `scope-intercept`
 
@@ -66,8 +67,9 @@ Behind the scene `env -S` is run to execute the script, however `scope-intercept
 This allows the engineer to see, in real time, suggestions for fixing errors.
 It also allows the engineer to upload a bug report immediately.
 
-IMPORTANT: `scope` will redact anything it finds as "sensitive".
-This allows you to fetch env-vars, and no leak GH API tokens for example.
+> [!IMPORTANT]
+> `scope` will redact anything it finds as "sensitive".
+> This allows you to fetch env-vars, and no leak GH API tokens for example.
 
 ## Special Thanks
 
