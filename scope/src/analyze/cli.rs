@@ -40,11 +40,8 @@ struct AnalyzeLogsArgs {
 #[derive(Debug, Args)]
 struct AnalyzeCommandArgs {
     /// The command to run
-    #[arg(required = true)]
-    command: String,
-
-    /// Arguments passed to command
-    args: Vec<String>,
+    #[arg(last = true, required = true)]
+    command: Vec<String>,
 }
 
 pub async fn analyze_root(found_config: &FoundConfig, args: &AnalyzeArgs) -> Result<i32> {
@@ -70,8 +67,7 @@ async fn analyze_logs(found_config: &FoundConfig, args: &AnalyzeLogsArgs) -> Res
 async fn analyze_command(found_config: &FoundConfig, args: &AnalyzeCommandArgs) -> Result<i32> {
     let exec_runner = DefaultExecutionProvider::default();
 
-    let mut command = vec![args.command.clone()];
-    command.extend(args.args.clone());
+    let command = args.command.clone();
     let path = env::var("PATH").unwrap_or_default();
 
     let capture_opts: CaptureOpts = CaptureOpts {

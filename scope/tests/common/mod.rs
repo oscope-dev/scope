@@ -67,7 +67,7 @@ impl<'a> ScopeTestHelper<'a> {
     }
 
     pub fn analyze_command(&self, command: &str) -> Assert {
-        let run_command = vec!["analyze", "command", command];
+        let run_command = vec!["analyze", "command", "--", command];
 
         self.run_command(&run_command)
     }
