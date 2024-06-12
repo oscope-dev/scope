@@ -3,7 +3,10 @@ use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 use opentelemetry::{global, KeyValue};
-use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
+use opentelemetry_otlp::{
+    HttpExporterBuilder, MetricsExporterBuilder, SpanExporterBuilder, TonicExporterBuilder,
+    WithExportConfig,
+};
 use opentelemetry_sdk::metrics::reader::{DefaultAggregationSelector, DefaultTemporalitySelector};
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::trace::Tracer;
@@ -85,10 +88,24 @@ pub struct LoggingOpts {
     #[clap(long = "otel-collector", env = "SCOPE_OTEL_ENDPOINT", global(true))]
     otel_collector: Option<String>,
 
+    #[clap(
+        long = "otel-protocol",
+        env = "SCOPE_OTEL_PROTOCOL",
+        global(true),
+        default_value = "grpc"
+    )]
+    otel_protocol: OtelProtocol,
+
     /// When set, we'll send debug details to otel endpoint.
     /// This option is hidden when running --help
     #[arg(long, hide = true, global(true))]
     pub otel_debug: bool,
+}
+
+#[derive(ValueEnum, Debug, Copy, Clone)]
+pub enum OtelProtocol {
+    Http,
+    Grpc,
 }
 
 #[derive(ValueEnum, Debug, Copy, Clone)]
@@ -147,6 +164,7 @@ impl LoggingOpts {
             progress: self.progress,
             default_level: new_default,
             otel_collector: self.otel_collector.clone(),
+            otel_protocol: self.otel_protocol,
             otel_debug: self.otel_debug,
         }
     }
@@ -160,7 +178,7 @@ impl LoggingOpts {
         }
     }
 
-    fn make_exporter(&self, id: &str) -> TonicExporterBuilder {
+    fn make_tonic_exporter(&self, id: &str) -> TonicExporterBuilder {
         let endpoint = self.otel_collector.clone().unwrap();
         let mut map = MetadataMap::with_capacity(2);
 
@@ -181,6 +199,29 @@ impl LoggingOpts {
             .with_metadata(map)
     }
 
+    fn make_http_exporter(&self) -> HttpExporterBuilder {
+        let endpoint = self.otel_collector.clone().unwrap();
+
+        opentelemetry_otlp::new_exporter()
+            .http()
+            .with_endpoint(endpoint)
+            .with_timeout(Duration::from_secs(3))
+    }
+
+    fn make_span_exporter_builder(&self, id: &str) -> SpanExporterBuilder {
+        match self.otel_protocol {
+            OtelProtocol::Grpc => SpanExporterBuilder::Tonic(self.make_tonic_exporter(id)),
+            OtelProtocol::Http => SpanExporterBuilder::Http(self.make_http_exporter()),
+        }
+    }
+
+    fn make_metrics_exporter_builder(&self, id: &str) -> MetricsExporterBuilder {
+        match self.otel_protocol {
+            OtelProtocol::Grpc => MetricsExporterBuilder::Tonic(self.make_tonic_exporter(id)),
+            OtelProtocol::Http => MetricsExporterBuilder::Http(self.make_http_exporter()),
+        }
+    }
+
     fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
         if self.otel_collector.is_some() {
             let resources = Resource::new(vec![
@@ -194,9 +235,10 @@ impl LoggingOpts {
                 ),
                 KeyValue::new("scope.id", run_id.to_string()),
             ]);
+
             let tracer = opentelemetry_otlp::new_pipeline()
                 .tracing()
-                .with_exporter(self.make_exporter(run_id))
+                .with_exporter(self.make_span_exporter_builder(run_id))
                 .with_trace_config(
                     trace::config()
                         .with_sampler(Sampler::AlwaysOn)
@@ -210,7 +252,7 @@ impl LoggingOpts {
 
             let metrics = opentelemetry_otlp::new_pipeline()
                 .metrics(opentelemetry_sdk::runtime::Tokio)
-                .with_exporter(self.make_exporter(run_id))
+                .with_exporter(self.make_metrics_exporter_builder(run_id))
                 .with_resource(resources)
                 .with_period(Duration::from_secs(3))
                 .with_timeout(Duration::from_secs(10))
