@@ -10,9 +10,12 @@ fn test_run_command_with_known_error_stdout() {
 
     let results = helper.analyze_command("bin/error-stdout.sh");
 
-    results.failure().stdout(predicate::str::contains(
-        "Known error 'error-exists' found on line 2",
-    ));
+    results
+        .failure()
+        .stdout(predicate::str::contains("analyzing:  error"))
+        .stdout(predicate::str::contains(
+            "Known error 'error-exists' found on line 2",
+        ));
 }
 
 #[test]
@@ -21,7 +24,10 @@ fn test_run_command_with_known_error_stderr() {
 
     let results = helper.analyze_command("bin/error-stderr.sh");
 
-    results.failure().stdout(predicate::str::contains(
-        "Known error 'error-exists' found on line 2",
-    ));
+    results
+        .failure()
+        .stderr(predicate::str::contains("analyzing:  error"))
+        .stdout(predicate::str::contains(
+            "Known error 'error-exists' found on line 2",
+        ));
 }

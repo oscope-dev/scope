@@ -75,7 +75,7 @@ async fn analyze_command(found_config: &FoundConfig, args: &AnalyzeCommandArgs) 
         env_vars: Default::default(),
         path: &path,
         args: &command,
-        output_dest: OutputDestination::StandardOut,
+        output_dest: OutputDestination::StandardOutWithPrefix("analyzing".to_string()),
     };
 
     let has_known_error = process_lines(
