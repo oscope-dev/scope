@@ -1,6 +1,6 @@
 [package]
 name = "dev-scope"
-version = "2024.2.55"
+version = "2024.2.56"
 edition = "2021"
 default-run = "scope"
 repository =  "https://github.com/oscope-dev/scope"
@@ -84,7 +84,7 @@ fake.workspace = true
 [dev-dependencies]
 assert_cmd = "2.0.14"
 assert_fs = "1.1.1"
-escargot = "0.5.10"
+escargot = "0.5.11"
 predicates = "3.1.0"
 
 [build-dependencies]

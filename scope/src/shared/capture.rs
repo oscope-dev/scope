@@ -184,7 +184,7 @@ impl OutputCapture {
         let stdout = stdout_stream.capture_output();
 
         // capture stderr
-        let stderr = child.stderr.take().expect("stdout to be available");
+        let stderr = child.stderr.take().expect("stderr to be available");
         let stderr_stream = StreamCapture {
             reader: stderr,
             writer: crate::shared::prelude::STDERR_WRITER.clone(),
