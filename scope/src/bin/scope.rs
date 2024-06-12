@@ -44,7 +44,7 @@ enum Command {
     /// Generate a bug report based from a command that was ran
     #[clap(alias("r"))]
     Report(ReportArgs),
-    /// Analyze logs, output, etc for known errors.
+    /// Analyze for known errors.
     #[clap(alias("a"))]
     Analyze(AnalyzeArgs),
     /// Validate inputs, providing recommendations about configuration

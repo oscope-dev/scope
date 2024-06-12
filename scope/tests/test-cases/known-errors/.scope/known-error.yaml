@@ -1,0 +1,8 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: error-exists
+  description: an error exists
+spec:
+  pattern: error
+  help: fix the error and try again
