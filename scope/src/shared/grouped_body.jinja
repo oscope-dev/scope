@@ -77,7 +77,7 @@ Output:
 | Name | Value |
 |---|---|
 {% for data in group.additionalData %}
-|{{ data.name }}|{% if data.output %}`{{ data.output }}`{% endif %}|
+|{{ data.name }}|{% if data.output %}`{{ data.output|split("\n")|map("trim")|join(", ") }}`{% endif %}|
 {% endfor %}
 {% endif %}
 {% endfor %}
