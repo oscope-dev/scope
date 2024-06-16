@@ -760,7 +760,7 @@ stderr
 | Name | Value |
 |---|---|
 |baz|`qux`|
-|lines|`line 1, line2`|
+|lines|`line 1`<br>`line2`|
 "
         .to_string();
         assert_eq!(expected_body, report.body);
