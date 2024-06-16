@@ -22,6 +22,6 @@ Output:
 | Name | Value |
 |---|---|
 {% for data in additionalData %}
-|{{ data.name }}|{% if data.output %}`{{ data.output }}`{% endif %}|
+|{{ data.name }}|{% if data.output %}`{{ data.output|split("\n")|map("trim")|join("`<br>`") }}`{% endif %}|
 {% endfor %}
 {% endif %}

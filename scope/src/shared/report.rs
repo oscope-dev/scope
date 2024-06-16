@@ -692,13 +692,22 @@ second line
             additional_data: Default::default(),
         };
 
-        let additional_data = BTreeMap::from([("baz".to_string(), "baz".to_string())]);
+        let additional_data = BTreeMap::from([
+            ("baz".to_string(), "baz".to_string()),
+            ("lines".to_string(), "lines".to_string()),
+        ]);
 
         exec_provider
             .expect_run_for_output()
             .times(1)
             .withf(move |_, _, command| command.eq("baz"))
             .returning(move |_, _, _| "qux".to_string());
+
+        exec_provider
+            .expect_run_for_output()
+            .times(1)
+            .withf(move |_, _, command| command.eq("lines"))
+            .returning(move |_, _, _| "line 1\nline2".to_string());
 
         let capture = OutputCaptureBuilder::default()
             .command("hello world")
@@ -751,6 +760,7 @@ stderr
 | Name | Value |
 |---|---|
 |baz|`qux`|
+|lines|`line 1`<br>`line2`|
 "
         .to_string();
         assert_eq!(expected_body, report.body);
