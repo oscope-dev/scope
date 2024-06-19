@@ -32,7 +32,7 @@ inherits = "release"
 lto = "thin"
 
 [workspace.dependencies]
-clap = { version = "4.5.6", features = ["derive", "env"]}
+clap = { version = "4.5.7", features = ["derive", "env"]}
 human-panic = "1.2.3"
 tokio = { version = "1", features = ["full"] }
 colored = "2.1.0"
@@ -76,7 +76,7 @@ strip-ansi-escapes = "0.2.0"
 octocrab = "0.38.0"
 jsonwebtoken = "9.3.0"
 secrecy = "0.8.0"
-url = "2.5.0"
+url = "2.5.1"
 dotenvy = "0.15.7"
 opentelemetry = { version = "0.22.0", features = ["metrics"] }
 opentelemetry-otlp = { version = "0.15.0", features = ["metrics", "reqwest", "http-proto", "reqwest-client", "reqwest-rustls"] }
