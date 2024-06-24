@@ -38,7 +38,7 @@ tokio = { version = "1", features = ["full"] }
 colored = "2.1.0"
 which = { version = "6.0", features = ["regex"] }
 regex = "1.10.5"
-lazy_static = "1.4.0"
+lazy_static = "1.5.0"
 inquire = {  version = "0.6", features = ["editor"]}
 tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
 tracing-appender = "0.2.3"
@@ -76,7 +76,7 @@ strip-ansi-escapes = "0.2.0"
 octocrab = "0.38.0"
 jsonwebtoken = "9.3.0"
 secrecy = "0.8.0"
-url = "2.5.1"
+url = "2.5.2"
 dotenvy = "0.15.7"
 opentelemetry = { version = "0.22.0", features = ["metrics"] }
 opentelemetry-otlp = { version = "0.15.0", features = ["metrics", "reqwest", "http-proto", "reqwest-client", "reqwest-rustls"] }
