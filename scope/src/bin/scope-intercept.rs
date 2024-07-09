@@ -105,7 +105,7 @@ async fn run_command(opts: Cli) -> anyhow::Result<i32> {
     }
 
     let ans = inquire::Confirm::new("Do you want to upload a bug report?")
-        .with_default(true)
+        .with_default(false)
         .with_help_message(
             "This will allow you to share the error with other engineers for support.",
         )

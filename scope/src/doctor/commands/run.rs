@@ -81,7 +81,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
             true
         } else {
             inquire::Confirm::new("Do you want to upload a bug report?")
-                .with_default(true)
+                .with_default(false)
                 .with_help_message(
                     "This will allow you to share the error with other engineers for support.",
                 )
