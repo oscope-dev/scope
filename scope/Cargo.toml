@@ -82,10 +82,10 @@ normpath.workspace = true
 fake.workspace = true
 
 [dev-dependencies]
-assert_cmd = "2.0.14"
-assert_fs = "1.1.1"
-escargot = "0.5.11"
-predicates = "3.1.0"
+assert_cmd = "2.0.15"
+assert_fs = "1.1.2"
+escargot = "0.5.12"
+predicates = "3.1.2"
 
 [build-dependencies]
 vergen = { version = "8.3", features = ["build", "git", "git2"] }
