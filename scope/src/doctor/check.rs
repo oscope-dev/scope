@@ -542,21 +542,21 @@ impl GlobWalker for DefaultGlobWalker {
         cache_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError> {
-        let mut files_found = false;
         for glob_str in paths {
             let glob_path = make_absolute(base_dir, glob_str);
-            for path in self.file_system.find_files(&glob_path)? {
-                files_found = true;
+            let files = self.file_system.find_files(&glob_path)?;
+
+            if files.is_empty() {
+                return Ok(false);
+            }
+
+            for path in files {
                 let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
                 let check_result = file_result == FileCacheStatus::FileMatches;
                 if !check_result {
                     return Ok(false);
                 }
             }
-        }
-
-        if !files_found {
-            return Ok(false);
         }
 
         Ok(true)
