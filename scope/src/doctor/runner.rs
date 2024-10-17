@@ -148,7 +148,7 @@ where
                 continue;
             }
 
-            let group_span = info_span!(parent: &header_span, "group", "indicatif.pb_show" = true);
+            let group_span = info_span!(parent: &header_span, "group", "indicatif.pb_show" = true, "group.name" = group_name);
             group_span.pb_set_length(group_container.actions.len() as u64);
             group_span.pb_set_message(&format!("group {}", group_name));
             let _span = group_span.enter();
@@ -181,7 +181,7 @@ where
                 continue;
             }
 
-            let action_span = info_span!(parent: group_span, "action", "indicatif.pb_show" = true);
+            let action_span = info_span!(parent: group_span, "action", "indicatif.pb_show" = true, "action.name" = action.name());
             action_span.pb_set_message(&format!(
                 "action {} - {}",
                 action.name(),
