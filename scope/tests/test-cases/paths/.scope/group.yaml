@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: path-checks
+  description: Run dep install
+spec:
+  actions:
+    - name: does-not-exist
+      check:
+        paths:
+          - nonexistant_file.txt
+      fix:
+        commands:
+          - touch nonexistant_file.txt
