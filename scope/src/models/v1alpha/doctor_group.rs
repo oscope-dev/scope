@@ -7,8 +7,8 @@ use crate::models::core::ModelMetadata;
 use crate::models::v1alpha::V1AlphaApiVersion;
 use crate::models::{HelpMetadata, InternalScopeModel, ScopeModel};
 
-/// What needs to be checked before the action will run. All `paths` will be checked first, then
-/// `commands`. If a `path` has changed, the `command` will not run.
+/// What needs to be checked before the action will run. `paths` will be checked first, then
+/// `commands`. If a `path` matches no files or the matching files have changed, the `command` will run.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
