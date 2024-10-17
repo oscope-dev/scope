@@ -123,7 +123,7 @@ fn test_templated_file_paths() {
     let result = test_helper.doctor_run(None);
 
     result.success().stdout(predicate::str::contains(
-        "Check was successful, group: \"templated\", name: \"hushlogin\"",
+        "INFO Check initially failed, fix was successful, group: \"templated\", name: \"hushlogin\"",
     ));
 }
 
