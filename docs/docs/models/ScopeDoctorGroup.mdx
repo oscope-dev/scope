@@ -64,6 +64,10 @@ The action should be atomic, and target a single resolution.
 Notice an action can provide both `paths` and `commands`, if either of them indicate that the fix should run, it will run.
 In the event there are no defined check, the fix will _always_ run.
 
+`paths` indicate a fix should run when:
+1. No files match any of the `path` globs, or
+2. Any of the matching files contents have changed
+
 ## Fix
 
 When the checks determine that something isn't correct, a fix is the way to automate the resolution.

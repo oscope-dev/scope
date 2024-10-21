@@ -30,7 +30,7 @@
   "additionalProperties": false,
   "definitions": {
     "DoctorCheckSpec": {
-      "description": "What needs to be checked before the action will run. All `paths` will be checked first, then `commands`. If a `path` has changed, the `command` will not run.",
+      "description": "What needs to be checked before the action will run. `paths` will be checked first, then `commands`. If a `path` matches no files or the matching files have changed, the `command` will run.",
       "type": "object",
       "properties": {
         "commands": {

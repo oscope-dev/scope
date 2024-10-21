@@ -74,6 +74,18 @@ fn test_able_to_limit_run() {
 }
 
 #[test]
+fn test_nonexistant_file() {
+    let test_helper = ScopeTestHelper::new("test_nonexistant_file", "paths");
+    let result = test_helper.doctor_run(None);
+
+    result.success().stdout(predicate::str::contains(
+        "Check initially failed, fix was successful, group: \"path-checks\", name: \"does-not-exist\"",
+    ));
+
+    test_helper.clean_work_dir();
+}
+
+#[test]
 fn test_cache_invalidation() {
     let test_helper = ScopeTestHelper::new("test_cache_invalidation", "file-cache-check");
 
@@ -123,7 +135,7 @@ fn test_templated_file_paths() {
     let result = test_helper.doctor_run(None);
 
     result.success().stdout(predicate::str::contains(
-        "Check was successful, group: \"templated\", name: \"hushlogin\"",
+        "INFO Check initially failed, fix was successful, group: \"templated\", name: \"hushlogin\"",
     ));
 }
 
