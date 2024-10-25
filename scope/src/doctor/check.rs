@@ -544,7 +544,13 @@ impl GlobWalker for DefaultGlobWalker {
     ) -> Result<bool, RuntimeError> {
         for glob_str in paths {
             let glob_path = make_absolute(base_dir, glob_str);
-            for path in self.file_system.find_files(&glob_path)? {
+            let files = self.file_system.find_files(&glob_path)?;
+
+            if files.is_empty() {
+                return Ok(false);
+            }
+
+            for path in files {
                 let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
                 let check_result = file_result == FileCacheStatus::FileMatches;
                 if !check_result {
