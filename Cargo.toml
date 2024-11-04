@@ -37,7 +37,7 @@ human-panic = "1.2.3"
 tokio = { version = "1", features = ["full"] }
 colored = "2.1.0"
 which = { version = "6.0", features = ["regex"] }
-regex = "1.11.0"
+regex = "1.11.1"
 lazy_static = "1.5.0"
 inquire = {  version = "0.6", features = ["editor"]}
 tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
@@ -49,7 +49,7 @@ derivative = "2"
 reqwest = { version = "0.12", features = ["multipart", "rustls-tls", "native-tls-vendored" ] }
 time = { version = "0.3", features = ["macros", "formatting", "local-offset"] }
 json = "0.12"
-minijinja = { version = "2.3.1", features = ["loader"] }
+minijinja = { version = "2.4.0", features = ["loader"] }
 itertools = { version = "0.13", features = [] }
 path-clean = "1.0.1"
 async-trait = "0.1.83"
@@ -59,8 +59,8 @@ glob = "0.3"
 educe = "0.5.11"
 petgraph = "0.6.5"
 sha256 = "1.5.0"
-anyhow = "1.0.90"
-thiserror = "1.0.64"
+anyhow = "1.0.92"
+thiserror = "1.0.67"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
