@@ -27,6 +27,7 @@ jobs:
               - 'Cross.toml'
               - '.github/bin/*'
               - '.github/workflows/*'
+              - 'rust-toolchain.toml'
             docs:
               - 'docs/**'
               - '.github/workflows/*'
