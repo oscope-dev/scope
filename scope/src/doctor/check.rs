@@ -74,6 +74,7 @@ pub enum ActionRunStatus {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ActionRunResult {
     pub action_name: String,
     pub status: ActionRunStatus,
