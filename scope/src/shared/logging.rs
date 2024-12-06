@@ -14,6 +14,7 @@ use opentelemetry_sdk::{
     trace::{self, RandomIdGenerator, Sampler},
     Resource,
 };
+use std::env;
 use std::fs::File;
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
@@ -96,6 +97,14 @@ pub struct LoggingOpts {
     )]
     otel_protocol: OtelProtocol,
 
+    #[clap(
+        long = "otel-service",
+        env = "SCOPE_OTEL_SERVICE",
+        global(true),
+        default_value = "scope"
+    )]
+    otel_service: String,
+
     /// When set, we'll send debug details to otel endpoint.
     /// This option is hidden when running --help
     #[arg(long, hide = true, global(true))]
@@ -165,6 +174,7 @@ impl LoggingOpts {
             default_level: new_default,
             otel_collector: self.otel_collector.clone(),
             otel_protocol: self.otel_protocol,
+            otel_service: self.otel_service.clone(),
             otel_debug: self.otel_debug,
         }
     }
@@ -225,7 +235,7 @@ impl LoggingOpts {
     fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
         if self.otel_collector.is_some() {
             let resources = Resource::new(vec![
-                KeyValue::new("service.name", "scope"),
+                KeyValue::new("service.name", self.otel_service.clone()),
                 KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
                 KeyValue::new(
                     "host.name",
