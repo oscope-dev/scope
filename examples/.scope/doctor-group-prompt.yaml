@@ -1,0 +1,21 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: prompt
+  description: Ask user if they want to run the fix
+spec:
+  include: when-required
+  actions:
+    - name: prompt-user
+      description: >-
+        Checks for an issue with a potentially destructive fix and 
+        prompts the user for permission before running the fix.
+      check:
+        commands:
+          - sleep 5 #gives the progress bar time to display
+          - test -f .prompt-check
+      fix:
+        autofix: false #this is the magic sauce that displays the user prompt
+        commands:
+          - sleep 5 #gives the progress bar time to display
+          - touch .prompt-check

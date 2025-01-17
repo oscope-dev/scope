@@ -80,13 +80,16 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         let create_report = if args.auto_publish_report {
             true
         } else {
-            inquire::Confirm::new("Do you want to upload a bug report?")
-                .with_default(false)
-                .with_help_message(
-                    "This will allow you to share the error with other engineers for support.",
-                )
-                .prompt()
-                .unwrap_or(false)
+            // FIXME: CMAC make sure we actually need this suspend when we're done
+            tracing_indicatif::suspend_tracing_indicatif(|| {
+                inquire::Confirm::new("Do you want to upload a bug report?")
+                    .with_default(false)
+                    .with_help_message(
+                        "This will allow you to share the error with other engineers for support.",
+                    )
+                    .prompt()
+                    .unwrap_or(false)
+            })
         };
 
         if create_report {

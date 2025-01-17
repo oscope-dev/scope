@@ -64,6 +64,11 @@
       "description": "Definition for fixing the environment.",
       "type": "object",
       "properties": {
+        "autofix": {
+          "description": "When false, prompt the user before running the fix. Defaults to true.",
+          "default": true,
+          "type": "boolean"
+        },
         "commands": {
           "description": "List of commands to run to fix the env.",
           "default": [],

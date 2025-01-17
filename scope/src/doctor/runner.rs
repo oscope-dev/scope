@@ -187,7 +187,10 @@ where
             ));
             action_span.pb_set_style(&progress_bar_without_pos());
 
-            let action_result = action.run_action().instrument(action_span).await?;
+            let action_result = action
+                .run_action(prompt_user)
+                .instrument(action_span)
+                .await?;
 
             results
                 .group_report
@@ -226,6 +229,22 @@ where
 
         Ok(results)
     }
+}
+
+// FIXME: not sure this is the right place to define this
+fn prompt_user() -> bool {
+    tracing_indicatif::suspend_tracing_indicatif(|| {
+        // FIXME: I don't like the "dangerous" wording of the prompt. Maybe each fix that has an autoprompt should allow specifying the prompt?
+        // I would also rather not return false if there is some sort of error?
+        inquire::Confirm::new("This fix is potentially dangerous. Would you like to run it?")
+            .with_default(false)
+            //FIXME: do we want a help message here?
+            // .with_help_message(
+            //     "This will allow you to share the error with other engineers for support.",
+            // )
+            .prompt()
+            .unwrap_or(false)
+    })
 }
 
 async fn report_action_output<T>(
@@ -534,7 +553,7 @@ mod tests {
 
     fn make_action_run(result: ActionRunStatus, required: bool) -> MockDoctorActionRun {
         let mut run = MockDoctorActionRun::new();
-        run.expect_run_action().returning(move || {
+        run.expect_run_action().returning(move |_| {
             Ok(ActionRunResult::new(
                 "a_name",
                 result.clone(),

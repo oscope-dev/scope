@@ -29,12 +29,15 @@ pub struct DoctorGroupActionFix {
     pub help_text: Option<String>,
     #[builder(default)]
     pub help_url: Option<String>,
+    #[builder(default)]
+    pub autofix: bool,
 }
 
 impl DoctorGroupAction {
     pub fn make_from(
         name: &str,
         description: &str,
+        autofix: bool,
         fix_command: Option<Vec<&str>>,
         check_path: Option<(&str, Vec<&str>)>,
         check_command: Option<Vec<&str>>,
@@ -47,6 +50,7 @@ impl DoctorGroupAction {
                 command: fix_command.map(DoctorGroupActionCommand::from),
                 help_text: None,
                 help_url: None,
+                autofix,
             },
             check: DoctorGroupActionCheck {
                 command: check_command.map(DoctorGroupActionCommand::from),
@@ -198,6 +202,12 @@ fn parse_action(
     } else {
         None
     };
+    let autofix = if let Some(fix) = &spec_action.fix {
+        fix.autofix
+    } else {
+        // FIXME: I don't like this we should only need to know autofix if there is a fix at all
+        true
+    };
 
     let check_command = if let Some(ref check) = spec_action.check.commands {
         let mut templated_commands = Vec::new();
@@ -220,6 +230,7 @@ fn parse_action(
             .unwrap_or_else(|| "default".to_string()),
         fix: DoctorGroupActionFix {
             command: fix_command,
+            autofix,
             help_text,
             help_url,
         },
@@ -275,6 +286,7 @@ mod tests {
                     command: Some(DoctorGroupActionCommand::from(vec![
                         "/foo/bar/.scope/fix1.sh"
                     ])),
+                    autofix: true,
                     help_text: Some("There is a good way to fix this, maybe...".to_string()),
                     help_url: Some("https://go.example.com/fixit".to_string()),
                 },
@@ -299,6 +311,7 @@ mod tests {
                     command: None,
                     help_text: None,
                     help_url: None,
+                    autofix: true,
                 },
                 check: DoctorGroupActionCheck {
                     command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
