@@ -53,22 +53,35 @@ impl Display for PathRunResult {
 impl PathRunResult {
     fn process(&mut self, group: &GroupExecutionResult) {
         let group_name = group.group_name.to_string();
-        //skip_remaining is handled up a level in the loop
-        if group.has_failure {
-            self.failed_group.insert(group_name);
-            self.did_succeed = false;
-        } else {
-            self.succeeded_groups.insert(group_name);
-        }
+
+        match group.status {
+            GroupExecutionStatus::Succeeded => {
+                self.succeeded_groups.insert(group_name);
+            }
+            GroupExecutionStatus::Failed => {
+                self.failed_group.insert(group_name);
+                self.did_succeed = false;
+            }
+            GroupExecutionStatus::Skipped => {
+                self.skipped_group.insert(group_name);
+            }
+        };
 
         self.group_reports.push(group.group_report.clone());
     }
 }
 
 #[derive(Debug)]
+enum GroupExecutionStatus {
+    Succeeded,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug)]
 struct GroupExecutionResult {
     group_name: String,
-    has_failure: bool,
+    status: GroupExecutionStatus,
     skip_remaining: bool,
     group_report: GroupReport,
 }
@@ -167,8 +180,8 @@ where
     ) -> Result<GroupExecutionResult> {
         let mut results = GroupExecutionResult {
             group_name: container.group_name.to_string(),
-            has_failure: false,
             skip_remaining: false,
+            status: GroupExecutionStatus::Succeeded,
             group_report: GroupReport::new(&container.group_name),
         };
 
@@ -206,14 +219,20 @@ where
                 | ActionRunStatus::NoCheckFixSucceeded
                 | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
                 ActionRunStatus::CheckFailedFixFailedStop => {
+                    results.status = GroupExecutionStatus::Failed;
                     results.skip_remaining = true;
-                    results.has_failure = true;
                 }
-                _ => {
+                ActionRunStatus::CheckFailedFixUserDenied => {
+                    results.status = GroupExecutionStatus::Skipped;
                     if action.required() {
                         results.skip_remaining = true;
                     }
-                    results.has_failure = true;
+                }
+                _ => {
+                    results.status = GroupExecutionStatus::Failed;
+                    if action.required() {
+                        results.skip_remaining = true;
+                    }
                 }
             }
         }
@@ -288,6 +307,12 @@ where
         }
         ActionRunStatus::CheckFailedFixFailedStop => {
             error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedFixUserDenied => {
+            warn!(target: "user", group = group_name, name = action.name(), "Checked failed, user opted not to run fix");
             print_pretty_result(group_name, &action.name(), action_result)
                 .await
                 .ok();
@@ -663,6 +688,90 @@ mod tests {
         );
         assert_eq!(
             BTreeSet::from(["skipped_1", "skipped_2"].map(str::to_string)),
+            exit_code.skipped_group
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_when_user_denies_fix_others_wont_run() -> Result<()> {
+        let group_actions = BTreeMap::from([
+            make_group_action(
+                "succeeds",
+                make_action_runs(ActionRunStatus::CheckFailedFixSucceedVerifySucceed),
+            ),
+            make_group_action(
+                "user_denies",
+                make_action_runs(ActionRunStatus::CheckFailedFixUserDenied),
+            ),
+            make_group_action("skipped", will_not_run()),
+        ]);
+
+        let run_groups = RunGroups {
+            group_actions,
+            all_paths: vec![
+                "succeeds".to_string(),
+                "user_denies".to_string(),
+                "skipped".to_string(),
+            ],
+        };
+
+        let exit_code = run_groups.execute().await?;
+        assert!(exit_code.did_succeed);
+
+        assert_eq!(
+            BTreeSet::from(["succeeds"].map(str::to_string)),
+            exit_code.succeeded_groups
+        );
+        // the user denied one counts as skipped
+        // and we should not try running anything that depends on it
+        assert_eq!(
+            BTreeSet::from(["user_denies", "skipped"].map(str::to_string)),
+            exit_code.skipped_group
+        );
+        assert_eq!(BTreeSet::new(), exit_code.failed_group);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_when_user_denies_optional_fix_others_run() -> Result<()> {
+        let group_actions = BTreeMap::from([
+            make_group_action(
+                "succeeds_1",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
+            ),
+            make_group_action(
+                "user_denies",
+                vec![make_action_run(
+                    ActionRunStatus::CheckFailedFixUserDenied,
+                    false,
+                )],
+            ),
+            make_group_action(
+                "succeeds_2",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
+            ),
+        ]);
+
+        let run_groups = RunGroups {
+            group_actions,
+            all_paths: vec![
+                "succeeds_1".to_string(),
+                "user_denies".to_string(),
+                "succeeds_2".to_string(),
+            ],
+        };
+
+        let exit_code = run_groups.execute().await?;
+        assert!(exit_code.did_succeed);
+        assert_eq!(
+            BTreeSet::from(["succeeds_1", "succeeds_2"].map(str::to_string)),
+            exit_code.succeeded_groups
+        );
+        assert_eq!(BTreeSet::new(), exit_code.failed_group);
+        assert_eq!(
+            BTreeSet::from(["user_denies"].map(str::to_string)),
             exit_code.skipped_group
         );
         Ok(())

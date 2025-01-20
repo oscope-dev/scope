@@ -70,6 +70,7 @@ pub enum ActionRunStatus {
     CheckFailedNoRunFix,
     CheckFailedNoFixProvided,
     CheckFailedFixFailedStop,
+    CheckFailedFixUserDenied,
     NoCheckFixSucceeded,
 }
 
@@ -122,6 +123,7 @@ impl ActionRunStatus {
             ActionRunStatus::CheckFailedNoRunFix => true,
             ActionRunStatus::CheckFailedNoFixProvided => true,
             ActionRunStatus::CheckFailedFixFailedStop => true,
+            ActionRunStatus::CheckFailedFixUserDenied => false,
             ActionRunStatus::NoCheckFixSucceeded => false,
         }
     }
@@ -182,12 +184,21 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         let (fix_result, fix_output) = self.run_fixes(prompt).await?;
 
         match fix_result {
-            i32::MIN..=-1 => {
+            i32::MIN..=-3 | -1 => {
                 return Ok(ActionRunResult::new(
                     &self.name(),
                     ActionRunStatus::CheckFailedNoFixProvided,
                     check_results.output,
                     None,
+                    None,
+                ));
+            }
+            -2 => {
+                return Ok(ActionRunResult::new(
+                    &self.name(),
+                    ActionRunStatus::CheckFailedFixUserDenied,
+                    check_results.output,
+                    Some(fix_output),
                     None,
                 ));
             }
@@ -306,6 +317,8 @@ impl DefaultDoctorActionRun {
                         return Ok((highest_exit_code, action_reports));
                     }
                 }
+            } else {
+                return Ok((-2, action_reports));
             }
         }
 
@@ -822,11 +835,7 @@ pub(crate) mod tests {
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
         let result = run.run_action(user_responds_no).await?;
-        assert_eq!(
-            //FIXME: would be nicer if this returned ActionRunStatus::CheckFailedNoRunFix ?
-            ActionRunStatus::CheckFailedNoFixProvided,
-            result.status
-        );
+        assert_eq!(ActionRunStatus::CheckFailedFixUserDenied, result.status);
 
         Ok(())
     }
