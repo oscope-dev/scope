@@ -75,7 +75,7 @@ strum = { version = "0.26", features = ["derive"] }
 jsonschema = "0.17"
 tracing = "0.1.40"
 ignore = "0.4.23"
-tracing-indicatif = "0.3"
+tracing-indicatif = "0.3.9"
 indicatif = "0.17"
 strip-ansi-escapes = "0.2.0"
 octocrab = "0.38.0"
