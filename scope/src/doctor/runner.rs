@@ -214,27 +214,23 @@ where
                 .await
                 .ok();
 
-            match action_result.status {
+            results.status = match action_result.status {
                 ActionRunStatus::CheckSucceeded
                 | ActionRunStatus::NoCheckFixSucceeded
-                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
-                ActionRunStatus::CheckFailedFixFailedStop => {
-                    results.status = GroupExecutionStatus::Failed;
-                    results.skip_remaining = true;
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
+                    GroupExecutionStatus::Succeeded
                 }
-                ActionRunStatus::CheckFailedFixUserDenied => {
-                    results.status = GroupExecutionStatus::Skipped;
-                    if action.required() {
-                        results.skip_remaining = true;
-                    }
-                }
-                _ => {
-                    results.status = GroupExecutionStatus::Failed;
-                    if action.required() {
-                        results.skip_remaining = true;
-                    }
-                }
-            }
+                ActionRunStatus::CheckFailedFixUserDenied => GroupExecutionStatus::Skipped,
+                _ => GroupExecutionStatus::Failed,
+            };
+
+            results.skip_remaining = match action_result.status {
+                ActionRunStatus::CheckSucceeded
+                | ActionRunStatus::NoCheckFixSucceeded
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => false,
+                ActionRunStatus::CheckFailedFixFailedStop => true,
+                _ => action.required(),
+            };
         }
 
         for (name, command) in &container.additional_report_details {
