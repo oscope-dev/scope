@@ -15,7 +15,9 @@ spec:
           - sleep 5 #gives the progress bar time to display
           - test -f .prompt-check
       fix:
-        autofix: false #this is the magic sauce that displays the user prompt
+        prompt: |- 
+          This may destroy some data.
+          Do you wish to continue?
         commands:
           - sleep 5 #gives the progress bar time to display
           - touch .prompt-check

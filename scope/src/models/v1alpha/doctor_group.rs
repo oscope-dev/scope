@@ -45,14 +45,9 @@ pub struct DoctorFixSpec {
     #[serde(default)]
     pub help_url: Option<String>,
 
-    /// When false, prompt the user before running the fix.
-    /// Defaults to true.
-    #[serde(default = "doctor_group_action_fix_autofix_default")]
-    pub autofix: bool,
-}
-
-fn doctor_group_action_fix_autofix_default() -> bool {
-    true
+    // When present, user will be prompted for approval before running the fix
+    #[serde(default)]
+    pub prompt: Option<String>,
 }
 
 /// An action is a single step used to check in a group. This is most commonly used to build a

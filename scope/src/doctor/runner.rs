@@ -246,17 +246,12 @@ where
     }
 }
 
-// FIXME: not sure this is the right place to define this
-fn prompt_user() -> bool {
+fn prompt_user(prompt_text: &str) -> bool {
     tracing_indicatif::suspend_tracing_indicatif(|| {
-        // FIXME: I don't like the "dangerous" wording of the prompt. Maybe each fix that has an autoprompt should allow specifying the prompt?
-        // I would also rather not return false if there is some sort of error?
-        inquire::Confirm::new("This fix is potentially dangerous. Would you like to run it?")
+        inquire::Confirm::new(prompt_text)
             .with_default(false)
-            //FIXME: do we want a help message here?
-            // .with_help_message(
-            //     "This will allow you to share the error with other engineers for support.",
-            // )
+            //FIXME: do we want to allow a help message here?
+            // .with_help_message("additional text explaining why this needs approval")
             .prompt()
             .unwrap_or(false)
     })

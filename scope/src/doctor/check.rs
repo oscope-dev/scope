@@ -132,7 +132,7 @@ impl ActionRunStatus {
 #[automock]
 #[async_trait::async_trait]
 pub trait DoctorActionRun: Send + Sync {
-    async fn run_action(&self, prompt: fn() -> bool) -> Result<ActionRunResult>;
+    async fn run_action(&self, prompt: for<'a> fn(&'a str) -> bool) -> Result<ActionRunResult>;
     fn required(&self) -> bool;
     fn name(&self) -> String;
     fn description(&self) -> String;
@@ -155,10 +155,14 @@ pub struct DefaultDoctorActionRun {
     pub glob_walker: Arc<dyn GlobWalker>,
 }
 
+const NO_COMMANDS_EXIT_CODE: i32 = -1;
+const USER_DENIED_EXIT_CODE: i32 = -2;
+//TODO: 100 is used a few times and needs a name but I don't understand why 100 well enough to name it
+
 #[async_trait::async_trait]
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
-    async fn run_action(&self, prompt: fn() -> bool) -> Result<ActionRunResult> {
+    async fn run_action(&self, prompt: for<'a> fn(&'a str) -> bool) -> Result<ActionRunResult> {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
@@ -184,7 +188,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         let (fix_result, fix_output) = self.run_fixes(prompt).await?;
 
         match fix_result {
-            i32::MIN..=-3 | -1 => {
+            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => {
                 return Ok(ActionRunResult::new(
                     &self.name(),
                     ActionRunStatus::CheckFailedNoFixProvided,
@@ -193,7 +197,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                     None,
                 ));
             }
-            -2 => {
+            USER_DENIED_EXIT_CODE => {
                 return Ok(ActionRunResult::new(
                     &self.name(),
                     ActionRunStatus::CheckFailedFixUserDenied,
@@ -302,23 +306,39 @@ impl DefaultDoctorActionRun {
 
     async fn run_fixes(
         &self,
-        prompt: fn() -> bool,
+        prompt: for<'a> fn(&'a str) -> bool,
     ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
-        let mut action_reports = Vec::new();
-        let mut highest_exit_code = -1;
-
-        if let Some(action_command) = &self.action.fix.command {
-            if self.action.fix.autofix || prompt() {
-                for command in &action_command.commands {
-                    let report = self.run_single_fix(command).await?;
-                    highest_exit_code = max(highest_exit_code, report.exit_code.unwrap_or(-1));
-                    action_reports.push(report);
-                    if highest_exit_code >= 100 {
-                        return Ok((highest_exit_code, action_reports));
+        match &self.action.fix.command {
+            None => Ok((NO_COMMANDS_EXIT_CODE, Vec::new())),
+            Some(action_command) => match &self.action.fix.prompt {
+                None => Ok(self.run_commands(&action_command.commands).await?),
+                Some(prompt_text) => {
+                    if prompt(prompt_text) {
+                        Ok(self.run_commands(&action_command.commands).await?)
+                    } else {
+                        Ok((USER_DENIED_EXIT_CODE, Vec::new()))
                     }
                 }
-            } else {
-                return Ok((-2, action_reports));
+            },
+        }
+    }
+
+    async fn run_commands(
+        &self,
+        commands: &Vec<String>,
+    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
+        let mut action_reports = Vec::new();
+        let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
+
+        for command in commands {
+            let report = self.run_single_fix(command).await?;
+            highest_exit_code = max(
+                highest_exit_code,
+                report.exit_code.unwrap_or(NO_COMMANDS_EXIT_CODE),
+            );
+            action_reports.push(report);
+            if highest_exit_code >= 100 {
+                return Ok((highest_exit_code, action_reports));
             }
         }
 
@@ -631,7 +651,6 @@ pub(crate) mod tests {
             .fix(
                 DoctorGroupActionFixBuilder::default()
                     .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
-                    .autofix(true)
                     .build()
                     .unwrap(),
             )
@@ -654,7 +673,7 @@ pub(crate) mod tests {
             .fix(
                 DoctorGroupActionFixBuilder::default()
                     .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
-                    .autofix(false)
+                    .prompt(Some("do you want to continue?".to_string()))
                     .build()
                     .unwrap(),
             )
@@ -677,7 +696,6 @@ pub(crate) mod tests {
             .fix(
                 DoctorGroupActionFixBuilder::default()
                     .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
-                    .autofix(true)
                     .build()
                     .unwrap(),
             )
@@ -726,15 +744,15 @@ pub(crate) mod tests {
         }
     }
 
-    fn panic_if_user_is_prompted() -> bool {
+    fn panic_if_user_is_prompted(_: &str) -> bool {
         unimplemented!("must not prompt user")
     }
 
-    fn user_responds_yes() -> bool {
+    fn user_responds_yes(_: &str) -> bool {
         true
     }
 
-    fn user_responds_no() -> bool {
+    fn user_responds_no(_: &str) -> bool {
         false
     }
 

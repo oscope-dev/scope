@@ -80,7 +80,6 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         let create_report = if args.auto_publish_report {
             true
         } else {
-            // FIXME: CMAC make sure we actually need this suspend when we're done
             tracing_indicatif::suspend_tracing_indicatif(|| {
                 inquire::Confirm::new("Do you want to upload a bug report?")
                     .with_default(false)
