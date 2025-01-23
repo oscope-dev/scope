@@ -45,9 +45,22 @@ pub struct DoctorFixSpec {
     #[serde(default)]
     pub help_url: Option<String>,
 
-    // When present, user will be prompted for approval before running the fix
+    /// When present, user will be prompted for approval before running the fix
     #[serde(default)]
-    pub prompt: Option<String>,
+    pub prompt: Option<DoctorFixPromptSpec>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct DoctorFixPromptSpec {
+    /// Yes/No question presented to the user
+    #[serde(default)]
+    pub text: String,
+
+    /// Additional context for why they're being prompted for approval
+    #[serde(default)]
+    pub extra_context: Option<String>,
 }
 
 /// An action is a single step used to check in a group. This is most commonly used to build a

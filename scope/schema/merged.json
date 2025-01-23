@@ -44,6 +44,26 @@
       },
       "additionalProperties": false
     },
+    "DoctorFixPromptSpec": {
+      "type": "object",
+      "properties": {
+        "extraContext": {
+          "description": "Additional context for why they're being prompted for approval",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "nullable": true
+        },
+        "text": {
+          "description": "Yes/No question presented to the user",
+          "default": "",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "DoctorFixSpec": {
       "description": "Definition for fixing the environment.",
       "type": "object",
@@ -75,10 +95,15 @@
           "nullable": true
         },
         "prompt": {
+          "description": "When present, user will be prompted for approval before running the fix",
           "default": null,
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DoctorFixPromptSpec"
+            },
+            {
+              "type": "null"
+            }
           ],
           "nullable": true
         }

@@ -246,14 +246,17 @@ where
     }
 }
 
-fn prompt_user(prompt_text: &str) -> bool {
+fn prompt_user(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
     tracing_indicatif::suspend_tracing_indicatif(|| {
-        inquire::Confirm::new(prompt_text)
-            .with_default(false)
-            //FIXME: do we want to allow a help message here?
-            // .with_help_message("additional text explaining why this needs approval")
-            .prompt()
-            .unwrap_or(false)
+        let prompt = {
+            let base_prompt = inquire::Confirm::new(prompt_text).with_default(false);
+            match maybe_help_text {
+                Some(help_text) => base_prompt.with_help_message(help_text),
+                None => base_prompt,
+            }
+        };
+
+        prompt.prompt().unwrap_or(false)
     })
 }
 

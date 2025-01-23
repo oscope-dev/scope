@@ -132,7 +132,10 @@ impl ActionRunStatus {
 #[automock]
 #[async_trait::async_trait]
 pub trait DoctorActionRun: Send + Sync {
-    async fn run_action(&self, prompt: for<'a> fn(&'a str) -> bool) -> Result<ActionRunResult>;
+    async fn run_action(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<ActionRunResult>;
     fn required(&self) -> bool;
     fn name(&self) -> String;
     fn description(&self) -> String;
@@ -162,7 +165,10 @@ const USER_DENIED_EXIT_CODE: i32 = -2;
 #[async_trait::async_trait]
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
-    async fn run_action(&self, prompt: for<'a> fn(&'a str) -> bool) -> Result<ActionRunResult> {
+    async fn run_action(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<ActionRunResult> {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
@@ -306,14 +312,14 @@ impl DefaultDoctorActionRun {
 
     async fn run_fixes(
         &self,
-        prompt: for<'a> fn(&'a str) -> bool,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
     ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
         match &self.action.fix.command {
             None => Ok((NO_COMMANDS_EXIT_CODE, Vec::new())),
             Some(action_command) => match &self.action.fix.prompt {
                 None => Ok(self.run_commands(&action_command.commands).await?),
-                Some(prompt_text) => {
-                    if prompt(prompt_text) {
+                Some(fix_prompt) => {
+                    if prompt(&fix_prompt.text, &fix_prompt.extra_context) {
                         Ok(self.run_commands(&action_command.commands).await?)
                     } else {
                         Ok((USER_DENIED_EXIT_CODE, Vec::new()))
@@ -673,7 +679,10 @@ pub(crate) mod tests {
             .fix(
                 DoctorGroupActionFixBuilder::default()
                     .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
-                    .prompt(Some("do you want to continue?".to_string()))
+                    .prompt(Some(DoctorGroupActionFixPrompt {
+                        text: "do you want to continue?".to_string(),
+                        extra_context: Some("additional context here".to_string()),
+                    }))
                     .build()
                     .unwrap(),
             )
@@ -744,15 +753,15 @@ pub(crate) mod tests {
         }
     }
 
-    fn panic_if_user_is_prompted(_: &str) -> bool {
+    fn panic_if_user_is_prompted(_: &str, _: &Option<String>) -> bool {
         unimplemented!("must not prompt user")
     }
 
-    fn user_responds_yes(_: &str) -> bool {
+    fn user_responds_yes(_: &str, _: &Option<String>) -> bool {
         true
     }
 
-    fn user_responds_no(_: &str) -> bool {
+    fn user_responds_no(_: &str, _: &Option<String>) -> bool {
         false
     }
 

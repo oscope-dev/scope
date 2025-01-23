@@ -30,14 +30,23 @@ pub struct DoctorGroupActionFix {
     #[builder(default)]
     pub help_url: Option<String>,
     #[builder(default)]
-    pub prompt: Option<String>,
+    pub prompt: Option<DoctorGroupActionFixPrompt>,
+}
+
+#[derive(Debug, PartialEq, Clone, Builder)]
+#[builder(setter(into))]
+pub struct DoctorGroupActionFixPrompt {
+    #[builder(default)]
+    pub text: String,
+    #[builder(default)]
+    pub extra_context: Option<String>,
 }
 
 impl DoctorGroupAction {
     pub fn make_from(
         name: &str,
         description: &str,
-        prompt: Option<&str>,
+        prompt: Option<DoctorGroupActionFixPrompt>,
         fix_command: Option<Vec<&str>>,
         check_path: Option<(&str, Vec<&str>)>,
         check_command: Option<Vec<&str>>,
@@ -50,7 +59,7 @@ impl DoctorGroupAction {
                 command: fix_command.map(DoctorGroupActionCommand::from),
                 help_text: None,
                 help_url: None,
-                prompt: prompt.map(str::to_string),
+                prompt,
             },
             check: DoctorGroupActionCheck {
                 command: check_command.map(DoctorGroupActionCommand::from),
@@ -224,7 +233,12 @@ fn parse_action(
             .unwrap_or_else(|| "default".to_string()),
         fix: DoctorGroupActionFix {
             command: fix_command,
-            prompt: spec_action.fix.and_then(|fix| fix.prompt),
+            prompt: spec_action.fix.and_then(|fix| fix.prompt).map(|p| {
+                DoctorGroupActionFixPrompt {
+                    text: p.text,
+                    extra_context: p.extra_context,
+                }
+            }),
             help_text,
             help_url,
         },
