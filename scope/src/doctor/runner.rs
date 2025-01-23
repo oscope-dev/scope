@@ -53,9 +53,7 @@ impl Display for PathRunResult {
 impl PathRunResult {
     fn process(&mut self, group: &GroupExecutionResult) {
         let group_name = group.group_name.to_string();
-        if group.skip_remaining {
-            self.skipped_group.insert(group_name.clone());
-        }
+        //skip_remaining is handled up a level in the loop
         if group.has_failure {
             self.failed_group.insert(group_name);
             self.did_succeed = false;
@@ -534,7 +532,7 @@ mod tests {
         Ok(())
     }
 
-    fn make_action_run(result: ActionRunStatus) -> Vec<MockDoctorActionRun> {
+    fn make_action_run(result: ActionRunStatus, required: bool) -> MockDoctorActionRun {
         let mut run = MockDoctorActionRun::new();
         run.expect_run_action().returning(move || {
             Ok(ActionRunResult::new(
@@ -548,10 +546,15 @@ mod tests {
         run.expect_help_text().return_const(None);
         run.expect_help_url().return_const(None);
         run.expect_name().returning(|| "step name".to_string());
-        run.expect_required().return_const(true);
+        run.expect_required().return_const(required);
         run.expect_description()
             .returning(|| "description".to_string());
-        vec![run]
+
+        run
+    }
+
+    fn make_action_runs(result: ActionRunStatus) -> Vec<MockDoctorActionRun> {
+        vec![make_action_run(result, true)]
     }
 
     fn will_not_run() -> Vec<MockDoctorActionRun> {
@@ -587,9 +590,9 @@ mod tests {
     #[tokio::test]
     async fn test_execute_run_with_multiple_paths_only_run_group_once() -> Result<()> {
         let group_actions = BTreeMap::from([
-            make_group_action("group_1", make_action_run(ActionRunStatus::CheckSucceeded)),
-            make_group_action("group_2", make_action_run(ActionRunStatus::CheckSucceeded)),
-            make_group_action("group_3", make_action_run(ActionRunStatus::CheckSucceeded)),
+            make_group_action("group_1", make_action_runs(ActionRunStatus::CheckSucceeded)),
+            make_group_action("group_2", make_action_runs(ActionRunStatus::CheckSucceeded)),
+            make_group_action("group_3", make_action_runs(ActionRunStatus::CheckSucceeded)),
         ]);
 
         let run_groups = RunGroups {
@@ -603,7 +606,12 @@ mod tests {
 
         let exit_code = run_groups.execute().await?;
         assert!(exit_code.did_succeed);
-
+        assert_eq!(
+            BTreeSet::from_iter(run_groups.all_paths),
+            exit_code.succeeded_groups
+        );
+        assert_eq!(BTreeSet::new(), exit_code.failed_group);
+        assert_eq!(BTreeSet::new(), exit_code.skipped_group);
         Ok(())
     }
 
@@ -611,53 +619,76 @@ mod tests {
     async fn test_execute_dep_fails_wont_run_others() -> Result<()> {
         let group_actions = BTreeMap::from([
             make_group_action(
-                "group_1",
-                make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
+                "fails",
+                make_action_runs(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
             ),
-            make_group_action("group_2", will_not_run()),
-            make_group_action("group_3", will_not_run()),
+            make_group_action("skipped_1", will_not_run()),
+            make_group_action("skipped_2", will_not_run()),
         ]);
 
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                "group_1".to_string(),
-                "group_2".to_string(),
-                "group_3".to_string(),
+                "fails".to_string(),
+                "skipped_1".to_string(),
+                "skipped_2".to_string(),
             ],
         };
 
         let exit_code = run_groups.execute().await?;
         assert!(!exit_code.did_succeed);
-
+        assert_eq!(BTreeSet::new(), exit_code.succeeded_groups);
+        assert_eq!(
+            BTreeSet::from(["fails"].map(str::to_string)),
+            exit_code.failed_group
+        );
+        assert_eq!(
+            BTreeSet::from(["skipped_1", "skipped_2"].map(str::to_string)),
+            exit_code.skipped_group
+        );
         Ok(())
     }
 
     #[tokio::test]
     async fn test_execute_branch_fails_but_other_branch_continues() -> Result<()> {
         let group_actions = BTreeMap::from([
-            make_group_action("group_1", make_action_run(ActionRunStatus::CheckSucceeded)),
             make_group_action(
-                "group_2",
-                make_action_run(ActionRunStatus::CheckFailedFixSucceedVerifyFailed),
+                "succeeds_1",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
             ),
-            make_group_action("group_3", will_not_run()),
-            make_group_action("group_4", make_action_run(ActionRunStatus::CheckSucceeded)),
+            make_group_action(
+                "fails",
+                vec![make_action_run(
+                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                    false,
+                )],
+            ),
+            make_group_action(
+                "succeeds_2",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
+            ),
         ]);
 
         let run_groups = RunGroups {
             group_actions,
             all_paths: vec![
-                "group_1".to_string(),
-                "group_2".to_string(),
-                "group_3".to_string(),
-                "group_4".to_string(),
+                "succeeds_1".to_string(),
+                "fails".to_string(),
+                "succeeds_2".to_string(),
             ],
         };
 
         let exit_code = run_groups.execute().await?;
         assert!(!exit_code.did_succeed);
-
+        assert_eq!(
+            BTreeSet::from(["succeeds_1", "succeeds_2"].map(str::to_string)),
+            exit_code.succeeded_groups
+        );
+        assert_eq!(
+            BTreeSet::from(["fails"].map(str::to_string)),
+            exit_code.failed_group
+        );
+        assert_eq!(BTreeSet::new(), exit_code.skipped_group);
         Ok(())
     }
 }
