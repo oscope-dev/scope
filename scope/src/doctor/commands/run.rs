@@ -75,7 +75,10 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         warn!(target: "user", "Unable to update cache, re-runs may redo work");
     }
 
-    if !result.did_succeed && !found_config.report_upload.is_empty() {
+    if !result.did_succeed
+        && !result.failed_group.is_empty()
+        && !found_config.report_upload.is_empty()
+    {
         println!();
         let create_report = if args.auto_publish_report {
             true

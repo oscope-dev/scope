@@ -64,6 +64,7 @@ impl PathRunResult {
             }
             GroupExecutionStatus::Skipped => {
                 self.skipped_group.insert(group_name);
+                self.did_succeed = false;
             }
         };
 
@@ -711,7 +712,7 @@ mod tests {
         };
 
         let exit_code = run_groups.execute().await?;
-        assert!(exit_code.did_succeed);
+        assert!(!exit_code.did_succeed);
 
         assert_eq!(
             BTreeSet::from(["succeeds"].map(str::to_string)),
@@ -758,7 +759,7 @@ mod tests {
         };
 
         let exit_code = run_groups.execute().await?;
-        assert!(exit_code.did_succeed);
+        assert!(!exit_code.did_succeed);
         assert_eq!(
             BTreeSet::from(["succeeds_1", "succeeds_2"].map(str::to_string)),
             exit_code.succeeded_groups
