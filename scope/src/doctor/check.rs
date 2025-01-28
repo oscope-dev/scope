@@ -70,6 +70,7 @@ pub enum ActionRunStatus {
     CheckFailedNoRunFix,
     CheckFailedNoFixProvided,
     CheckFailedFixFailedStop,
+    CheckFailedFixUserDenied,
     NoCheckFixSucceeded,
 }
 
@@ -122,6 +123,7 @@ impl ActionRunStatus {
             ActionRunStatus::CheckFailedNoRunFix => true,
             ActionRunStatus::CheckFailedNoFixProvided => true,
             ActionRunStatus::CheckFailedFixFailedStop => true,
+            ActionRunStatus::CheckFailedFixUserDenied => false,
             ActionRunStatus::NoCheckFixSucceeded => false,
         }
     }
@@ -130,7 +132,10 @@ impl ActionRunStatus {
 #[automock]
 #[async_trait::async_trait]
 pub trait DoctorActionRun: Send + Sync {
-    async fn run_action(&self) -> Result<ActionRunResult>;
+    async fn run_action(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<ActionRunResult>;
     fn required(&self) -> bool;
     fn name(&self) -> String;
     fn description(&self) -> String;
@@ -153,10 +158,17 @@ pub struct DefaultDoctorActionRun {
     pub glob_walker: Arc<dyn GlobWalker>,
 }
 
+const NO_COMMANDS_EXIT_CODE: i32 = -1;
+const USER_DENIED_EXIT_CODE: i32 = -2;
+//TODO: 100 is used a few times and needs a name but I don't understand why 100 well enough to name it
+
 #[async_trait::async_trait]
 impl DoctorActionRun for DefaultDoctorActionRun {
     #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
-    async fn run_action(&self) -> Result<ActionRunResult> {
+    async fn run_action(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<ActionRunResult> {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
@@ -179,15 +191,24 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             ));
         }
 
-        let (fix_result, fix_output) = self.run_fixes().await?;
+        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
 
         match fix_result {
-            i32::MIN..=-1 => {
+            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => {
                 return Ok(ActionRunResult::new(
                     &self.name(),
                     ActionRunStatus::CheckFailedNoFixProvided,
                     check_results.output,
                     None,
+                    None,
+                ));
+            }
+            USER_DENIED_EXIT_CODE => {
+                return Ok(ActionRunResult::new(
+                    &self.name(),
+                    ActionRunStatus::CheckFailedFixUserDenied,
+                    check_results.output,
+                    Some(fix_output),
                     None,
                 ));
             }
@@ -289,17 +310,41 @@ impl DefaultDoctorActionRun {
         }
     }
 
-    async fn run_fixes(&self) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
-        let mut action_reports = Vec::new();
-        let mut highest_exit_code = -1;
-        if let Some(action_command) = &self.action.fix.command {
-            for command in &action_command.commands {
-                let report = self.run_single_fix(command).await?;
-                highest_exit_code = max(highest_exit_code, report.exit_code.unwrap_or(-1));
-                action_reports.push(report);
-                if highest_exit_code >= 100 {
-                    return Ok((highest_exit_code, action_reports));
+    async fn run_fixes(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
+        match &self.action.fix.command {
+            None => Ok((NO_COMMANDS_EXIT_CODE, Vec::new())),
+            Some(action_command) => match &self.action.fix.prompt {
+                None => Ok(self.run_commands(&action_command.commands).await?),
+                Some(fix_prompt) => {
+                    if prompt(&fix_prompt.text, &fix_prompt.extra_context) {
+                        Ok(self.run_commands(&action_command.commands).await?)
+                    } else {
+                        Ok((USER_DENIED_EXIT_CODE, Vec::new()))
+                    }
                 }
+            },
+        }
+    }
+
+    async fn run_commands(
+        &self,
+        commands: &Vec<String>,
+    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
+        let mut action_reports = Vec::new();
+        let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
+
+        for command in commands {
+            let report = self.run_single_fix(command).await?;
+            highest_exit_code = max(
+                highest_exit_code,
+                report.exit_code.unwrap_or(NO_COMMANDS_EXIT_CODE),
+            );
+            action_reports.push(report);
+            if highest_exit_code >= 100 {
+                return Ok((highest_exit_code, action_reports));
             }
         }
 
@@ -619,6 +664,32 @@ pub(crate) mod tests {
             .unwrap()
     }
 
+    pub fn build_run_action_that_prompts_user() -> DoctorGroupAction {
+        DoctorGroupActionBuilder::default()
+            .description("a test action that prompts the user before applying fix")
+            .name("action")
+            .required(true)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .files(None)
+                    .command(Some(DoctorGroupActionCommand::from(vec!["check"])))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .prompt(Some(DoctorGroupActionFixPrompt {
+                        text: "do you want to continue?".to_string(),
+                        extra_context: Some("additional context here".to_string()),
+                    }))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap()
+    }
+
     pub fn build_file_fix_action() -> DoctorGroupAction {
         DoctorGroupActionBuilder::default()
             .description("a test action")
@@ -682,6 +753,18 @@ pub(crate) mod tests {
         }
     }
 
+    fn panic_if_user_is_prompted(_: &str, _: &Option<String>) -> bool {
+        unimplemented!("must not prompt user")
+    }
+
+    fn user_responds_yes(_: &str, _: &Option<String>) -> bool {
+        true
+    }
+
+    fn user_responds_no(_: &str, _: &Option<String>) -> bool {
+        false
+    }
+
     #[tokio::test]
     async fn test_only_exec_will_check_passes() -> Result<()> {
         let action = build_run_fail_fix_succeed_action();
@@ -692,7 +775,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
         assert!(result.action_report.check.len() == 1);
 
@@ -710,7 +793,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(
             ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
             result.status
@@ -734,7 +817,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(
             ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
             result.status
@@ -743,6 +826,43 @@ pub(crate) mod tests {
         assert!(result.action_report.check.len() == 1);
         assert!(result.action_report.fix.len() == 1);
         assert!(result.action_report.validate.len() == 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_prompt_user_says_yes_fix_runs() -> Result<()> {
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        let action = build_run_action_that_prompts_user();
+
+        command_result(&mut exec_runner, "check", vec![1, 0]);
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action(user_responds_yes).await?;
+        assert_eq!(
+            ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+            result.status
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_prompt_user_says_no_fix_does_not_run() -> Result<()> {
+        let mut exec_runner = MockExecutionProvider::new();
+        let glob_walker = MockGlobWalker::new();
+
+        let action = build_run_action_that_prompts_user();
+
+        command_result(&mut exec_runner, "check", vec![1]);
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action(user_responds_no).await?;
+        assert_eq!(ActionRunStatus::CheckFailedFixUserDenied, result.status);
 
         Ok(())
     }
@@ -758,7 +878,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
 
         assert!(result.action_report.check.len() == 1);
@@ -786,7 +906,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(
             ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
             result.status
@@ -816,7 +936,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(
             ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
             result.status
@@ -843,7 +963,7 @@ pub(crate) mod tests {
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
-        let result = run.run_action().await?;
+        let result = run.run_action(panic_if_user_is_prompted).await?;
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
 
         assert!(result.action_report.fix.len() == 1);

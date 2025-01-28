@@ -53,22 +53,36 @@ impl Display for PathRunResult {
 impl PathRunResult {
     fn process(&mut self, group: &GroupExecutionResult) {
         let group_name = group.group_name.to_string();
-        //skip_remaining is handled up a level in the loop
-        if group.has_failure {
-            self.failed_group.insert(group_name);
-            self.did_succeed = false;
-        } else {
-            self.succeeded_groups.insert(group_name);
-        }
+
+        match group.status {
+            GroupExecutionStatus::Succeeded => {
+                self.succeeded_groups.insert(group_name);
+            }
+            GroupExecutionStatus::Failed => {
+                self.failed_group.insert(group_name);
+                self.did_succeed = false;
+            }
+            GroupExecutionStatus::Skipped => {
+                self.skipped_group.insert(group_name);
+                self.did_succeed = false;
+            }
+        };
 
         self.group_reports.push(group.group_report.clone());
     }
 }
 
 #[derive(Debug)]
+enum GroupExecutionStatus {
+    Succeeded,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug)]
 struct GroupExecutionResult {
     group_name: String,
-    has_failure: bool,
+    status: GroupExecutionStatus,
     skip_remaining: bool,
     group_report: GroupReport,
 }
@@ -167,8 +181,8 @@ where
     ) -> Result<GroupExecutionResult> {
         let mut results = GroupExecutionResult {
             group_name: container.group_name.to_string(),
-            has_failure: false,
             skip_remaining: false,
+            status: GroupExecutionStatus::Succeeded,
             group_report: GroupReport::new(&container.group_name),
         };
 
@@ -187,7 +201,10 @@ where
             ));
             action_span.pb_set_style(&progress_bar_without_pos());
 
-            let action_result = action.run_action().instrument(action_span).await?;
+            let action_result = action
+                .run_action(prompt_user)
+                .instrument(action_span)
+                .await?;
 
             results
                 .group_report
@@ -198,21 +215,23 @@ where
                 .await
                 .ok();
 
-            match action_result.status {
+            results.status = match action_result.status {
                 ActionRunStatus::CheckSucceeded
                 | ActionRunStatus::NoCheckFixSucceeded
-                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {}
-                ActionRunStatus::CheckFailedFixFailedStop => {
-                    results.skip_remaining = true;
-                    results.has_failure = true;
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
+                    GroupExecutionStatus::Succeeded
                 }
-                _ => {
-                    if action.required() {
-                        results.skip_remaining = true;
-                    }
-                    results.has_failure = true;
-                }
-            }
+                ActionRunStatus::CheckFailedFixUserDenied => GroupExecutionStatus::Skipped,
+                _ => GroupExecutionStatus::Failed,
+            };
+
+            results.skip_remaining = match action_result.status {
+                ActionRunStatus::CheckSucceeded
+                | ActionRunStatus::NoCheckFixSucceeded
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => false,
+                ActionRunStatus::CheckFailedFixFailedStop => true,
+                _ => action.required(),
+            };
         }
 
         for (name, command) in &container.additional_report_details {
@@ -226,6 +245,20 @@ where
 
         Ok(results)
     }
+}
+
+fn prompt_user(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
+    tracing_indicatif::suspend_tracing_indicatif(|| {
+        let prompt = {
+            let base_prompt = inquire::Confirm::new(prompt_text).with_default(false);
+            match maybe_help_text {
+                Some(help_text) => base_prompt.with_help_message(help_text),
+                None => base_prompt,
+            }
+        };
+
+        prompt.prompt().unwrap_or(false)
+    })
 }
 
 async fn report_action_output<T>(
@@ -269,6 +302,12 @@ where
         }
         ActionRunStatus::CheckFailedFixFailedStop => {
             error!(target: "user", group = group_name, name = action.name(), "Check failed, fix ran and {} and aborted", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedFixUserDenied => {
+            warn!(target: "user", group = group_name, name = action.name(), "Checked failed, user opted not to run fix");
             print_pretty_result(group_name, &action.name(), action_result)
                 .await
                 .ok();
@@ -534,7 +573,7 @@ mod tests {
 
     fn make_action_run(result: ActionRunStatus, required: bool) -> MockDoctorActionRun {
         let mut run = MockDoctorActionRun::new();
-        run.expect_run_action().returning(move || {
+        run.expect_run_action().returning(move |_| {
             Ok(ActionRunResult::new(
                 "a_name",
                 result.clone(),
@@ -644,6 +683,90 @@ mod tests {
         );
         assert_eq!(
             BTreeSet::from(["skipped_1", "skipped_2"].map(str::to_string)),
+            exit_code.skipped_group
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_when_user_denies_fix_others_wont_run() -> Result<()> {
+        let group_actions = BTreeMap::from([
+            make_group_action(
+                "succeeds",
+                make_action_runs(ActionRunStatus::CheckFailedFixSucceedVerifySucceed),
+            ),
+            make_group_action(
+                "user_denies",
+                make_action_runs(ActionRunStatus::CheckFailedFixUserDenied),
+            ),
+            make_group_action("skipped", will_not_run()),
+        ]);
+
+        let run_groups = RunGroups {
+            group_actions,
+            all_paths: vec![
+                "succeeds".to_string(),
+                "user_denies".to_string(),
+                "skipped".to_string(),
+            ],
+        };
+
+        let exit_code = run_groups.execute().await?;
+        assert!(!exit_code.did_succeed);
+
+        assert_eq!(
+            BTreeSet::from(["succeeds"].map(str::to_string)),
+            exit_code.succeeded_groups
+        );
+        // the user denied one counts as skipped
+        // and we should not try running anything that depends on it
+        assert_eq!(
+            BTreeSet::from(["user_denies", "skipped"].map(str::to_string)),
+            exit_code.skipped_group
+        );
+        assert_eq!(BTreeSet::new(), exit_code.failed_group);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_when_user_denies_optional_fix_others_run() -> Result<()> {
+        let group_actions = BTreeMap::from([
+            make_group_action(
+                "succeeds_1",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
+            ),
+            make_group_action(
+                "user_denies",
+                vec![make_action_run(
+                    ActionRunStatus::CheckFailedFixUserDenied,
+                    false,
+                )],
+            ),
+            make_group_action(
+                "succeeds_2",
+                make_action_runs(ActionRunStatus::CheckSucceeded),
+            ),
+        ]);
+
+        let run_groups = RunGroups {
+            group_actions,
+            all_paths: vec![
+                "succeeds_1".to_string(),
+                "user_denies".to_string(),
+                "succeeds_2".to_string(),
+            ],
+        };
+
+        let exit_code = run_groups.execute().await?;
+        assert!(!exit_code.did_succeed);
+        assert_eq!(
+            BTreeSet::from(["succeeds_1", "succeeds_2"].map(str::to_string)),
+            exit_code.succeeded_groups
+        );
+        assert_eq!(BTreeSet::new(), exit_code.failed_group);
+        assert_eq!(
+            BTreeSet::from(["user_denies"].map(str::to_string)),
             exit_code.skipped_group
         );
         Ok(())
