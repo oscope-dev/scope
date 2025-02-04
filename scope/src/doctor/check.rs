@@ -1040,4 +1040,137 @@ pub(crate) mod tests {
             .await;
         assert!(res.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_honors_tilde_paths() {
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("group_name".to_string()),
+                predicate::eq(Path::new("/Users/first.last/path/foo.txt")),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            // this is what should be used
+            // .with(predicate::eq("/Users/first.last/path/*.txt"))
+            // this is the current incorrect behavior
+            .with(predicate::eq("/foo/root/~/path/*.txt"))
+            .returning(|_| Ok(vec![PathBuf::from("/Users/first.last/path/foo.txt")]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                Path::new("/foo/root"),
+                &["~/path/*.txt".to_string()],
+                "group_name",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_honors_relative_paths() {
+        // I can make an argument that we should toss this test
+        // and say that the correct thing to do is use **/path/*.txt
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("group_name".to_string()),
+                predicate::eq(Path::new("/foo/path/foo.txt")),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            //glob will error on relative paths! This is wrong!
+            .with(predicate::eq("/foo/root/../path/*.txt"))
+            // this is the correct expectation
+            // .with(predicate::eq("/foo/path/*.txt"))
+            .returning(|_| Ok(vec![PathBuf::from("/foo/path/foo.txt")]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                Path::new("/foo/root"),
+                &["../path/*.txt".to_string()],
+                "group_name",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    mod test_make_absolute {
+        use crate::doctor::check::make_absolute;
+
+        use super::*;
+
+        #[test]
+        fn filename_gets_preprended_with_basepath() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/foo.txt", &actual)
+        }
+
+        #[test]
+        fn wildcard_does_not_get_replaced() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "*.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/*.txt", &actual)
+        }
+
+        #[test]
+        fn path_from_root_does_not_get_replaced() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "/etc/project/foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/etc/project/foo.txt", &actual)
+        }
+
+        #[test]
+        fn relative_paths_are_not_resolved() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "../foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/../foo.txt", &actual)
+        }
+
+        #[test]
+        fn tilde_resolves() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "~/foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            // we want this to be equal
+            assert_ne!("/Users/first.last/path/foo.txt", &actual);
+            // assert_eq!("/Users/first.last/path/foo.txt", &actual);
+            // current, erroneous, behavior
+            assert_eq!("/Users/first.last/path/to/project/~/foo.txt", &actual)
+        }
+    }
 }
