@@ -572,10 +572,11 @@ impl Default for DefaultGlobWalker {
 }
 
 fn make_absolute(base_dir: &Path, glob: &String) -> String {
-    if glob.starts_with('/') {
-        glob.to_string()
+    let glob_buf = PathBuf::from(glob);
+    if glob_buf.is_absolute() {
+        glob_buf.display().to_string()
     } else {
-        format!("{}/{}", base_dir.display(), glob)
+        base_dir.join(glob_buf).display().to_string()
     }
 }
 
