@@ -1,0 +1,19 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: home-directory
+  description: Cache on a file in user's home directory
+spec:
+  include: when-required
+  actions:
+    - name: home-directory
+      check:
+        paths:
+          - ~/.doesnotexist
+        # alternatively, tilde expansion works in commands too
+        # if you don't want to cache the file
+        commands:
+          - test -f ~/.doesnotexist
+      fix:
+        commands:
+          - touch ~/.doesnotexist
