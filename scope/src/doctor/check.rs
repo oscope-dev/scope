@@ -352,7 +352,7 @@ impl DefaultDoctorActionRun {
     }
 
     async fn run_single_fix(&self, command: &str) -> Result<ActionTaskReport, RuntimeError> {
-        let args = vec![command.to_string()];
+        let args = vec![Self::expand_command(command)];
         let capture = self
             .exec_runner
             .run_command(CaptureOpts {
@@ -467,7 +467,7 @@ impl DefaultDoctorActionRun {
         let mut result: Option<CacheStatus> = None;
 
         for command in &action_command.commands {
-            let args = vec![command.clone()];
+            let args = vec![Self::expand_command(command)];
             let path = format!(
                 "{}:{}",
                 self.model.metadata().containing_dir(),
@@ -513,6 +513,16 @@ impl DefaultDoctorActionRun {
             status,
             output: Some(action_reports),
         })
+    }
+
+    /// splits a commands and performs shell expansion its parts
+    fn expand_command(command: &str) -> String {
+        command
+            .split(' ')
+            //consider doing a full expansion that includes env vars?
+            .map(|word| shellexpand::tilde(word))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -572,10 +582,12 @@ impl Default for DefaultGlobWalker {
 }
 
 fn make_absolute(base_dir: &Path, glob: &String) -> String {
-    if glob.starts_with('/') {
-        glob.to_string()
+    let expanded_glob = shellexpand::tilde(glob);
+    let glob_buf = PathBuf::from(expanded_glob.to_string());
+    if glob_buf.is_absolute() {
+        glob_buf.display().to_string()
     } else {
-        format!("{}/{}", base_dir.display(), glob)
+        base_dir.join(glob_buf).display().to_string()
     }
 }
 
@@ -638,6 +650,7 @@ pub(crate) mod tests {
     use crate::doctor::tests::build_root_model;
     use crate::shared::prelude::*;
     use anyhow::{anyhow, Result};
+    use directories::UserDirs;
     use predicates::prelude::predicate;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
@@ -723,10 +736,11 @@ pub(crate) mod tests {
             .withf(move |params| {
                 params.args[0].eq(command) && params.env_vars.contains_key("SCOPE_BIN_DIR")
             })
-            .returning(move |_| {
+            .returning(move |capture_opts| {
                 let resp_code = expected_results[counter];
                 counter += 1;
                 Ok(OutputCaptureBuilder::default()
+                    .command(capture_opts.args[0].to_string())
                     .exit_code(Some(resp_code))
                     .build()
                     .unwrap())
@@ -763,6 +777,11 @@ pub(crate) mod tests {
 
     fn user_responds_no(_: &str, _: &Option<String>) -> bool {
         false
+    }
+
+    fn home_dir() -> PathBuf {
+        let user_dirs = UserDirs::new().expect("Couldn't initialize UserDirs");
+        user_dirs.home_dir().to_owned()
     }
 
     #[tokio::test]
@@ -1039,5 +1058,211 @@ pub(crate) mod tests {
             )
             .await;
         assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_honors_tilde_paths() {
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        let home_dir = home_dir();
+        let resolved_path = home_dir.join("path/foo.txt").as_path().to_owned();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("group_name".to_string()),
+                predicate::eq(resolved_path.clone()),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            .withf(move |glob_pattern| {
+                home_dir
+                    .join("path/*.txt")
+                    .as_path()
+                    .to_owned()
+                    .to_str()
+                    .unwrap()
+                    == glob_pattern
+            })
+            .returning(move |_| Ok(vec![resolved_path.clone()]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                Path::new("/foo/root"),
+                &["~/path/*.txt".to_string()],
+                "group_name",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_glob_walker_update_path_honors_relative_paths() {
+        // I can make an argument that we should toss this test
+        // and say that the correct thing to do is use **/path/*.txt
+        let mut file_system = MockFileSystem::new();
+        let mut file_cache = MockFileCache::new();
+
+        file_cache
+            .expect_update_cache_entry()
+            .once()
+            .with(
+                predicate::eq("group_name".to_string()),
+                predicate::eq(Path::new("/foo/path/foo.txt")),
+            )
+            .returning(|_, _| Ok(()));
+
+        file_system
+            .expect_find_files()
+            .once()
+            //glob() will error on relative paths! This is wrong!
+            .with(predicate::eq("/foo/root/../path/*.txt"))
+            // this is the correct expectation
+            // .with(predicate::eq("/foo/path/*.txt"))
+            .returning(|_| Ok(vec![PathBuf::from("/foo/path/foo.txt")]));
+
+        let walker = DefaultGlobWalker {
+            file_system: Box::new(file_system),
+        };
+
+        let res = walker
+            .update_cache(
+                Path::new("/foo/root"),
+                &["../path/*.txt".to_string()],
+                "group_name",
+                Arc::new(file_cache),
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    mod test_run_single_fix {
+        use super::*;
+
+        #[tokio::test]
+        async fn expands_tilde_to_home_dir() {
+            let mut exec_runner = MockExecutionProvider::new();
+            exec_runner
+                .expect_run_command()
+                .once()
+                .returning(move |capture_opts| {
+                    Ok(OutputCaptureBuilder::default()
+                        .command(capture_opts.args[0].to_string())
+                        .exit_code(Some(0))
+                        .build()
+                        .unwrap())
+                });
+
+            let run = setup_test(
+                vec![build_run_fail_fix_succeed_action()],
+                exec_runner,
+                MockGlobWalker::new(),
+            );
+
+            let result = run.run_single_fix("touch ~/.somefile").await.unwrap();
+
+            assert_eq!(
+                format!("{} {}", "touch", home_dir().join(".somefile").display()),
+                result.command
+            );
+        }
+    }
+
+    mod test_run_check_command {
+        use super::*;
+
+        #[tokio::test]
+        async fn expands_tilde_to_home_dir() {
+            let mut exec_runner = MockExecutionProvider::new();
+            exec_runner
+                .expect_run_command()
+                .once()
+                .returning(move |capture_opts| {
+                    Ok(OutputCaptureBuilder::default()
+                        .command(capture_opts.args[0].to_string())
+                        .exit_code(Some(0))
+                        .build()
+                        .unwrap())
+                });
+
+            let run = setup_test(
+                vec![build_run_fail_fix_succeed_action()],
+                exec_runner,
+                MockGlobWalker::new(),
+            );
+
+            let action_commands = DoctorGroupActionCommandBuilder::default()
+                .commands(vec!["test -f ~/.somefile".to_string()])
+                .build()
+                .unwrap();
+
+            let result = run.run_check_command(&action_commands).await.unwrap();
+            let reports = result.output.expect("Expected ActionTaskreports");
+            assert_eq!(
+                format!("{} {}", "test -f", home_dir().join(".somefile").display()),
+                reports[0].command
+            );
+        }
+    }
+
+    mod test_make_absolute {
+        use super::*;
+        use crate::doctor::check::make_absolute;
+
+        #[test]
+        fn filename_gets_preprended_with_basepath() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/foo.txt", &actual)
+        }
+
+        #[test]
+        fn wildcard_does_not_get_replaced() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "*.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/*.txt", &actual)
+        }
+
+        #[test]
+        fn path_from_root_does_not_get_replaced() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "/etc/project/foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/etc/project/foo.txt", &actual)
+        }
+
+        #[test]
+        fn relative_paths_are_not_resolved() {
+            let base_dir = Path::new("/Users/first.last/path/to/project");
+            let glob = "../foo.txt".to_string();
+
+            let actual = make_absolute(base_dir, &glob);
+            assert_eq!("/Users/first.last/path/to/project/../foo.txt", &actual)
+        }
+
+        #[test]
+        fn tilde_resolves() {
+            let home_dir = home_dir();
+            let base_dir = home_dir.join("path/to/project");
+            let glob = "~/foo.txt".to_string();
+
+            let actual = make_absolute(base_dir.as_path(), &glob);
+            assert_eq!(home_dir.join("foo.txt").display().to_string(), actual);
+        }
     }
 }
