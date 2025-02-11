@@ -2,18 +2,19 @@ use clap::{ArgGroup, Parser, ValueEnum};
 use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
-use opentelemetry::{global, KeyValue};
-use opentelemetry_otlp::{
-    HttpExporterBuilder, MetricsExporterBuilder, SpanExporterBuilder, TonicExporterBuilder,
-    WithExportConfig,
+
+use opentelemetry::{
+    trace::{TraceError, TracerProvider as _},
+    KeyValue,
 };
-use opentelemetry_sdk::metrics::reader::{DefaultAggregationSelector, DefaultTemporalitySelector};
-use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::trace::Tracer;
+use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig, WithTonicConfig};
 use opentelemetry_sdk::{
-    trace::{self, RandomIdGenerator, Sampler},
+    metrics::{MetricError, PeriodicReader, SdkMeterProvider},
+    runtime,
+    trace::{RandomIdGenerator, Sampler, TracerProvider},
     Resource,
 };
+
 use std::env;
 use std::fs::File;
 use std::io::{IsTerminal, Write};
@@ -27,7 +28,7 @@ use tracing::level_filters::LevelFilter;
 use tracing::warn;
 use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
 use tracing_indicatif::IndicatifLayer;
-use tracing_opentelemetry::MetricsLayer;
+use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::fmt::format::DefaultFields;
 use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
@@ -152,8 +153,9 @@ pub struct ConfiguredLogger {
     pub log_location: String,
 }
 
+/// RAII wrapper that ensures metrics and traces are flushed on shutdown
 struct OtelProperties {
-    tracer: Tracer,
+    tracer: TracerProvider,
     metrics: SdkMeterProvider,
 }
 
@@ -162,7 +164,9 @@ impl Drop for OtelProperties {
         if let Err(e) = self.metrics.shutdown() {
             warn!("Unable to emit final metrics: {:?}", e);
         }
-        global::shutdown_tracer_provider();
+        if let Err(e) = self.tracer.shutdown() {
+            warn!("Unable to emit final traces: {:?}", e);
+        }
     }
 }
 
@@ -188,11 +192,106 @@ impl LoggingOpts {
         }
     }
 
-    fn make_tonic_exporter(&self, id: &str) -> TonicExporterBuilder {
-        let endpoint = self.otel_collector.clone().unwrap();
-        let mut map = MetadataMap::with_capacity(2);
+    fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
+        if self.otel_collector.is_some() {
+            let resource = self.resource(run_id);
+            let metadata_map = self.metadata_map(run_id);
+            let timeout = Duration::from_secs(3);
+            let endpoint = &self.otel_collector.clone().unwrap();
 
-        map.insert(
+            let tracer = self.init_tracer_provider(&resource, &metadata_map, endpoint, &timeout)?;
+            let metrics = self.init_meter_provider(&resource, &metadata_map, endpoint, &timeout)?;
+
+            Ok(Some(OtelProperties { metrics, tracer }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn init_tracer_provider(
+        &self,
+        resource: &Resource,
+        metadata_map: &MetadataMap,
+        endpoint: &str,
+        timeout: &Duration,
+    ) -> Result<TracerProvider, TraceError> {
+        let span_exporter = match self.otel_protocol {
+            OtelProtocol::Grpc => SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .with_timeout(*timeout)
+                .with_metadata(metadata_map.clone())
+                .build(),
+            OtelProtocol::Http => SpanExporter::builder()
+                .with_http()
+                .with_endpoint(endpoint)
+                .with_timeout(*timeout)
+                .build(),
+        };
+
+        let tracer = TracerProvider::builder()
+            .with_batch_exporter(span_exporter?, runtime::Tokio)
+            .with_sampler(Sampler::AlwaysOn)
+            .with_id_generator(RandomIdGenerator::default())
+            .with_max_attributes_per_span(16)
+            .with_max_events_per_span(16)
+            .with_resource(resource.clone())
+            .build();
+
+        Ok(tracer)
+    }
+
+    fn init_meter_provider(
+        &self,
+        resource: &Resource,
+        metadata_map: &MetadataMap,
+        endpoint: &str,
+        timeout: &Duration,
+    ) -> Result<SdkMeterProvider, MetricError> {
+        let metric_exporter = match self.otel_protocol {
+            OtelProtocol::Grpc => MetricExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .with_timeout(*timeout)
+                .with_metadata(metadata_map.clone())
+                .build(),
+            OtelProtocol::Http => MetricExporter::builder()
+                .with_http()
+                .with_endpoint(endpoint)
+                .with_timeout(*timeout)
+                .build(),
+        };
+
+        let reader = PeriodicReader::builder(metric_exporter?, runtime::Tokio)
+            .with_interval(Duration::from_secs(3))
+            .with_timeout(Duration::from_secs(10))
+            .build();
+
+        let metrics = SdkMeterProvider::builder()
+            .with_reader(reader)
+            .with_resource(resource.clone())
+            .build();
+
+        Ok(metrics)
+    }
+
+    fn resource(&self, run_id: &str) -> Resource {
+        Resource::new(vec![
+            KeyValue::new("service.name", self.otel_service.clone()),
+            KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+            KeyValue::new(
+                "host.name",
+                gethostname()
+                    .into_string()
+                    .unwrap_or_else(|_| "unknown".to_string()),
+            ),
+            KeyValue::new("scope.id", run_id.to_string()),
+        ])
+    }
+
+    fn metadata_map(&self, run_id: &str) -> MetadataMap {
+        let mut metadata_map = MetadataMap::with_capacity(2);
+        metadata_map.insert(
             "host",
             gethostname()
                 .into_string()
@@ -200,80 +299,9 @@ impl LoggingOpts {
                 .parse()
                 .unwrap(),
         );
-        map.insert("scope.id", id.parse().unwrap());
+        metadata_map.insert("scope.id", run_id.parse().unwrap());
 
-        opentelemetry_otlp::new_exporter()
-            .tonic()
-            .with_endpoint(endpoint)
-            .with_timeout(Duration::from_secs(3))
-            .with_metadata(map)
-    }
-
-    fn make_http_exporter(&self) -> HttpExporterBuilder {
-        let endpoint = self.otel_collector.clone().unwrap();
-
-        opentelemetry_otlp::new_exporter()
-            .http()
-            .with_endpoint(endpoint)
-            .with_timeout(Duration::from_secs(3))
-    }
-
-    fn make_span_exporter_builder(&self, id: &str) -> SpanExporterBuilder {
-        match self.otel_protocol {
-            OtelProtocol::Grpc => SpanExporterBuilder::Tonic(self.make_tonic_exporter(id)),
-            OtelProtocol::Http => SpanExporterBuilder::Http(self.make_http_exporter()),
-        }
-    }
-
-    fn make_metrics_exporter_builder(&self, id: &str) -> MetricsExporterBuilder {
-        match self.otel_protocol {
-            OtelProtocol::Grpc => MetricsExporterBuilder::Tonic(self.make_tonic_exporter(id)),
-            OtelProtocol::Http => MetricsExporterBuilder::Http(self.make_http_exporter()),
-        }
-    }
-
-    fn setup_otel(&self, run_id: &str) -> Result<Option<OtelProperties>, anyhow::Error> {
-        if self.otel_collector.is_some() {
-            let resources = Resource::new(vec![
-                KeyValue::new("service.name", self.otel_service.clone()),
-                KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
-                KeyValue::new(
-                    "host.name",
-                    gethostname()
-                        .into_string()
-                        .unwrap_or_else(|_| "unknown".to_string()),
-                ),
-                KeyValue::new("scope.id", run_id.to_string()),
-            ]);
-
-            let tracer = opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_exporter(self.make_span_exporter_builder(run_id))
-                .with_trace_config(
-                    trace::config()
-                        .with_sampler(Sampler::AlwaysOn)
-                        .with_id_generator(RandomIdGenerator::default())
-                        .with_max_events_per_span(64)
-                        .with_max_attributes_per_span(16)
-                        .with_max_events_per_span(16)
-                        .with_resource(resources.clone()),
-                )
-                .install_batch(opentelemetry_sdk::runtime::Tokio)?;
-
-            let metrics = opentelemetry_otlp::new_pipeline()
-                .metrics(opentelemetry_sdk::runtime::Tokio)
-                .with_exporter(self.make_metrics_exporter_builder(run_id))
-                .with_resource(resources)
-                .with_period(Duration::from_secs(3))
-                .with_timeout(Duration::from_secs(10))
-                .with_aggregation_selector(DefaultAggregationSelector::new())
-                .with_temporality_selector(DefaultTemporalitySelector::new())
-                .build()?;
-
-            Ok(Some(OtelProperties { metrics, tracer }))
-        } else {
-            Ok(None)
-        }
+        metadata_map
     }
 
     pub async fn configure_logging(&self, run_id: &str, prefix: &str) -> ConfiguredLogger {
@@ -354,8 +382,7 @@ impl LoggingOpts {
         let (otel_tracer_layer, otel_metrics_layer) = match otel_props {
             Some(ref props) => (
                 Some(
-                    tracing_opentelemetry::layer()
-                        .with_tracer(props.tracer.clone())
+                    OpenTelemetryLayer::new(props.tracer.tracer("scope"))
                         .with_filter(filter_func.clone()),
                 ),
                 Some(MetricsLayer::new(props.metrics.clone()).with_filter(filter_func)),

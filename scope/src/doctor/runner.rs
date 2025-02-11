@@ -4,6 +4,7 @@ use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
 use colored::Colorize;
+use opentelemetry::trace::Status;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
 use petgraph::visit::{DfsPostOrder, Walker};
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, info_span, warn, Instrument, Span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Debug)]
 pub struct PathRunResult {
@@ -160,12 +162,27 @@ where
                 continue;
             }
 
-            let group_span = info_span!(parent: &header_span, "group", "indicatif.pb_show" = true, "group.name" = group_name);
+            let group_span = info_span!(
+                parent: &header_span,
+                "group",
+                "indicatif.pb_show" = true,
+                "group.name" = group_name,
+                "otel.name" = format!("group {}", group_name)
+            );
             group_span.pb_set_length(group_container.actions.len() as u64);
             group_span.pb_set_message(&format!("group {}", group_name));
             let _span = group_span.enter();
 
             let group_result = self.execute_group(&group_span, group_container).await?;
+            if let GroupExecutionStatus::Failed = group_result.status {
+                group_span.set_status(Status::Error {
+                    description: std::borrow::Cow::Owned(format!(
+                        "{} group failed",
+                        group_result.group_name
+                    )),
+                });
+            }
+
             run_result.process(&group_result);
 
             skip_remaining |= group_result.skip_remaining;
@@ -193,7 +210,14 @@ where
                 continue;
             }
 
-            let action_span = info_span!(parent: group_span, "action", "indicatif.pb_show" = true, "action.name" = action.name());
+            let action_span = info_span!(
+                parent: group_span,
+                "action",
+                "indicatif.pb_show" = true,
+                "group.name" = container.group_name,
+                "action.name" = action.name(),
+                "otel.name" = format!("action {}", action.name())
+            );
             action_span.pb_set_message(&format!(
                 "action {} - {}",
                 action.name(),
@@ -203,8 +227,17 @@ where
 
             let action_result = action
                 .run_action(prompt_user)
-                .instrument(action_span)
+                .instrument(action_span.clone())
                 .await?;
+
+            if action_result.status.is_failure() {
+                action_span.set_status(Status::Error {
+                    description: std::borrow::Cow::Owned(format!(
+                        "{} action failed",
+                        action_result.action_name
+                    )),
+                });
+            }
 
             results
                 .group_report
