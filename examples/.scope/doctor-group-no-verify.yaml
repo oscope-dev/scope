@@ -1,0 +1,24 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: no-verify
+  description: |
+    Sometimes we may want to trigger a fix when a file changes, 
+    and _also_ some other condition, but there that condition won't
+    change after the fix.
+    Setting `verify: false` skips running the check commands after the fix has run.
+spec:
+  include: when-required
+  actions:
+    - name: no-verify
+      verify: false
+      check:
+        paths:
+          - example.txt
+        commands:
+          # Maybe you have a script that also checks the value of an env variable.
+          # Here, we'll just run the `false` command so it always fails.
+          - "false"
+      fix:
+        commands:
+          - echo "The fix ran, but the check command still fails. That's okay because verify is set to false."

@@ -18,6 +18,7 @@ pub struct DoctorGroupAction {
     pub fix: DoctorGroupActionFix,
     pub check: DoctorGroupActionCheck,
     pub required: bool,
+    pub verify: bool,
 }
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -40,36 +41,6 @@ pub struct DoctorGroupActionFixPrompt {
     pub text: String,
     #[builder(default)]
     pub extra_context: Option<String>,
-}
-
-impl DoctorGroupAction {
-    pub fn make_from(
-        name: &str,
-        description: &str,
-        prompt: Option<DoctorGroupActionFixPrompt>,
-        fix_command: Option<Vec<&str>>,
-        check_path: Option<(&str, Vec<&str>)>,
-        check_command: Option<Vec<&str>>,
-    ) -> Self {
-        Self {
-            required: true,
-            name: name.to_string(),
-            description: description.to_string(),
-            fix: DoctorGroupActionFix {
-                command: fix_command.map(DoctorGroupActionCommand::from),
-                help_text: None,
-                help_url: None,
-                prompt,
-            },
-            check: DoctorGroupActionCheck {
-                command: check_command.map(DoctorGroupActionCommand::from),
-                files: check_path.map(|(base, paths)| DoctorGroupCachePath {
-                    base_path: PathBuf::from(base),
-                    paths: crate::shared::convert_to_string(paths),
-                }),
-            },
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -228,6 +199,7 @@ fn parse_action(
     Ok(DoctorGroupAction {
         name: spec_action.name.unwrap_or_else(|| format!("{}", idx + 1)),
         required: spec_action.required,
+        verify: spec_action.verify,
         description: spec_action
             .description
             .unwrap_or_else(|| "default".to_string()),
@@ -289,6 +261,7 @@ mod tests {
             DoctorGroupAction {
                 name: "1".to_string(),
                 required: false,
+                verify: true,
                 description: "foo1".to_string(),
                 fix: DoctorGroupActionFix {
                     command: Some(DoctorGroupActionCommand::from(vec![
@@ -314,6 +287,7 @@ mod tests {
             DoctorGroupAction {
                 name: "2".to_string(),
                 required: true,
+                verify: true,
                 description: "foo2".to_string(),
                 fix: DoctorGroupActionFix {
                     command: None,

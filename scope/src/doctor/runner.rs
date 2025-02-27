@@ -251,7 +251,8 @@ where
             results.status = match action_result.status {
                 ActionRunStatus::CheckSucceeded
                 | ActionRunStatus::NoCheckFixSucceeded
-                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed => {
+                | ActionRunStatus::CheckFailedFixSucceedVerifySucceed
+                | ActionRunStatus::CheckFailedFixSucceededNoVerification => {
                     GroupExecutionStatus::Succeeded
                 }
                 ActionRunStatus::CheckFailedFixUserDenied => GroupExecutionStatus::Skipped,
@@ -320,6 +321,12 @@ where
         }
         ActionRunStatus::CheckFailedFixSucceedVerifyFailed => {
             error!(target: "user", group = group_name, name = action.name(), "Check initially failed, fix ran, verification {}", "failed".red().bold());
+            print_pretty_result(group_name, &action.name(), action_result)
+                .await
+                .ok();
+        }
+        ActionRunStatus::CheckFailedFixSucceededNoVerification => {
+            info!(target: "user", group = group_name, name = action.name(), "Checked failed, fix succeeded, no verification");
             print_pretty_result(group_name, &action.name(), action_result)
                 .await
                 .ok();

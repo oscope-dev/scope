@@ -89,9 +89,17 @@ pub struct DoctorGroupActionSpec {
     /// to `true`.
     #[serde(default = "doctor_group_action_required_default")]
     pub required: bool,
+
+    /// If false, the check does not run again after the fix. Defaults to `true`.
+    #[serde(default = "doctor_group_action_verify_default")]
+    pub verify: bool,
 }
 
 fn doctor_group_action_required_default() -> bool {
+    true
+}
+
+fn doctor_group_action_verify_default() -> bool {
     true
 }
 

@@ -169,6 +169,11 @@
           "description": "If false, the action is allowed to fail and let other actions in the group execute. Defaults to `true`.",
           "default": true,
           "type": "boolean"
+        },
+        "verify": {
+          "description": "If false, the check does not run again after the fix. Defaults to `true`.",
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

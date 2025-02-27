@@ -72,6 +72,7 @@ pub enum ActionRunStatus {
     CheckFailedFixFailedStop,
     CheckFailedFixUserDenied,
     NoCheckFixSucceeded,
+    CheckFailedFixSucceededNoVerification,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +126,7 @@ impl ActionRunStatus {
             ActionRunStatus::CheckFailedFixFailedStop => true,
             ActionRunStatus::CheckFailedFixUserDenied => false,
             ActionRunStatus::NoCheckFixSucceeded => false,
+            ActionRunStatus::CheckFailedFixSucceededNoVerification => false,
         }
     }
 }
@@ -244,25 +246,14 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             ));
         }
 
-        let mut validate_output = None;
-        if let Some(validate_result) = self.evaluate_command_checks().await? {
-            validate_output = validate_result.output;
-            if validate_result.status != CacheStatus::FixNotRequired {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
-                    check_results.output,
-                    Some(fix_output),
-                    validate_output,
-                ));
-            }
+        let (status, validate_output) = self.verify().await?;
+        if status != ActionRunStatus::CheckFailedFixSucceedVerifyFailed {
+            self.update_caches().await;
         }
-
-        self.update_caches().await;
 
         return Ok(ActionRunResult::new(
             &self.name(),
-            ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+            status,
             check_results.output,
             Some(fix_output),
             validate_output,
@@ -524,6 +515,29 @@ impl DefaultDoctorActionRun {
             .collect::<Vec<_>>()
             .join(" ")
     }
+
+    async fn verify(
+        &self,
+    ) -> Result<(ActionRunStatus, Option<Vec<ActionTaskReport>>), RuntimeError> {
+        match self.action.verify {
+            true => match self.evaluate_command_checks().await? {
+                Some(validate_result) => {
+                    match validate_result.status != CacheStatus::FixNotRequired {
+                        true => Ok((
+                            ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                            validate_result.output,
+                        )),
+                        false => Ok((
+                            ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+                            validate_result.output,
+                        )),
+                    }
+                }
+                None => Ok((ActionRunStatus::CheckFailedFixSucceedVerifySucceed, None)),
+            },
+            false => Ok((ActionRunStatus::CheckFailedFixSucceededNoVerification, None)),
+        }
+    }
 }
 
 #[automock]
@@ -660,6 +674,7 @@ pub(crate) mod tests {
             .description("a test action")
             .name("action")
             .required(true)
+            .verify(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .files(None)
@@ -682,6 +697,7 @@ pub(crate) mod tests {
             .description("a test action that prompts the user before applying fix")
             .name("action")
             .required(true)
+            .verify(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .files(None)
@@ -708,6 +724,7 @@ pub(crate) mod tests {
             .description("a test action")
             .name("action")
             .required(true)
+            .verify(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .command(None)
@@ -818,9 +835,9 @@ pub(crate) mod tests {
             result.status
         );
 
-        assert!(result.action_report.check.len() == 1);
-        assert!(result.action_report.fix.len() == 1);
-        assert!(result.action_report.validate.len() == 1);
+        assert_eq!(1, result.action_report.check.len(), "check");
+        assert_eq!(1, result.action_report.fix.len(), "fix");
+        assert_eq!(1, result.action_report.validate.len(), "validate");
 
         Ok(())
     }
@@ -902,6 +919,59 @@ pub(crate) mod tests {
 
         assert!(result.action_report.check.len() == 1);
         assert!(result.action_report.fix.len() == 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_check_fails_fix_succeeds_no_verify() -> Result<()> {
+        let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
+        glob_walker
+            .expect_have_globs_changed()
+            .once()
+            .returning(|_, _, _, _| Ok(true));
+
+        glob_walker
+            .expect_update_cache()
+            .once()
+            .returning(|_, _, _, _| Ok(()));
+
+        let action = DoctorGroupActionBuilder::default()
+            .description("a test action")
+            .name("action")
+            .required(true)
+            .verify(false)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
+                    .command(Some(DoctorGroupActionCommand::from(vec!["check"])))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(
+                DoctorGroupActionFixBuilder::default()
+                    .command(Some(DoctorGroupActionCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap();
+
+        command_result(&mut exec_runner, "check", vec![1]);
+        command_result(&mut exec_runner, "fix", vec![0]);
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action(panic_if_user_is_prompted).await?;
+        assert_eq!(
+            ActionRunStatus::CheckFailedFixSucceededNoVerification,
+            result.status
+        );
+
+        assert_eq!(1, result.action_report.check.len(), "check");
+        assert_eq!(1, result.action_report.fix.len(), "fix");
+        assert_eq!(0, result.action_report.validate.len(), "validate");
 
         Ok(())
     }
