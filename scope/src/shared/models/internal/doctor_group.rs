@@ -8,68 +8,16 @@ use minijinja::{context, Environment};
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
-use crate::shared::models::internal::extract_command_path;
+use crate::shared::models::internal::{DoctorCommand, DoctorFix, DoctorGroupActionFixPrompt};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorGroupAction {
     pub name: String,
     pub description: String,
-    pub fix: DoctorGroupActionFix,
+    pub fix: DoctorFix,
     pub check: DoctorGroupActionCheck,
     pub required: bool,
-}
-
-#[derive(Debug, PartialEq, Clone, Builder)]
-#[builder(setter(into))]
-pub struct DoctorGroupActionFix {
-    #[builder(default)]
-    pub command: Option<DoctorGroupActionCommand>,
-    #[builder(default)]
-    pub help_text: Option<String>,
-    #[builder(default)]
-    pub help_url: Option<String>,
-    #[builder(default)]
-    pub prompt: Option<DoctorGroupActionFixPrompt>,
-}
-
-#[derive(Debug, PartialEq, Clone, Builder)]
-#[builder(setter(into))]
-pub struct DoctorGroupActionFixPrompt {
-    #[builder(default)]
-    pub text: String,
-    #[builder(default)]
-    pub extra_context: Option<String>,
-}
-
-impl DoctorGroupAction {
-    pub fn make_from(
-        name: &str,
-        description: &str,
-        prompt: Option<DoctorGroupActionFixPrompt>,
-        fix_command: Option<Vec<&str>>,
-        check_path: Option<(&str, Vec<&str>)>,
-        check_command: Option<Vec<&str>>,
-    ) -> Self {
-        Self {
-            required: true,
-            name: name.to_string(),
-            description: description.to_string(),
-            fix: DoctorGroupActionFix {
-                command: fix_command.map(DoctorGroupActionCommand::from),
-                help_text: None,
-                help_url: None,
-                prompt,
-            },
-            check: DoctorGroupActionCheck {
-                command: check_command.map(DoctorGroupActionCommand::from),
-                files: check_path.map(|(base, paths)| DoctorGroupCachePath {
-                    base_path: PathBuf::from(base),
-                    paths: crate::shared::convert_to_string(paths),
-                }),
-            },
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -94,38 +42,8 @@ impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorGroupActionCheck {
-    pub command: Option<DoctorGroupActionCommand>,
+    pub command: Option<DoctorCommand>,
     pub files: Option<DoctorGroupCachePath>,
-}
-
-#[derive(Debug, PartialEq, Clone, Builder)]
-#[builder(setter(into))]
-pub struct DoctorGroupActionCommand {
-    pub commands: Vec<String>,
-}
-
-impl From<Vec<&str>> for DoctorGroupActionCommand {
-    fn from(value: Vec<&str>) -> Self {
-        let commands = value.iter().map(|x| x.to_string()).collect();
-        Self { commands }
-    }
-}
-
-impl<T> From<(&Path, Vec<T>)> for DoctorGroupActionCommand
-where
-    String: for<'a> From<&'a T>,
-{
-    fn from((base_path, command_strings): (&Path, Vec<T>)) -> Self {
-        let commands = command_strings
-            .iter()
-            .map(|s| {
-                let exec: String = s.into();
-                extract_command_path(base_path, &exec)
-            })
-            .collect();
-
-        DoctorGroupActionCommand { commands }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Builder)]
@@ -204,10 +122,7 @@ fn parse_action(
         for command in &fix.commands {
             templated_commands.push(substitute_templates(&working_dir, command)?);
         }
-        Some(DoctorGroupActionCommand::from((
-            containing_dir,
-            templated_commands,
-        )))
+        Some(DoctorCommand::from((containing_dir, templated_commands)))
     } else {
         None
     };
@@ -217,10 +132,7 @@ fn parse_action(
         for command in check {
             templated_commands.push(substitute_templates(&working_dir, command)?);
         }
-        Some(DoctorGroupActionCommand::from((
-            containing_dir,
-            templated_commands,
-        )))
+        Some(DoctorCommand::from((containing_dir, templated_commands)))
     } else {
         None
     };
@@ -231,7 +143,7 @@ fn parse_action(
         description: spec_action
             .description
             .unwrap_or_else(|| "default".to_string()),
-        fix: DoctorGroupActionFix {
+        fix: DoctorFix {
             command: fix_command,
             prompt: spec_action.fix.and_then(|fix| fix.prompt).map(|p| {
                 DoctorGroupActionFixPrompt {
@@ -261,7 +173,7 @@ mod tests {
 
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::{
-        DoctorGroupAction, DoctorGroupActionCheck, DoctorGroupActionCommand, DoctorGroupActionFix,
+        DoctorCommand, DoctorFix, DoctorGroupAction, DoctorGroupActionCheck,
     };
     use crate::shared::prelude::DoctorGroupCachePath;
 
@@ -290,18 +202,14 @@ mod tests {
                 name: "1".to_string(),
                 required: false,
                 description: "foo1".to_string(),
-                fix: DoctorGroupActionFix {
-                    command: Some(DoctorGroupActionCommand::from(vec![
-                        "/foo/bar/.scope/fix1.sh"
-                    ])),
+                fix: DoctorFix {
+                    command: Some(DoctorCommand::from(vec!["/foo/bar/.scope/fix1.sh"])),
                     prompt: None,
                     help_text: Some("There is a good way to fix this, maybe...".to_string()),
                     help_url: Some("https://go.example.com/fixit".to_string()),
                 },
                 check: DoctorGroupActionCheck {
-                    command: Some(DoctorGroupActionCommand::from(vec![
-                        "/foo/bar/.scope/foo1.sh"
-                    ])),
+                    command: Some(DoctorCommand::from(vec!["/foo/bar/.scope/foo1.sh"])),
                     files: Some(DoctorGroupCachePath::from((
                         "/foo/bar",
                         vec!["flig/bar/**/*"]
@@ -315,14 +223,14 @@ mod tests {
                 name: "2".to_string(),
                 required: true,
                 description: "foo2".to_string(),
-                fix: DoctorGroupActionFix {
+                fix: DoctorFix {
                     command: None,
                     help_text: None,
                     help_url: None,
                     prompt: None,
                 },
                 check: DoctorGroupActionCheck {
-                    command: Some(DoctorGroupActionCommand::from(vec!["sleep infinity"])),
+                    command: Some(DoctorCommand::from(vec!["sleep infinity"])),
                     files: Some(DoctorGroupCachePath::from(("/foo/bar", vec!["*/*.txt"])))
                 }
             }
