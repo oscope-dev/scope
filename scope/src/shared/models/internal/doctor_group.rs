@@ -3,12 +3,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use derive_builder::Builder;
-use minijinja::{context, Environment};
 
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
-use crate::shared::models::internal::{DoctorCommand, DoctorFix, DoctorFixPrompt};
+use crate::shared::models::internal::{DoctorCommand, DoctorFix};
+
+use super::substitute_templates;
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
@@ -67,15 +68,6 @@ impl HelpMetadata for DoctorGroup {
     }
 }
 
-fn substitute_templates(work_dir: &str, input_str: &str) -> Result<String> {
-    let mut env = Environment::new();
-    env.add_template("input_str", input_str)?;
-    let template = env.get_template("input_str")?;
-    let result = template.render(context! { working_dir => work_dir })?;
-
-    Ok(result)
-}
-
 impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
     type Error = anyhow::Error;
 
@@ -112,29 +104,19 @@ fn parse_action(
         .clone();
 
     let spec_action = action.clone();
-    let help_text = spec_action
-        .fix
-        .as_ref()
-        .and_then(|x| x.help_text.as_ref().map(|st| st.trim().to_string()).clone());
-    let help_url = spec_action.fix.as_ref().and_then(|x| x.help_url.clone());
-    let fix_command = if let Some(fix) = &spec_action.fix {
-        let mut templated_commands = Vec::new();
-        for command in &fix.commands {
-            templated_commands.push(substitute_templates(&working_dir, command)?);
-        }
-        Some(DoctorCommand::from((containing_dir, templated_commands)))
-    } else {
-        None
+
+    let fix = match &spec_action.fix {
+        Some(fix_spec) => DoctorFix::from_spec(containing_dir, &working_dir, fix_spec.clone())?,
+        None => DoctorFix::empty(),
     };
 
-    let check_command = if let Some(ref check) = spec_action.check.commands {
-        let mut templated_commands = Vec::new();
-        for command in check {
-            templated_commands.push(substitute_templates(&working_dir, command)?);
-        }
-        Some(DoctorCommand::from((containing_dir, templated_commands)))
-    } else {
-        None
+    let check_command = match spec_action.check.commands {
+        Some(ref check) => Some(DoctorCommand::from_commands(
+            containing_dir,
+            &working_dir,
+            check,
+        )?),
+        None => None,
     };
 
     Ok(DoctorGroupAction {
@@ -143,15 +125,7 @@ fn parse_action(
         description: spec_action
             .description
             .unwrap_or_else(|| "default".to_string()),
-        fix: DoctorFix {
-            command: fix_command,
-            prompt: spec_action
-                .fix
-                .and_then(|fix| fix.prompt)
-                .map(DoctorFixPrompt::from),
-            help_text,
-            help_url,
-        },
+        fix,
         check: DoctorGroupActionCheck {
             command: check_command,
             files: spec_action.check.paths.map(|paths| DoctorGroupCachePath {
