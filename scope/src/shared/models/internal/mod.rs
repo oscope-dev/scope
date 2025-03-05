@@ -9,7 +9,9 @@ use serde_yaml::Value;
 use std::collections::VecDeque;
 use std::path::Path;
 
+mod command;
 mod doctor_group;
+mod fix;
 mod known_error;
 mod upload_location;
 
@@ -18,7 +20,7 @@ use self::upload_location::ReportUploadLocation;
 
 pub mod prelude {
     pub use super::ParsedConfig;
-    pub use super::{doctor_group::*, known_error::*, upload_location::*};
+    pub use super::{command::*, doctor_group::*, fix::*, known_error::*, upload_location::*};
 }
 
 #[derive(Debug, PartialEq)]
@@ -89,17 +91,22 @@ pub(crate) fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
         .join(" ")
 }
 
-#[test]
-fn test_extract_command_path() {
-    let base_path = Path::new("/foo/bar");
-    assert_eq!(
-        "/foo/bar/scripts/foo.sh",
-        extract_command_path(base_path, "./scripts/foo.sh")
-    );
-    assert_eq!(
-        "/scripts/foo.sh",
-        extract_command_path(base_path, "/scripts/foo.sh")
-    );
-    assert_eq!("foo", extract_command_path(base_path, "foo"));
-    assert_eq!("foo bar", extract_command_path(base_path, "foo bar"));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_command_path() {
+        let base_path = Path::new("/foo/bar");
+        assert_eq!(
+            "/foo/bar/scripts/foo.sh",
+            extract_command_path(base_path, "./scripts/foo.sh")
+        );
+        assert_eq!(
+            "/scripts/foo.sh",
+            extract_command_path(base_path, "/scripts/foo.sh")
+        );
+        assert_eq!("foo", extract_command_path(base_path, "foo"));
+        assert_eq!("foo bar", extract_command_path(base_path, "foo bar"));
+    }
 }
