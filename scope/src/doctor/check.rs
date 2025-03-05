@@ -692,7 +692,7 @@ pub(crate) mod tests {
             .fix(
                 DoctorFixBuilder::default()
                     .command(Some(DoctorCommand::from(vec!["fix"])))
-                    .prompt(Some(DoctorGroupActionFixPrompt {
+                    .prompt(Some(DoctorFixPrompt {
                         text: "do you want to continue?".to_string(),
                         extra_context: Some("additional context here".to_string()),
                     }))

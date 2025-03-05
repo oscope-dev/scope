@@ -8,7 +8,7 @@ use minijinja::{context, Environment};
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
-use crate::shared::models::internal::{DoctorCommand, DoctorFix, DoctorGroupActionFixPrompt};
+use crate::shared::models::internal::{DoctorCommand, DoctorFix, DoctorFixPrompt};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
@@ -145,12 +145,10 @@ fn parse_action(
             .unwrap_or_else(|| "default".to_string()),
         fix: DoctorFix {
             command: fix_command,
-            prompt: spec_action.fix.and_then(|fix| fix.prompt).map(|p| {
-                DoctorGroupActionFixPrompt {
-                    text: p.text,
-                    extra_context: p.extra_context,
-                }
-            }),
+            prompt: spec_action
+                .fix
+                .and_then(|fix| fix.prompt)
+                .map(DoctorFixPrompt::from),
             help_text,
             help_url,
         },
