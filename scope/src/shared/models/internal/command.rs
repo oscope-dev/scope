@@ -1,13 +1,27 @@
+use anyhow::Result;
+use derive_builder::Builder;
 use std::path::Path;
 
-use derive_builder::Builder;
-
-use super::extract_command_path;
+use super::{extract_command_path, substitute_templates};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorCommand {
     pub commands: Vec<String>,
+}
+
+impl DoctorCommand {
+    pub fn from_commands(
+        containing_dir: &Path,
+        working_dir: &str,
+        commands: &Vec<String>,
+    ) -> Result<DoctorCommand> {
+        let mut templated_commands = Vec::new();
+        for command in commands {
+            templated_commands.push(substitute_templates(working_dir, command)?);
+        }
+        Ok(DoctorCommand::from((containing_dir, templated_commands)))
+    }
 }
 
 impl<T> From<(&Path, Vec<T>)> for DoctorCommand
@@ -73,5 +87,27 @@ mod tests {
             },
             actual
         )
+    }
+
+    #[test]
+    fn from_commands_succeeds() {
+        let containing_dir = Path::new("/foo/bar");
+        let working_dir = "/some/working_dir";
+        let commands = vec!["{{ working_dir }}/foo.sh", "./bar.sh"]
+            .iter()
+            .map(|cmd| cmd.to_string())
+            .collect::<Vec<String>>();
+
+        let actual = DoctorCommand::from_commands(containing_dir, working_dir, &commands)
+            .expect("Expected Ok");
+
+        let templated_commands = commands
+            .iter()
+            .map(|cmd| substitute_templates(&working_dir, &cmd).unwrap())
+            .collect::<Vec<String>>();
+
+        let expected = DoctorCommand::from((containing_dir, templated_commands));
+
+        assert_eq!(expected, actual)
     }
 }

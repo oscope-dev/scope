@@ -4,6 +4,8 @@ use crate::models::prelude::{
 use crate::models::InternalScopeModel;
 use crate::shared::prelude::*;
 use anyhow::anyhow;
+use anyhow::Result;
+use minijinja::{context, Environment};
 use path_clean::PathClean;
 use serde_yaml::Value;
 use std::collections::VecDeque;
@@ -91,6 +93,15 @@ pub(crate) fn extract_command_path(parent_dir: &Path, exec: &str) -> String {
         .join(" ")
 }
 
+pub(crate) fn substitute_templates(work_dir: &str, input_str: &str) -> Result<String> {
+    let mut env = Environment::new();
+    env.add_template("input_str", input_str)?;
+    let template = env.get_template("input_str")?;
+    let result = template.render(context! { working_dir => work_dir })?;
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +119,41 @@ mod tests {
         );
         assert_eq!("foo", extract_command_path(base_path, "foo"));
         assert_eq!("foo bar", extract_command_path(base_path, "foo bar"));
+    }
+
+    mod substitute_templates_spec {
+        use super::*;
+
+        #[test]
+        fn working_dir_is_subbed() {
+            let working_dir = "/some/path";
+            let command = "{{ working_dir }}/foo.sh";
+
+            let actual = substitute_templates(&working_dir, &command).unwrap();
+
+            assert_eq!("/some/path/foo.sh".to_string(), actual)
+        }
+
+        #[test]
+        fn text_without_templates_is_passed_through() {
+            let working_dir = "/some/path";
+            let command = "./foo.sh";
+
+            let actual = substitute_templates(&working_dir, &command).unwrap();
+
+            assert_eq!("./foo.sh".to_string(), actual)
+        }
+
+        #[test]
+        fn other_templates_are_erased() {
+            // I don't believe this is intentional behavior,
+            // but it is the current behavior.
+            let working_dir = "/some/path";
+            let command = "{{ not_a_thing }}/foo.sh";
+
+            let actual = substitute_templates(&working_dir, &command).unwrap();
+
+            assert_eq!("/foo.sh".to_string(), actual)
+        }
     }
 }
