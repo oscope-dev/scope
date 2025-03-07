@@ -5,6 +5,8 @@ use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::prelude::DoctorFixSpec;
+
 /// Definition of the known error
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -15,6 +17,9 @@ pub struct KnownErrorSpec {
 
     /// A Regex used to determine if the line is an error.
     pub pattern: String,
+
+    /// An optional fix the user will be prompted to run.
+    pub fix: Option<DoctorFixSpec>,
 }
 
 #[derive(Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, JsonSchema)]

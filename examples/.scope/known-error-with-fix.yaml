@@ -1,0 +1,26 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: known-error-with-fix
+  description: Check if the word kaboom is in the logs
+spec:
+  pattern: kaboom
+  help: The command had an error, try reading the logs around there to find out what happened.
+  fix:
+    commands:
+      - echo 'Running some thing that will fix the error we found.'
+    # Stuff below here is part of the ScopeDoctorFix model
+    # I'd like them to be the same, but maybe that's not best.
+    # For example, I'm unsure if an extra prompt is wise given we're already going to prompt
+    # for approval before running he fix.
+    #
+    # helpText: This text displays when the commands fail.
+    # helpUrl: https://example.com
+    # prompt:
+    #   text: |-
+    #     This may destroy some data.
+    #     Do you wish to continue?
+    #   # this is an optional field
+    #   extraContext: >-
+    #     Some additional context about why this needs approval
+    #     and what it's actually doing
