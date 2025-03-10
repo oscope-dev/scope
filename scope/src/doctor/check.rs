@@ -316,10 +316,10 @@ impl DefaultDoctorActionRun {
         match &self.action.fix.command {
             None => Ok((NO_COMMANDS_EXIT_CODE, Vec::new())),
             Some(action_command) => match &self.action.fix.prompt {
-                None => Ok(self.run_commands(&action_command).await?),
+                None => Ok(self.run_commands(action_command).await?),
                 Some(fix_prompt) => {
                     if prompt(&fix_prompt.text, &fix_prompt.extra_context) {
-                        Ok(self.run_commands(&action_command).await?)
+                        Ok(self.run_commands(action_command).await?)
                     } else {
                         Ok((USER_DENIED_EXIT_CODE, Vec::new()))
                     }

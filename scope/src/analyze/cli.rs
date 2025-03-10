@@ -155,39 +155,75 @@ async fn prompt_and_run_fix(
     exec_path: String,
     fix: &DoctorFix,
 ) -> Result<AnalyzeStatus> {
-    let prompt = inquire::Confirm::new("Would you like to run it?").with_default(false);
+    let fix_prompt = &fix.prompt.as_ref();
+    let prompt_text = fix_prompt
+        .map(|p| p.text.clone())
+        .unwrap_or("Would you like to run it?".to_string());
+    let extra_context = &fix_prompt.map(|p| p.extra_context.clone()).flatten();
+
+    let prompt = {
+        let base_prompt = inquire::Confirm::new(&prompt_text).with_default(false);
+        match extra_context {
+            Some(help_text) => base_prompt.with_help_message(help_text),
+            None => base_prompt,
+        }
+    };
 
     if prompt.prompt().unwrap() {
-        let output = run_fix(working_dir, &exec_path, fix).await?;
+        let outputs = run_fix(working_dir, &exec_path, fix).await?;
         // failure indicates an issue with us actually executing it,
         // not the success/failure of the command itself.
-        let exit_code = output
-            .exit_code
-            .expect("Expected command executor to give us an exit code.");
+        let max_exit_code = outputs
+            .iter()
+            .map(|c| c.exit_code.unwrap_or(-1))
+            .max()
+            .unwrap();
 
-        match exit_code {
+        match max_exit_code {
             0 => Ok(AnalyzeStatus::KnownErrorFoundFixSucceeded),
-            _ => Ok(AnalyzeStatus::KnownErrorFoundFixFailed),
+            _ => {
+                if let Some(help_text) = &fix.help_text {
+                    error!(target: "user", "Fix Help: {}", help_text);
+                }
+                if let Some(help_url) = &fix.help_url {
+                    error!(target: "user", "For more help, please visit {}", help_url);
+                }
+
+                Ok(AnalyzeStatus::KnownErrorFoundFixFailed)
+            }
         }
     } else {
         Ok(AnalyzeStatus::KnownErrorFoundUserDenied)
     }
 }
 
-async fn run_fix(working_dir: &PathBuf, exec_path: &str, fix: &DoctorFix) -> Result<OutputCapture> {
+async fn run_fix(
+    working_dir: &PathBuf,
+    exec_path: &str,
+    fix: &DoctorFix,
+) -> Result<Vec<OutputCapture>> {
     let exec_runner = DefaultExecutionProvider::default();
 
     let commands = fix.command.as_ref().expect("Expected a command");
 
-    let capture_opts = CaptureOpts {
-        working_dir,
-        args: &commands.expand(),
-        output_dest: OutputDestination::StandardOutWithPrefix("fixing".to_string()),
-        path: exec_path,
-        env_vars: generate_env_vars(),
-    };
+    let mut outputs = Vec::<OutputCapture>::new();
+    for cmd in commands.expand() {
+        let capture_opts = CaptureOpts {
+            working_dir,
+            args: &[cmd],
+            output_dest: OutputDestination::StandardOutWithPrefix("fixing".to_string()),
+            path: exec_path,
+            env_vars: generate_env_vars(),
+        };
+        let output = exec_runner.run_command(capture_opts).await?;
+        let exit_code = output.exit_code.expect("Expected an exit code");
+        outputs.push(output);
+        if exit_code != 0 {
+            break;
+        }
+    }
 
-    Ok(exec_runner.run_command(capture_opts).await?)
+    Ok(outputs)
 }
 
 async fn read_from_command(
@@ -225,12 +261,12 @@ enum AnalyzeStatus {
 }
 
 impl AnalyzeStatus {
-    fn to_exit_code(&self) -> i32 {
+    fn to_exit_code(self) -> i32 {
         match self {
             // we need this to return a success code
             AnalyzeStatus::KnownErrorFoundFixSucceeded => 0,
             // all others can return their discriminant value
-            status => *status as i32,
+            status => status as i32,
         }
     }
 }
