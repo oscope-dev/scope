@@ -22,6 +22,24 @@ impl DoctorCommand {
         }
         Ok(DoctorCommand::from((containing_dir, templated_commands)))
     }
+
+    /// Performs shell expansion
+    pub fn expand(&self) -> Vec<String> {
+        self.commands
+            .iter()
+            .map(|cmd| Self::expand_command(cmd))
+            .collect()
+    }
+
+    /// splits a commands and performs shell expansion its parts
+    fn expand_command(command: &str) -> String {
+        command
+            .split(' ')
+            //consider doing a full expansion that includes env vars?
+            .map(|word| shellexpand::tilde(word))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
 }
 
 impl<T> From<(&Path, Vec<T>)> for DoctorCommand

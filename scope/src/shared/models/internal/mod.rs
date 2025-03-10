@@ -8,7 +8,7 @@ use anyhow::Result;
 use minijinja::{context, Environment};
 use path_clean::PathClean;
 use serde_yaml::Value;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
 
 mod command;
@@ -21,6 +21,7 @@ use self::known_error::KnownError;
 use self::upload_location::ReportUploadLocation;
 
 pub mod prelude {
+    pub use super::generate_env_vars;
     pub use super::ParsedConfig;
     pub use super::{command::*, doctor_group::*, fix::*, known_error::*, upload_location::*};
 }
@@ -100,6 +101,21 @@ pub(crate) fn substitute_templates(work_dir: &str, input_str: &str) -> Result<St
     let result = template.render(context! { working_dir => work_dir })?;
 
     Ok(result)
+}
+
+pub fn generate_env_vars() -> BTreeMap<String, String> {
+    let mut env_vars = BTreeMap::new();
+    env_vars.insert(
+        "SCOPE_BIN_DIR".to_string(),
+        std::env::current_exe()
+            .unwrap()
+            .parent()
+            .expect("executable should be in a directory")
+            .to_str()
+            .expect("bin directory should be a valid string")
+            .to_string(),
+    );
+    env_vars
 }
 
 #[cfg(test)]
