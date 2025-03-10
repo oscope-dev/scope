@@ -2,10 +2,9 @@ use super::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
-use std::collections::BTreeMap;
 
 use crate::models::HelpMetadata;
-use crate::prelude::{ActionReport, ActionReportBuilder, ActionTaskReport};
+use crate::prelude::{generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport};
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorCommand, DoctorGroup, DoctorGroupAction, DoctorGroupCachePath,
     ExecutionProvider, OutputDestination,
@@ -317,10 +316,10 @@ impl DefaultDoctorActionRun {
         match &self.action.fix.command {
             None => Ok((NO_COMMANDS_EXIT_CODE, Vec::new())),
             Some(action_command) => match &self.action.fix.prompt {
-                None => Ok(self.run_commands(&action_command.commands).await?),
+                None => Ok(self.run_commands(action_command).await?),
                 Some(fix_prompt) => {
                     if prompt(&fix_prompt.text, &fix_prompt.extra_context) {
-                        Ok(self.run_commands(&action_command.commands).await?)
+                        Ok(self.run_commands(action_command).await?)
                     } else {
                         Ok((USER_DENIED_EXIT_CODE, Vec::new()))
                     }
@@ -331,13 +330,13 @@ impl DefaultDoctorActionRun {
 
     async fn run_commands(
         &self,
-        commands: &Vec<String>,
+        commands: &DoctorCommand,
     ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
         let mut action_reports = Vec::new();
         let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
 
-        for command in commands {
-            let report = self.run_single_fix(command).await?;
+        for command in commands.expand() {
+            let report = self.run_single_fix(&command).await?;
             highest_exit_code = max(
                 highest_exit_code,
                 report.exit_code.unwrap_or(NO_COMMANDS_EXIT_CODE),
@@ -352,7 +351,7 @@ impl DefaultDoctorActionRun {
     }
 
     async fn run_single_fix(&self, command: &str) -> Result<ActionTaskReport, RuntimeError> {
-        let args = vec![Self::expand_command(command)];
+        let args = vec![command.to_string()];
         let capture = self
             .exec_runner
             .run_command(CaptureOpts {
@@ -364,28 +363,13 @@ impl DefaultDoctorActionRun {
                     self.action.name
                 )),
                 path: &self.model.metadata.exec_path(),
-                env_vars: self.generate_env_vars(),
+                env_vars: generate_env_vars(),
             })
             .await?;
 
         info!("fix ran {} and exited {:?}", command, capture.exit_code);
 
         Ok(ActionTaskReport::from(&capture))
-    }
-
-    fn generate_env_vars(&self) -> BTreeMap<String, String> {
-        let mut env_vars = BTreeMap::new();
-        env_vars.insert(
-            "SCOPE_BIN_DIR".to_string(),
-            std::env::current_exe()
-                .unwrap()
-                .parent()
-                .expect("executable should be in a directory")
-                .to_str()
-                .expect("bin directory should be a valid string")
-                .to_string(),
-        );
-        env_vars
     }
 
     async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
@@ -466,8 +450,8 @@ impl DefaultDoctorActionRun {
         let mut action_reports = Vec::new();
         let mut result: Option<CacheStatus> = None;
 
-        for command in &action_command.commands {
-            let args = vec![Self::expand_command(command)];
+        for command in &action_command.expand() {
+            let args = vec![command.clone()];
             let path = format!(
                 "{}:{}",
                 self.model.metadata().containing_dir(),
@@ -480,7 +464,7 @@ impl DefaultDoctorActionRun {
                     args: &args,
                     output_dest: OutputDestination::Logging,
                     path: &path,
-                    env_vars: self.generate_env_vars(),
+                    env_vars: generate_env_vars(),
                 })
                 .await?;
 
@@ -513,16 +497,6 @@ impl DefaultDoctorActionRun {
             status,
             output: Some(action_reports),
         })
-    }
-
-    /// splits a commands and performs shell expansion its parts
-    fn expand_command(command: &str) -> String {
-        command
-            .split(' ')
-            //consider doing a full expansion that includes env vars?
-            .map(|word| shellexpand::tilde(word))
-            .collect::<Vec<_>>()
-            .join(" ")
     }
 }
 
@@ -1146,7 +1120,7 @@ pub(crate) mod tests {
         assert!(res.is_ok());
     }
 
-    mod test_run_single_fix {
+    mod test_run_commands {
         use super::*;
 
         #[tokio::test]
@@ -1169,11 +1143,18 @@ pub(crate) mod tests {
                 MockGlobWalker::new(),
             );
 
-            let result = run.run_single_fix("touch ~/.somefile").await.unwrap();
+            let (_highest_status_code, reports) = run
+                .run_commands(&DoctorCommand {
+                    commands: vec!["touch ~/.somefile".to_string()],
+                })
+                .await
+                .unwrap();
+            let report = reports[0].clone();
+            let actual_command = report.command;
 
             assert_eq!(
                 format!("{} {}", "touch", home_dir().join(".somefile").display()),
-                result.command
+                actual_command
             );
         }
     }

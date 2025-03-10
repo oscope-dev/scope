@@ -1,0 +1,23 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: known-error-with-fix
+  description: Check if the word kaboom is in the logs
+spec:
+  pattern: kaboom
+  help: The command had an error, try reading the logs around there to find out what happened.
+  fix:
+    commands:
+      - echo 'Running some thing that will fix the error we found.'
+      # uncomment to test helpText and helpUrl
+      # - 'false'
+    helpText: This text displays when the fix fails.
+    helpUrl: https://example.com
+    prompt:
+      text: |-
+        This may destroy some data.
+        Do you wish to continue?
+      # this is an optional field
+      extraContext: >-
+        Some additional context about why this needs approval
+        and what it's actually doing

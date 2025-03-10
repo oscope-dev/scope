@@ -250,6 +250,18 @@
         "pattern"
       ],
       "properties": {
+        "fix": {
+          "description": "An optional fix the user will be prompted to run.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DoctorFixSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "nullable": true
+        },
         "help": {
           "description": "Text that the user can use to fix the issue",
           "type": "string"
