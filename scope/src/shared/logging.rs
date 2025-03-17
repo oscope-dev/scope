@@ -14,6 +14,7 @@ use opentelemetry_sdk::{
     trace::{RandomIdGenerator, Sampler, TracerProvider},
     Resource,
 };
+use url::Url;
 
 use std::env;
 use std::fs::File;
@@ -222,11 +223,21 @@ impl LoggingOpts {
                 .with_timeout(*timeout)
                 .with_metadata(metadata_map.clone())
                 .build(),
-            OtelProtocol::Http => SpanExporter::builder()
-                .with_http()
-                .with_endpoint(endpoint)
-                .with_timeout(*timeout)
-                .build(),
+            OtelProtocol::Http => {
+                // with_endpoint() is _roughly_ equivalent to using the OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env var
+                // So we have to append the `v1/traces` to the base URL when using http
+                // https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/#otel_exporter_otlp_traces_endpoint
+                // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md#endpoint-urls-for-otlphttp
+                let url = Url::parse(endpoint)
+                    .expect("Expected a valid URI")
+                    .join("v1/traces")
+                    .unwrap();
+                SpanExporter::builder()
+                    .with_http()
+                    .with_endpoint(url)
+                    .with_timeout(*timeout)
+                    .build()
+            }
         };
 
         let tracer = TracerProvider::builder()
