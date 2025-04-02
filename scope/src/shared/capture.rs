@@ -76,10 +76,16 @@ impl<R: io::AsyncRead + Unpin> StreamCapture<R> {
                     _ => info!("{}", line),
                 },
                 OutputDestination::StandardOut => {
-                    writeln!(self.writer.write().await, "{}", line).ok();
+                    writeln!(self.writer.write().await, "{}\r", line).ok();
                 }
                 OutputDestination::StandardOutWithPrefix(prefix) => {
-                    writeln!(self.writer.write().await, "{}:  {}", prefix.dimmed(), line).ok();
+                    writeln!(
+                        self.writer.write().await,
+                        "{}:  {}\r",
+                        prefix.dimmed(),
+                        line
+                    )
+                    .ok();
                 }
                 OutputDestination::Null => {}
             };
