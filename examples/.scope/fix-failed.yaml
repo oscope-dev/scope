@@ -1,0 +1,16 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: fix-failed
+  description: |
+    This will always fail the fix step.
+    Echos some text before failing so we can verify it shows up in the telemetry.
+spec:
+  include: when-required
+  actions:
+    - name: will-fail
+      check: {} #always run fix
+      fix:
+        commands:
+          - echo "applesauce"
+          - "false"
