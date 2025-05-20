@@ -1,5 +1,7 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
-use crate::prelude::{progress_bar_without_pos, ExecutionProvider, GroupReport};
+use crate::prelude::{
+    progress_bar_without_pos, ActionReport, ActionTaskReport, ExecutionProvider, GroupReport,
+};
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
 use anyhow::Result;
@@ -364,12 +366,7 @@ async fn print_pretty_result(
     action_name: &str,
     result: &ActionRunResult,
 ) -> Result<()> {
-    let action_report = &result.action_report;
-    let task_reports = if !action_report.check.is_empty() {
-        action_report.check.clone()
-    } else {
-        action_report.validate.clone()
-    };
+    let task_reports = action_task_reports_for_display(&result.action_report);
     for task in task_reports {
         if let Some(text) = task.output {
             let line_prefix = format!("{}/{}", group_name, action_name);
@@ -381,6 +378,17 @@ async fn print_pretty_result(
     }
 
     Ok(())
+}
+
+/// Returns the action task reports for display based on the presumed action report status.
+fn action_task_reports_for_display(action_report: &ActionReport) -> Vec<ActionTaskReport> {
+    if !action_report.check.is_empty() {
+        action_report.check.clone()
+    } else if !action_report.fix.is_empty() {
+        action_report.fix.clone()
+    } else {
+        action_report.validate.clone()
+    }
 }
 
 pub fn compute_group_order(
@@ -435,16 +443,19 @@ pub fn compute_group_order(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use crate::doctor::check::tests::build_run_fail_fix_succeed_action;
     use crate::doctor::check::{
         ActionRunResult, ActionRunStatus, DoctorActionRun, MockDoctorActionRun,
     };
     use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
-    use crate::prelude::MockExecutionProvider;
+    use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider};
     use anyhow::Result;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
+    use std::vec;
 
     #[tokio::test]
     async fn test_compute_group_order_with_no_dep_will_have_no_tasks() -> Result<()> {
@@ -846,5 +857,65 @@ mod tests {
         );
         assert_eq!(BTreeSet::new(), exit_code.skipped_group);
         Ok(())
+    }
+
+    #[test]
+    fn test_action_task_reports_for_display_when_check_nonempty() {
+        let action_report = ActionReport {
+            action_name: "test".to_string(),
+            check: vec![ActionTaskReport {
+                output: Some("check output".to_string()),
+                ..Default::default()
+            }],
+            fix: vec![ActionTaskReport {
+                output: Some("fix output".to_string()),
+                ..Default::default()
+            }],
+            validate: vec![ActionTaskReport {
+                output: Some("validate output".to_string()),
+                ..Default::default()
+            }],
+        };
+
+        let task_reports = action_task_reports_for_display(&action_report);
+        let actual = task_reports.first().unwrap();
+        assert_eq!(actual.output, Some("check output".to_string()));
+    }
+
+    #[test]
+    fn test_action_task_reports_for_display_when_fix_nonempty() {
+        let action_report = ActionReport {
+            action_name: "test".to_string(),
+            check: vec![],
+            fix: vec![ActionTaskReport {
+                output: Some("fix output".to_string()),
+                ..Default::default()
+            }],
+            validate: vec![ActionTaskReport {
+                output: Some("validate output".to_string()),
+                ..Default::default()
+            }],
+        };
+
+        let task_reports = action_task_reports_for_display(&action_report);
+        let actual = task_reports.first().unwrap();
+        assert_eq!(actual.output, Some("fix output".to_string()));
+    }
+
+    #[test]
+    fn test_action_task_reports_for_display_when_validate_nonempty() {
+        let action_report = ActionReport {
+            action_name: "test".to_string(),
+            check: vec![],
+            fix: vec![],
+            validate: vec![ActionTaskReport {
+                output: Some("validate output".to_string()),
+                ..Default::default()
+            }],
+        };
+
+        let task_reports = action_task_reports_for_display(&action_report);
+        let actual = task_reports.first().unwrap();
+        assert_eq!(actual.output, Some("validate output".to_string()));
     }
 }
