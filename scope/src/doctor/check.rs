@@ -2,6 +2,7 @@ use super::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use std::cmp;
 use std::cmp::max;
+use tracing::debug;
 
 use crate::models::HelpMetadata;
 use crate::prelude::{generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport};
@@ -373,34 +374,35 @@ impl DefaultDoctorActionRun {
     }
 
     async fn evaluate_checks(&self) -> Result<CacheResults, RuntimeError> {
-        let mut path_check = None;
-        let mut command_check = None;
-        if let Some(cache_path) = &self.action.check.files {
-            let result = self.evaluate_path_check(cache_path).await?;
-            if !result.is_success() {
-                return Ok(CacheResults {
-                    status: result,
-                    output: None,
-                });
-            }
-
-            path_check = Some(result);
-        }
-
-        if let Some(results) = self.evaluate_command_checks().await? {
-            if !results.status.is_success() {
-                return Ok(results);
-            }
-            command_check = Some(results);
-        }
+        let (path_check, command_check) =
+            match (&self.action.check.files, &self.action.check.command) {
+                (None, None) => (None, None),
+                (Some(cache_path), None) => {
+                    let result = self.evaluate_path_check(cache_path).await?;
+                    (Some(result), None)
+                }
+                (None, Some(check_command)) => {
+                    let result = self.run_check_command(check_command).await?;
+                    (None, Some(result))
+                }
+                (Some(cache_path), Some(check_command)) => {
+                    let path_result = self.evaluate_path_check(cache_path).await?;
+                    if !path_result.is_success() {
+                        let result = self.run_check_command(check_command).await?;
+                        (Some(path_result), Some(result))
+                    } else {
+                        (Some(path_result), None)
+                    }
+                }
+            };
 
         let status = match (&path_check, &command_check) {
             (None, None) => CacheStatus::CacheNotDefined,
             (Some(p), None) if p.is_success() => CacheStatus::FixNotRequired,
             (None, Some(c)) if c.status.is_success() => CacheStatus::FixNotRequired,
-            (Some(p), Some(c)) if p.is_success() && c.status.is_success() => {
-                CacheStatus::FixNotRequired
-            }
+            // If we have both path and command, that means the path check failed
+            // but we only want to run the fix if the command check also failed.
+            (Some(_p), Some(c)) if c.status.is_success() => CacheStatus::FixNotRequired,
             _ => CacheStatus::FixRequired,
         };
 
@@ -584,6 +586,7 @@ impl GlobWalker for DefaultGlobWalker {
 
             for path in files {
                 let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
+                debug!(target: "user", "CacheStatus for file {}: {:?}", path.display(), file_result);
                 let check_result = file_result == FileCacheStatus::FileMatches;
                 if !check_result {
                     return Ok(false);
@@ -960,6 +963,120 @@ pub(crate) mod tests {
         assert_eq!(ActionRunStatus::CheckFailedFixFailed, result.status);
 
         assert!(result.action_report.fix.len() == 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_cache_valid_check_command_does_not_run() -> Result<()> {
+        let check_command = "some_command";
+        let action = DoctorGroupActionBuilder::default()
+            .description("a test action")
+            .name("action")
+            .required(true)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .command(Some(DoctorCommand {
+                        commands: vec![check_command.to_string()],
+                    }))
+                    .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(
+                DoctorFixBuilder::default()
+                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap();
+
+        let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
+
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(true));
+        glob_walker.expect_update_cache().never();
+
+        exec_runner
+            .expect_run_command()
+            .withf(move |params| params.args[0].eq(check_command))
+            .never()
+            .returning(move |capture_opts| {
+                Ok(OutputCaptureBuilder::default()
+                    .command(capture_opts.args[0].to_string())
+                    .exit_code(Some(0))
+                    .build()
+                    .unwrap())
+            });
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action(panic_if_user_is_prompted).await?;
+        assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
+
+        assert!(result.action_report.check.is_empty());
+        assert!(result.action_report.fix.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_cache_invalid_check_command_valid() -> Result<()> {
+        let check_command = "some_command";
+        let action = DoctorGroupActionBuilder::default()
+            .description("a test action")
+            .name("action")
+            .required(true)
+            .check(
+                DoctorGroupActionCheckBuilder::default()
+                    .command(Some(DoctorCommand {
+                        commands: vec![check_command.to_string()],
+                    }))
+                    .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
+                    .build()
+                    .unwrap(),
+            )
+            .fix(
+                DoctorFixBuilder::default()
+                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .build()
+                    .unwrap(),
+            )
+            .build()
+            .unwrap();
+
+        let mut exec_runner = MockExecutionProvider::new();
+        let mut glob_walker = MockGlobWalker::new();
+
+        glob_walker
+            .expect_have_globs_changed()
+            .times(1)
+            .returning(|_, _, _, _| Ok(false));
+        glob_walker.expect_update_cache().never();
+
+        exec_runner
+            .expect_run_command()
+            .withf(move |params| params.args[0].eq(check_command))
+            .once()
+            .returning(move |capture_opts| {
+                Ok(OutputCaptureBuilder::default()
+                    .command(capture_opts.args[0].to_string())
+                    .exit_code(Some(0))
+                    .build()
+                    .unwrap())
+            });
+
+        let run = setup_test(vec![action], exec_runner, glob_walker);
+
+        let result = run.run_action(panic_if_user_is_prompted).await?;
+        assert_eq!(ActionRunStatus::CheckSucceeded, result.status);
+
+        assert!(result.action_report.check.len() == 1);
+        assert!(result.action_report.fix.is_empty());
 
         Ok(())
     }

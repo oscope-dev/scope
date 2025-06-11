@@ -1,0 +1,22 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: caching-on-files
+  description: Check if status.txt contains 'ready', fix if not
+spec:
+  include: when-required
+  actions:
+    - name: cache-example
+      description: |
+        Check if status.txt contains 'ready', fix if not.
+      check:
+        paths:
+          - status.txt
+        commands:
+          # this only runs if status.txt changes or doesn't exist
+          # you can prove that by changing 'ready' to anything else
+          # once this has been run once
+          - grep -q 'ready' status.txt
+      fix:
+        commands:
+          - bash -c 'echo ready > status.txt'
