@@ -8,7 +8,8 @@ use std::path::Path;
 mod capture;
 mod config_load;
 mod logging;
-// mod models_bck;
+
+mod analyze;
 mod models;
 mod redact;
 mod report;
@@ -17,6 +18,7 @@ pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
 pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
 
 pub mod prelude {
+    pub use super::analyze::{process_lines, AnalyzeStatus};
     pub use super::capture::{
         CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider,
         MockExecutionProvider, OutputCapture, OutputCaptureBuilder, OutputDestination,
