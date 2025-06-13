@@ -1,0 +1,20 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: doctor-group-auto-fix
+  description: Works along with the known-error-auto-fix to demonstrate auto-fixing a known error
+spec:
+  include: when-required
+  actions:
+    - name: auto-fix
+      check:
+        commands:
+          - grep -q "ready" status.txt
+      fix:
+        commands:
+          - echo "message to trigger the known-error"
+          # we intentionally use a fix that won't fix it to demonstrate the known error fix
+          # The grep || is to ensure we don't break it again after the know-error fixes it
+          - bash -c 'grep -q "ready" status.txt || echo "foobar" > status.txt'
+          # this ensures the fix fails the first time and passes the second time
+          - grep -q "ready" status.txt

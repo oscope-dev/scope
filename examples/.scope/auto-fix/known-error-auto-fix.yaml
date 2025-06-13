@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: known-error-auto-fix
+  description: Works with the doctor-group-auto-fix to trigger a known error and auto-fix it
+spec:
+  pattern: trigger the known-error
+  help: The command had an error, try reading the logs around there to find out what happened.
+  fix:
+    prompt:
+      text: |-
+        Fix the status.txt file?
+    commands:
+      - bash -c 'echo "ready" > status.txt'
