@@ -1,26 +1,29 @@
 use crate::models::HelpMetadata;
 use crate::prelude::{
     generate_env_vars, CaptureOpts, DefaultExecutionProvider, DoctorFix, ExecutionProvider,
-    OutputCapture, OutputDestination,
+    KnownError, OutputCapture, OutputDestination,
 };
-use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tracing::{debug, error, info, warn};
 
-pub mod status;
-pub use crate::shared::analyze::status::AnalyzeStatus;
+mod status;
+pub use crate::shared::analyze::status::{report_result, AnalyzeStatus};
 
-pub async fn process_lines<T>(found_config: &FoundConfig, input: T) -> Result<AnalyzeStatus>
+pub async fn process_lines<T>(
+    known_errors: &BTreeMap<String, KnownError>,
+    working_dir: &PathBuf,
+    input: T,
+) -> Result<AnalyzeStatus>
 where
     T: AsyncRead,
     T: AsyncBufReadExt,
     T: Unpin,
 {
     let mut result = AnalyzeStatus::NoKnownErrorsFound;
-    let mut known_errors: BTreeMap<_, _> = found_config.known_error.clone();
+    let mut known_errors = known_errors.clone();
     let mut line_number = 0;
 
     let mut lines = input.lines();
@@ -39,7 +42,7 @@ where
 
                         tracing_indicatif::suspend_tracing_indicatif(|| {
                             let exec_path = ke.metadata.exec_path();
-                            prompt_and_run_fix(&found_config.working_dir, exec_path, fix)
+                            prompt_and_run_fix(working_dir, exec_path, fix)
                         })
                         .await?
                     }

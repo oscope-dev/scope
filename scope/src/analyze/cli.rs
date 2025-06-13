@@ -2,6 +2,7 @@ use super::error::AnalyzeError;
 use crate::prelude::{
     CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider, OutputDestination,
 };
+use crate::shared::analyze;
 use crate::shared::prelude::FoundConfig;
 use anyhow::Result;
 use clap::{Args, Subcommand};
@@ -10,9 +11,6 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::{BufReader, Stdin};
-use tracing::{error, info, warn};
-
-use crate::prelude::{process_lines, AnalyzeStatus};
 
 #[derive(Debug, Args)]
 pub struct AnalyzeArgs {
@@ -53,11 +51,25 @@ pub async fn analyze_root(found_config: &FoundConfig, args: &AnalyzeArgs) -> Res
 
 async fn analyze_logs(found_config: &FoundConfig, args: &AnalyzeLogsArgs) -> Result<i32> {
     let result = match args.location.as_str() {
-        "-" => process_lines(found_config, read_from_stdin().await?).await?,
-        file_path => process_lines(found_config, read_from_file(file_path).await?).await?,
+        "-" => {
+            analyze::process_lines(
+                &found_config.known_error,
+                &found_config.working_dir,
+                read_from_stdin().await?,
+            )
+            .await?
+        }
+        file_path => {
+            analyze::process_lines(
+                &found_config.known_error,
+                &found_config.working_dir,
+                read_from_file(file_path).await?,
+            )
+            .await?
+        }
     };
 
-    report_result(&result);
+    analyze::report_result(&result);
     Ok(result.to_exit_code())
 }
 
@@ -75,26 +87,15 @@ async fn analyze_command(found_config: &FoundConfig, args: &AnalyzeCommandArgs) 
         output_dest: OutputDestination::StandardOutWithPrefix("analyzing".to_string()),
     };
 
-    let result = process_lines(
-        found_config,
+    let result = analyze::process_lines(
+        &found_config.known_error,
+        &found_config.working_dir,
         read_from_command(&exec_runner, capture_opts).await?,
     )
     .await?;
 
-    report_result(&result);
+    analyze::report_result(&result);
     Ok(result.to_exit_code())
-}
-
-fn report_result(status: &AnalyzeStatus) {
-    match status {
-        AnalyzeStatus::NoKnownErrorsFound => info!(target: "always", "No known errors found"),
-        AnalyzeStatus::KnownErrorFoundNoFixFound => {
-            info!(target: "always", "No automatic fix available")
-        }
-        AnalyzeStatus::KnownErrorFoundUserDenied => warn!(target: "always", "User denied fix"),
-        AnalyzeStatus::KnownErrorFoundFixFailed => error!(target: "always", "Fix failed"),
-        AnalyzeStatus::KnownErrorFoundFixSucceeded => info!(target: "always", "Fix succeeded"),
-    }
 }
 
 async fn read_from_command(
@@ -120,15 +121,4 @@ async fn read_from_file(file_name: &str) -> Result<BufReader<File>, AnalyzeError
         });
     }
     Ok(BufReader::new(File::open(file_path).await?))
-}
-
-impl AnalyzeStatus {
-    fn to_exit_code(self) -> i32 {
-        match self {
-            // we need this to return a success code
-            AnalyzeStatus::KnownErrorFoundFixSucceeded => 0,
-            // all others can return their discriminant value
-            status => status as i32,
-        }
-    }
 }

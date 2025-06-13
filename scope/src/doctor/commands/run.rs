@@ -165,6 +165,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
                 run_fix: args.fix.unwrap_or(true),
                 exec_runner: exec_runner.clone(),
                 glob_walker: glob_walker.clone(),
+                known_errors: found_config.known_error.clone(),
             };
 
             action_runs.push(run);

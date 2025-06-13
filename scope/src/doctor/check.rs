@@ -1,11 +1,17 @@
 use super::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
-use std::cmp;
 use std::cmp::max;
+use std::collections::BTreeMap;
+use std::io::Cursor;
+use std::{cmp, vec};
+use tokio::io::BufReader;
 use tracing::debug;
 
 use crate::models::HelpMetadata;
-use crate::prelude::{generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport};
+use crate::prelude::{
+    generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport, KnownError,
+};
+use crate::shared::analyze::{self, AnalyzeStatus};
 use crate::shared::prelude::{
     CaptureError, CaptureOpts, DoctorCommand, DoctorGroup, DoctorGroupAction, DoctorGroupCachePath,
     ExecutionProvider, OutputDestination,
@@ -156,8 +162,10 @@ pub struct DefaultDoctorActionRun {
     pub exec_runner: Arc<dyn ExecutionProvider>,
     #[educe(Debug(ignore))]
     pub glob_walker: Arc<dyn GlobWalker>,
+    pub known_errors: BTreeMap<String, KnownError>,
 }
 
+const SUCCESS_EXIT_CODE: i32 = 0;
 const NO_COMMANDS_EXIT_CODE: i32 = -1;
 const USER_DENIED_EXIT_CODE: i32 = -2;
 //TODO: 100 is used a few times and needs a name but I don't understand why 100 well enough to name it
@@ -191,7 +199,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             ));
         }
 
-        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+        let (fix_result, fix_output) = self.run_fixes_with_self_healing(prompt).await?;
 
         match fix_result {
             i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => {
@@ -212,7 +220,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
                     None,
                 ));
             }
-            0 => {}
+            SUCCESS_EXIT_CODE => {}
             1...100 => {
                 return Ok(ActionRunResult::new(
                     &self.name(),
@@ -478,7 +486,7 @@ impl DefaultDoctorActionRun {
             );
 
             let command_result = match output.exit_code {
-                Some(0) => CacheStatus::FixNotRequired,
+                Some(SUCCESS_EXIT_CODE) => CacheStatus::FixNotRequired,
                 Some(100..=i32::MAX) => CacheStatus::StopExecution,
                 _ => CacheStatus::FixRequired,
             };
@@ -499,6 +507,43 @@ impl DefaultDoctorActionRun {
             status,
             output: Some(action_reports),
         })
+    }
+
+    /// Run the action fix and if it fails, analyze the output for known errors.
+    /// If a known error is found, it's help text will be displayed to the user
+    /// and if the known error has a fix, the user will be prompted to run it.
+    /// If the known error fix succeeds, the action will be re-run.
+    async fn run_fixes_with_self_healing(
+        &self,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
+        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+        if fix_result == SUCCESS_EXIT_CODE {
+            return Ok((fix_result, fix_output));
+        }
+
+        let analyze_status = self.analyze_known_errors(&fix_output).await?;
+        analyze::report_result(&analyze_status);
+
+        match analyze_status {
+            AnalyzeStatus::KnownErrorFoundFixSucceeded => Ok(self.run_fixes(prompt).await?),
+            _ => Ok((fix_result, fix_output)),
+        }
+    }
+
+    async fn analyze_known_errors(
+        &self,
+        fix_output: &Vec<ActionTaskReport>,
+    ) -> Result<AnalyzeStatus> {
+        let lines = fix_output
+            .iter()
+            .filter_map(|r| r.output.as_ref())
+            .map(|output| output.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"); //it feels really dumb to allocate a big string here but I don't know a better way to create a buffer from a Vec<String>
+        let buffer = BufReader::new(Cursor::new(lines));
+
+        analyze::process_lines(&self.known_errors, &self.working_dir, buffer).await
     }
 }
 
@@ -619,6 +664,7 @@ impl GlobWalker for DefaultGlobWalker {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::*;
     use crate::doctor::check::{
         ActionRunStatus, DefaultDoctorActionRun, DefaultGlobWalker, DoctorActionRun, GlobWalker,
         MockFileSystem, MockGlobWalker, RuntimeError,
@@ -741,6 +787,7 @@ pub(crate) mod tests {
             run_fix: true,
             exec_runner: Arc::new(exec_runner),
             glob_walker: Arc::new(glob_walker),
+            known_errors: BTreeMap::new(),
         }
     }
 
