@@ -324,7 +324,6 @@ impl DefaultDoctorActionRun {
     ) -> Result<ActionRunResult> {
         let result = match self.evaluate_command_checks().await? {
             Some(validate_result) => {
-                let validate_output = validate_result.output;
                 match validate_result.status {
                     // verification was successful, so we're done
                     CacheStatus::FixNotRequired => ActionRunResult::new(
@@ -332,11 +331,11 @@ impl DefaultDoctorActionRun {
                         ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
                         check_output,
                         Some(fix_output),
-                        validate_output,
+                        validate_result.output,
                     ),
                     _ => {
                         // verification failed
-                        match &validate_output {
+                        match &validate_result.output {
                             None => {
                                 // If the validation output is None, we can't analyze it
                                 ActionRunResult::new(
@@ -347,17 +346,16 @@ impl DefaultDoctorActionRun {
                                     None,
                                 )
                             }
-                            Some(_) => {
+                            Some(validate_output) => {
                                 // We have validation output, so we can analyze it
                                 // to see if we can fix the known error
-                                let analyze_status = self
-                                    .analyze_known_errors(&validate_output.as_ref().unwrap())
-                                    .await?;
+                                let analyze_status =
+                                    self.analyze_known_errors(validate_output).await?;
                                 analyze::report_result(&analyze_status);
 
                                 match analyze_status {
                                     AnalyzeStatus::KnownErrorFoundFixSucceeded => {
-                                        // If the known error fix succeeded, we can re-run the action fix
+                                        // The known-error fix succeeded, so we can re-run the action fix
                                         // It could fail for a different reason now, so we allow self-healing
                                         let (fix_result, fix_output) =
                                             self.run_fixes_with_self_healing(prompt).await?;
@@ -376,7 +374,7 @@ impl DefaultDoctorActionRun {
                                                 // Now we need to re-evaluate the validation
                                                 match self.evaluate_command_checks().await? {
                                                     Some(verification_results) => {
-                                                        let cache_status = match verification_results.status {
+                                                        let action_status = match verification_results.status {
                                                             // Great success! We fixed it and the validation passed!
                                                             CacheStatus::FixNotRequired => {
                                                                 ActionRunStatus::CheckFailedFixSucceedVerifySucceed
@@ -386,15 +384,16 @@ impl DefaultDoctorActionRun {
                                                         };
                                                         ActionRunResult::new(
                                                             &self.name(),
-                                                            cache_status,
+                                                            action_status,
                                                             check_output,
                                                             Some(fix_output),
+                                                            // note that we've replaced the original validation output
+                                                            // with the new one from after running the known-error fix
                                                             verification_results.output,
                                                         )
                                                     }
                                                     None => {
                                                         // There was no check command defined, so there's no validation to perform
-                                                        // In theory it's impossible to get here, but we handle it gracefully
                                                         ActionRunResult::new(
                                                             &self.name(),
                                                             ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
@@ -415,7 +414,7 @@ impl DefaultDoctorActionRun {
                                             ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
                                             check_output,
                                             Some(fix_output),
-                                            validate_output,
+                                            validate_result.output,
                                         )
                                     }
                                 }
