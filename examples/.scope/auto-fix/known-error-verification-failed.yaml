@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeKnownError
+metadata:
+  name: verification-failed
+  description: Works with the doctor-group-auto-fix to trigger a known error and auto-fix it
+spec:
+  pattern: verification-failed
+  help: The verification failed.
+  fix:
+    prompt:
+      text: |-
+        Fix the status.txt file?
+    commands:
+      - bash -c 'echo "bazqux" > status.txt'

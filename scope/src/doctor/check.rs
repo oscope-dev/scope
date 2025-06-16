@@ -120,6 +120,10 @@ impl ActionRunResult {
 }
 
 impl ActionRunStatus {
+    pub(crate) fn is_success(&self) -> bool {
+        ! self.is_failure()
+    }
+
     pub(crate) fn is_failure(&self) -> bool {
         match self {
             ActionRunStatus::CheckSucceeded => false,
@@ -201,44 +205,12 @@ impl DoctorActionRun for DefaultDoctorActionRun {
 
         let (fix_result, fix_output) = self.run_fixes_with_self_healing(prompt).await?;
 
-        match fix_result {
-            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedNoFixProvided,
-                    check_results.output,
-                    None,
-                    None,
-                ));
-            }
-            USER_DENIED_EXIT_CODE => {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedFixUserDenied,
-                    check_results.output,
-                    Some(fix_output),
-                    None,
-                ));
-            }
-            SUCCESS_EXIT_CODE => {}
-            1...100 => {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedFixFailed,
-                    check_results.output,
-                    Some(fix_output),
-                    None,
-                ));
-            }
-            _ => {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedFixFailedStop,
-                    check_results.output,
-                    Some(fix_output),
-                    None,
-                ));
-            }
+        let maybe_action_run_result =
+            self.action_run_result_from_fix_status(fix_result, &fix_output, &check_results.output);
+
+        // we get some only if it was not successful and we're able to return early
+        if let Some(action_run_result) = maybe_action_run_result {
+            return Ok(action_run_result);
         }
 
         if check_status == CacheStatus::CacheNotDefined {
@@ -256,13 +228,78 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         if let Some(validate_result) = self.evaluate_command_checks().await? {
             validate_output = validate_result.output;
             if validate_result.status != CacheStatus::FixNotRequired {
-                return Ok(ActionRunResult::new(
-                    &self.name(),
-                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
-                    check_results.output,
-                    Some(fix_output),
-                    validate_output,
-                ));
+                //FIXME: need to deal with the unwrap here!
+                let analyze_status = self
+                    .analyze_known_errors(&validate_output.as_ref().unwrap())
+                    .await?;
+                analyze::report_result(&analyze_status);
+
+                match analyze_status {
+                    AnalyzeStatus::KnownErrorFoundFixSucceeded => {
+                        // If the known error fix succeeded, we can re-run the action fix
+                        //FIXME: should this also run with self-healing?
+                        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+
+                        let maybe_action_run_result = self.action_run_result_from_fix_status(
+                            fix_result,
+                            &fix_output,
+                            &check_results.output,
+                        );
+                        // we get some only if the fix failed, so we can return early
+                        if let Some(action_run_result) = maybe_action_run_result {
+                            return Ok(action_run_result);
+                        }
+
+                        // Now we need to re-evaluate the validation
+                        let validate_result = self.evaluate_command_checks().await?;
+                        let action_run_result = match validate_result {
+                            Some(results) => {
+                                let cache_status = match results.status {
+                                    // Great success! We fixed it and the validation passed!
+                                    CacheStatus::FixNotRequired => {
+                                        ActionRunStatus::CheckFailedFixSucceedVerifySucceed
+                                    }
+                                    // Even after retrying the action fix, the validation still failed
+                                    _ => ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                                };
+                                ActionRunResult::new(
+                                    &self.name(),
+                                    cache_status,
+                                    check_results.output,
+                                    Some(fix_output),
+                                    results.output,
+                                )
+                            }
+                            None => {
+                                // There was no check command defined, so there's not validation to perform
+                                ActionRunResult::new(
+                                    &self.name(),
+                                    ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+                                    check_results.output,
+                                    Some(fix_output),
+                                    None,
+                                )
+                            }
+                        };
+                        if action_run_result.status.is_success() {
+                            // If the action run result is not a failure, we can update the caches
+                            self.update_caches().await;
+                        }
+
+                        return Ok(action_run_result);
+                    }
+                    _ => {
+                        // either no fix was found or it failed,
+                        // so we can exit with VerifyFailed status
+                        return Ok(ActionRunResult::new(
+                            &self.name(),
+                            ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                            check_results.output,
+                            Some(fix_output),
+                            validate_output,
+                        ));
+                    }
+                }
             }
         }
 
@@ -315,6 +352,45 @@ impl DefaultDoctorActionRun {
                 info!("Unable to update cache, dropping update {:?}", e);
                 info!(target: "user", "Unable to update file cache, next run will re-run this action.")
             }
+        }
+    }
+
+    fn action_run_result_from_fix_status(
+        &self,
+        fix_result: i32,
+        fix_output: &Vec<ActionTaskReport>,
+        check_output: &Option<Vec<ActionTaskReport>>,
+    ) -> Option<ActionRunResult> {
+        match fix_result {
+            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedNoFixProvided,
+                check_output.to_owned(),
+                None,
+                None,
+            )),
+            USER_DENIED_EXIT_CODE => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixUserDenied,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
+            SUCCESS_EXIT_CODE => None,
+            1..=100 => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixFailed,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
+            _ => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixFailedStop,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
         }
     }
 
@@ -422,13 +498,16 @@ impl DefaultDoctorActionRun {
         Ok(CacheResults { status, output })
     }
 
+    /// Returns `Some(CacheResults)` if the command check was run.
+    /// If no command check was defined, it returns `None`.
     async fn evaluate_command_checks(&self) -> Result<Option<CacheResults>, RuntimeError> {
-        if let Some(action_command) = &self.action.check.command {
-            let result = self.run_check_command(action_command).await?;
-            return Ok(Some(result));
+        match &self.action.check.command {
+            Some(action_command) => {
+                let result = self.run_check_command(action_command).await?;
+                Ok(Some(result))
+            }
+            _ => Ok(None),
         }
-
-        Ok(None)
     }
 
     async fn evaluate_path_check(

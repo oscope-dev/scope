@@ -2,19 +2,30 @@ apiVersion: scope.github.com/v1alpha
 kind: ScopeDoctorGroup
 metadata:
   name: doctor-group-auto-fix
-  description: Works along with the known-error-auto-fix to demonstrate auto-fixing a known error
+  description: |
+    Works along with the known-error-action-failed and verification-failed to demonstrate auto-fixing a known error.
 spec:
   include: when-required
   actions:
-    - name: auto-fix
+    - name: action-fails
       check:
         commands:
           - grep -q "ready" status.txt
       fix:
         commands:
-          - echo "message to trigger the known-error"
+          - echo "action-failed - message to trigger the known-error"
           # we intentionally use a fix that won't fix it to demonstrate the known error fix
           # The grep || is to ensure we don't break it again after the know-error fixes it
           - bash -c 'grep -q "ready" status.txt || echo "foobar" > status.txt'
           # this ensures the fix fails the first time and passes the second time
           - grep -q "ready" status.txt
+    - name: verification-fails
+      check:
+        commands:
+          - echo "verification-failed - message to trigger the known-error"
+          - grep -q "foobar" status.txt
+      fix:
+        commands:
+          # don't fix it if it's the first time the fix has run (file contains "ready")
+          # Then only fix it if the known-error fix has been applied (file contains "bazqux")
+          - bash -c 'grep -q "ready" status.txt || (grep -q "bazqux" status.txt && echo "foobar" > status.txt)'
