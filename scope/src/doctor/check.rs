@@ -224,100 +224,9 @@ impl DoctorActionRun for DefaultDoctorActionRun {
             ));
         }
 
-        let action_run_result = match self.evaluate_command_checks().await? {
-            Some(validate_result) => {
-                let validate_output = validate_result.output;
-                match validate_result.status {
-                    // verification was successful, so we're done
-                    CacheStatus::FixNotRequired => ActionRunResult::new(
-                        &self.name(),
-                        ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
-                        check_results.output,
-                        Some(fix_output),
-                        validate_output,
-                    ),
-                    _ => {
-                        // verification failed
-                        //FIXME: need to deal with the unwrap here!
-                        let analyze_status = self
-                            .analyze_known_errors(&validate_output.as_ref().unwrap())
-                            .await?;
-                        analyze::report_result(&analyze_status);
-
-                        match analyze_status {
-                            AnalyzeStatus::KnownErrorFoundFixSucceeded => {
-                                // If the known error fix succeeded, we can re-run the action fix
-                                //FIXME: should this also run with self-healing?
-                                let (fix_result, fix_output) = self.run_fixes(prompt).await?;
-
-                                let maybe_action_run_result = self
-                                    .action_run_result_from_fix_status(
-                                        fix_result,
-                                        &fix_output,
-                                        &check_results.output,
-                                    );
-
-                                match maybe_action_run_result {
-                                    // we get some only if the fix failed, so we can return early
-                                    Some(action_run_result) => action_run_result,
-                                    None => {
-                                        // Now we need to re-evaluate the validation
-                                        match self.evaluate_command_checks().await? {
-                                            Some(verification_results) => {
-                                                let cache_status = match verification_results.status {
-                                                    // Great success! We fixed it and the validation passed!
-                                                    CacheStatus::FixNotRequired => {
-                                                        ActionRunStatus::CheckFailedFixSucceedVerifySucceed
-                                                    }
-                                                    // Even after retrying the action fix, the validation still failed
-                                                    _ => ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
-                                                };
-                                                ActionRunResult::new(
-                                                    &self.name(),
-                                                    cache_status,
-                                                    check_results.output,
-                                                    Some(fix_output),
-                                                    verification_results.output,
-                                                )
-                                            }
-                                            None => {
-                                                // There was no check command defined, so there's no validation to perform
-                                                ActionRunResult::new(
-                                                    &self.name(),
-                                                    ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
-                                                    check_results.output,
-                                                    Some(fix_output),
-                                                    None,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {
-                                // either no fix was found or it failed,
-                                // so we can exit with VerifyFailed status
-                                ActionRunResult::new(
-                                    &self.name(),
-                                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
-                                    check_results.output,
-                                    Some(fix_output),
-                                    validate_output,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            // There was no check command defined, so there's no validation to perform
-            None => ActionRunResult::new(
-                &self.name(),
-                ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
-                check_results.output,
-                Some(fix_output),
-                None,
-            ),
-        };
+        let action_run_result = self
+            .run_verification(check_results.output, fix_output, prompt)
+            .await?;
 
         if action_run_result.status.is_success() {
             self.update_caches().await;
@@ -422,6 +331,110 @@ impl DefaultDoctorActionRun {
                 }
             },
         }
+    }
+
+    async fn run_verification(
+        &self,
+        check_output: Option<Vec<ActionTaskReport>>,
+        fix_output: Vec<ActionTaskReport>,
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<ActionRunResult> {
+        let result = match self.evaluate_command_checks().await? {
+            Some(validate_result) => {
+                let validate_output = validate_result.output;
+                match validate_result.status {
+                    // verification was successful, so we're done
+                    CacheStatus::FixNotRequired => ActionRunResult::new(
+                        &self.name(),
+                        ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+                        check_output,
+                        Some(fix_output),
+                        validate_output,
+                    ),
+                    _ => {
+                        // verification failed
+                        //FIXME: need to deal with the unwrap here! If the validation output is None, there's nothing to analyze.
+                        let analyze_status = self
+                            .analyze_known_errors(&validate_output.as_ref().unwrap())
+                            .await?;
+                        analyze::report_result(&analyze_status);
+
+                        match analyze_status {
+                            AnalyzeStatus::KnownErrorFoundFixSucceeded => {
+                                // If the known error fix succeeded, we can re-run the action fix
+                                //FIXME: should this also run with self-healing?
+                                let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+
+                                let maybe_action_run_result = self
+                                    .action_run_result_from_fix_status(
+                                        fix_result,
+                                        &fix_output,
+                                        &check_output,
+                                    );
+
+                                match maybe_action_run_result {
+                                    // we get some only if the fix failed, so we can return early
+                                    Some(action_run_result) => action_run_result,
+                                    None => {
+                                        // Now we need to re-evaluate the validation
+                                        match self.evaluate_command_checks().await? {
+                                            Some(verification_results) => {
+                                                let cache_status = match verification_results.status {
+                                                    // Great success! We fixed it and the validation passed!
+                                                    CacheStatus::FixNotRequired => {
+                                                        ActionRunStatus::CheckFailedFixSucceedVerifySucceed
+                                                    }
+                                                    // Even after retrying the action fix, the validation still failed
+                                                    _ => ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                                                };
+                                                ActionRunResult::new(
+                                                    &self.name(),
+                                                    cache_status,
+                                                    check_output,
+                                                    Some(fix_output),
+                                                    verification_results.output,
+                                                )
+                                            }
+                                            None => {
+                                                // There was no check command defined, so there's no validation to perform
+                                                // In theory it's impossible to get here, but we handle it gracefully
+                                                ActionRunResult::new(
+                                                    &self.name(),
+                                                    ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+                                                    check_output,
+                                                    Some(fix_output),
+                                                    None,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                // either no fix was found or it failed,
+                                // so we can exit with VerifyFailed status
+                                ActionRunResult::new(
+                                    &self.name(),
+                                    ActionRunStatus::CheckFailedFixSucceedVerifyFailed,
+                                    check_output,
+                                    Some(fix_output),
+                                    validate_output,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            // There was no check command defined, so there's no validation to perform
+            None => ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixSucceedVerifySucceed,
+                check_output,
+                Some(fix_output),
+                None,
+            ),
+        };
+        Ok(result)
     }
 
     async fn run_commands(
