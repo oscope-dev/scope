@@ -275,42 +275,25 @@ impl DefaultDoctorActionRun {
         }
     }
 
-    fn action_run_result_from_fix_status(
+    /// Run the action fix and if it fails, analyze the output for known errors.
+    /// If a known error is found, it's help text will be displayed to the user
+    /// and if the known error has a fix, the user will be prompted to run it.
+    /// If the known error fix succeeds, the action will be re-run.
+    async fn run_fixes_with_self_healing(
         &self,
-        fix_result: i32,
-        fix_output: &Vec<ActionTaskReport>,
-        check_output: &Option<Vec<ActionTaskReport>>,
-    ) -> Option<ActionRunResult> {
-        match fix_result {
-            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => Some(ActionRunResult::new(
-                &self.name(),
-                ActionRunStatus::CheckFailedNoFixProvided,
-                check_output.to_owned(),
-                None,
-                None,
-            )),
-            USER_DENIED_EXIT_CODE => Some(ActionRunResult::new(
-                &self.name(),
-                ActionRunStatus::CheckFailedFixUserDenied,
-                check_output.to_owned(),
-                Some(fix_output.to_owned()),
-                None,
-            )),
-            SUCCESS_EXIT_CODE => None,
-            1..=100 => Some(ActionRunResult::new(
-                &self.name(),
-                ActionRunStatus::CheckFailedFixFailed,
-                check_output.to_owned(),
-                Some(fix_output.to_owned()),
-                None,
-            )),
-            _ => Some(ActionRunResult::new(
-                &self.name(),
-                ActionRunStatus::CheckFailedFixFailedStop,
-                check_output.to_owned(),
-                Some(fix_output.to_owned()),
-                None,
-            )),
+        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
+    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
+        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+        if fix_result == SUCCESS_EXIT_CODE {
+            return Ok((fix_result, fix_output));
+        }
+
+        let analyze_status = self.analyze_known_errors(&fix_output).await?;
+        analyze::report_result(&analyze_status);
+
+        match analyze_status {
+            AnalyzeStatus::KnownErrorFoundFixSucceeded => Ok(self.run_fixes(prompt).await?),
+            _ => Ok((fix_result, fix_output)),
         }
     }
 
@@ -363,7 +346,8 @@ impl DefaultDoctorActionRun {
                             AnalyzeStatus::KnownErrorFoundFixSucceeded => {
                                 // If the known error fix succeeded, we can re-run the action fix
                                 // It could fail for a different reason now, so we allow self-healing
-                                let (fix_result, fix_output) = self.run_fixes_with_self_healing(prompt).await?;
+                                let (fix_result, fix_output) =
+                                    self.run_fixes_with_self_healing(prompt).await?;
 
                                 let maybe_action_run_result = self
                                     .action_run_result_from_fix_status(
@@ -457,6 +441,45 @@ impl DefaultDoctorActionRun {
         }
 
         Ok((highest_exit_code, action_reports))
+    }
+
+    fn action_run_result_from_fix_status(
+        &self,
+        fix_result: i32,
+        fix_output: &Vec<ActionTaskReport>,
+        check_output: &Option<Vec<ActionTaskReport>>,
+    ) -> Option<ActionRunResult> {
+        match fix_result {
+            i32::MIN..=-3 | NO_COMMANDS_EXIT_CODE => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedNoFixProvided,
+                check_output.to_owned(),
+                None,
+                None,
+            )),
+            USER_DENIED_EXIT_CODE => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixUserDenied,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
+            SUCCESS_EXIT_CODE => None,
+            1..=100 => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixFailed,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
+            _ => Some(ActionRunResult::new(
+                &self.name(),
+                ActionRunStatus::CheckFailedFixFailedStop,
+                check_output.to_owned(),
+                Some(fix_output.to_owned()),
+                None,
+            )),
+        }
     }
 
     async fn run_single_fix(&self, command: &str) -> Result<ActionTaskReport, RuntimeError> {
@@ -610,28 +633,6 @@ impl DefaultDoctorActionRun {
             status,
             output: Some(action_reports),
         })
-    }
-
-    /// Run the action fix and if it fails, analyze the output for known errors.
-    /// If a known error is found, it's help text will be displayed to the user
-    /// and if the known error has a fix, the user will be prompted to run it.
-    /// If the known error fix succeeds, the action will be re-run.
-    async fn run_fixes_with_self_healing(
-        &self,
-        prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
-    ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
-        let (fix_result, fix_output) = self.run_fixes(prompt).await?;
-        if fix_result == SUCCESS_EXIT_CODE {
-            return Ok((fix_result, fix_output));
-        }
-
-        let analyze_status = self.analyze_known_errors(&fix_output).await?;
-        analyze::report_result(&analyze_status);
-
-        match analyze_status {
-            AnalyzeStatus::KnownErrorFoundFixSucceeded => Ok(self.run_fixes(prompt).await?),
-            _ => Ok((fix_result, fix_output)),
-        }
     }
 
     async fn analyze_known_errors(
