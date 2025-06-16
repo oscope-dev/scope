@@ -362,8 +362,8 @@ impl DefaultDoctorActionRun {
                         match analyze_status {
                             AnalyzeStatus::KnownErrorFoundFixSucceeded => {
                                 // If the known error fix succeeded, we can re-run the action fix
-                                //FIXME: should this also run with self-healing?
-                                let (fix_result, fix_output) = self.run_fixes(prompt).await?;
+                                // It could fail for a different reason now, so we allow self-healing
+                                let (fix_result, fix_output) = self.run_fixes_with_self_healing(prompt).await?;
 
                                 let maybe_action_run_result = self
                                     .action_run_result_from_fix_status(
