@@ -649,10 +649,7 @@ impl DefaultDoctorActionRun {
         })
     }
 
-    async fn analyze_known_errors(
-        &self,
-        fix_output: &Vec<ActionTaskReport>,
-    ) -> Result<AnalyzeStatus> {
+    async fn analyze_known_errors(&self, fix_output: &[ActionTaskReport]) -> Result<AnalyzeStatus> {
         let lines = fix_output
             .iter()
             .filter_map(|r| r.output.as_ref())
