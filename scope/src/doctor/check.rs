@@ -2,7 +2,6 @@ use super::file_cache::{FileCache, FileCacheStatus};
 use anyhow::Result;
 use std::cmp::max;
 use std::collections::BTreeMap;
-use std::io::Cursor;
 use std::{cmp, vec};
 use tokio::io::BufReader;
 use tracing::debug;
@@ -24,6 +23,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, info, instrument};
+
+mod string_vec_reader;
+use string_vec_reader::StringVecReader;
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -654,10 +656,9 @@ impl DefaultDoctorActionRun {
             .iter()
             .filter_map(|r| r.output.as_ref())
             .map(|output| output.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"); //it feels really dumb to allocate a big string here but I don't know a better way to create a buffer from a Vec<String>
-        let buffer = BufReader::new(Cursor::new(lines));
+            .collect::<Vec<String>>();
 
+        let buffer = BufReader::new(StringVecReader::new(&lines));
         analyze::process_lines(&self.known_errors, &self.working_dir, buffer).await
     }
 }
