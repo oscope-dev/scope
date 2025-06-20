@@ -567,7 +567,7 @@ impl DefaultDoctorActionRun {
                 let result = self.run_check_command(action_command).await?;
                 Ok(Some(result))
             }
-            _ => Ok(None),
+            None => Ok(None),
         }
     }
 
