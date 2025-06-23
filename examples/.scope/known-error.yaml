@@ -4,5 +4,5 @@ metadata:
   name: error-exists
   description: Check if the word error is in the logs
 spec:
-  pattern: error
+  pattern: \serror\s
   help: The command had an error, try reading the logs around there to find out what happened.

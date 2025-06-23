@@ -8,7 +8,8 @@ use std::path::Path;
 mod capture;
 mod config_load;
 mod logging;
-// mod models_bck;
+
+pub(crate) mod analyze;
 mod models;
 mod redact;
 mod report;
