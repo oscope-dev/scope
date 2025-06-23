@@ -651,6 +651,7 @@ impl DefaultDoctorActionRun {
         })
     }
 
+    #[instrument(skip(self, fix_output), ret)]
     async fn analyze_known_errors(&self, fix_output: &[ActionTaskReport]) -> Result<AnalyzeStatus> {
         let lines = fix_output
             .iter()
