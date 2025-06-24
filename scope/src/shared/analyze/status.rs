@@ -1,6 +1,6 @@
 use tracing::{error, info, warn};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AnalyzeStatus {
     NoKnownErrorsFound,
     KnownErrorFoundNoFixFound,
