@@ -178,7 +178,7 @@ const USER_DENIED_EXIT_CODE: i32 = -2;
 
 #[async_trait::async_trait]
 impl DoctorActionRun for DefaultDoctorActionRun {
-    #[instrument(skip_all, fields(model.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
+    #[instrument(skip_all, fields(group.name = self.model.name(), action.name = self.action.name, action.description = self.action.description ))]
     async fn run_action(
         &self,
         prompt: for<'a> fn(&'a str, &'a Option<String>) -> bool,
@@ -651,7 +651,7 @@ impl DefaultDoctorActionRun {
         })
     }
 
-    #[instrument(skip(self, fix_output), ret)]
+    #[instrument(skip(self, fix_output), fields(group.name = self.model.name(), action.name = self.action.name), ret)]
     async fn analyze_known_errors(&self, fix_output: &[ActionTaskReport]) -> Result<AnalyzeStatus> {
         let lines = fix_output
             .iter()
