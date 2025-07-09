@@ -186,6 +186,7 @@ impl DoctorActionRun for DefaultDoctorActionRun {
         let check_results = self.evaluate_checks().await?;
         let check_status = check_results.status;
         if check_status == CacheStatus::FixNotRequired {
+            self.update_caches().await;
             return Ok(ActionRunResult::new(
                 &self.name(),
                 ActionRunStatus::CheckSucceeded,
@@ -1163,7 +1164,10 @@ pub(crate) mod tests {
             .expect_have_globs_changed()
             .times(1)
             .returning(|_, _, _, _| Ok(true));
-        glob_walker.expect_update_cache().never();
+        glob_walker
+            .expect_update_cache()
+            .once()
+            .returning(|_, _, _, _| Ok(()));
 
         exec_runner
             .expect_run_command()
@@ -1220,7 +1224,10 @@ pub(crate) mod tests {
             .expect_have_globs_changed()
             .times(1)
             .returning(|_, _, _, _| Ok(false));
-        glob_walker.expect_update_cache().never();
+        glob_walker
+            .expect_update_cache()
+            .once()
+            .returning(|_, _, _, _| Ok(()));
 
         exec_runner
             .expect_run_command()
