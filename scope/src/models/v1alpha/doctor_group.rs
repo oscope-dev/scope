@@ -115,11 +115,32 @@ pub struct DoctorGroupSpec {
     #[serde(default)]
     pub include: DoctorInclude,
 
+    /// Defines conditions under which the group should be skipped.
+    /// `skip` can be a boolean, in which case the group will be skipped if `true`.
+    /// Alternatively, it can be a command that will be run to determine if the group should
+    /// be skipped. If the command returns a zero exit code, the group will be skipped.
+    /// If the command returns a non-zero exit code, the group will not be skipped.
+    #[serde(default)]
+    pub skip: SkipSpec,
+
     /// defines additional data that needs to be pulled from the system when reporting a bug.
     /// `reportExtraDetails` is a map of `string:string`, the value is a command that should be run.
     /// When a report is built, the commands will be run and automatically included in the report.
     #[serde(default)]
     pub report_extra_details: BTreeMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[serde(untagged)]
+pub enum SkipSpec {
+    Skip(bool),
+    Command { command: String },
+}
+
+impl Default for SkipSpec {
+    fn default() -> Self {
+        SkipSpec::Skip(false)
+    }
 }
 
 /// Configure how a groups will be used when determining the task graph.
