@@ -6,21 +6,21 @@ use super::{extract_command_path, substitute_templates};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
-pub struct DoctorCommand {
+pub struct DoctorCommands {
     pub commands: Vec<String>,
 }
 
-impl DoctorCommand {
+impl DoctorCommands {
     pub fn from_commands(
         containing_dir: &Path,
         working_dir: &str,
         commands: &Vec<String>,
-    ) -> Result<DoctorCommand> {
+    ) -> Result<DoctorCommands> {
         let mut templated_commands = Vec::new();
         for command in commands {
             templated_commands.push(substitute_templates(working_dir, command)?);
         }
-        Ok(DoctorCommand::from((containing_dir, templated_commands)))
+        Ok(DoctorCommands::from((containing_dir, templated_commands)))
     }
 
     /// Performs shell expansion
@@ -42,7 +42,7 @@ impl DoctorCommand {
     }
 }
 
-impl<T> From<(&Path, Vec<T>)> for DoctorCommand
+impl<T> From<(&Path, Vec<T>)> for DoctorCommands
 where
     String: for<'a> From<&'a T>,
 {
@@ -55,12 +55,12 @@ where
             })
             .collect();
 
-        DoctorCommand { commands }
+        DoctorCommands { commands }
     }
 }
 
 #[cfg(test)]
-impl From<Vec<&str>> for DoctorCommand {
+impl From<Vec<&str>> for DoctorCommands {
     /// This is only used by some tests and should NOT be used in production code
     /// because it does not properly pre-pend the command with a base path.
     fn from(value: Vec<&str>) -> Self {
@@ -77,10 +77,10 @@ mod tests {
     fn from_vec_str() {
         let input = vec!["echo 'foo'", "false"];
 
-        let actual = DoctorCommand::from(input.clone());
+        let actual = DoctorCommands::from(input.clone());
 
         assert_eq!(
-            DoctorCommand {
+            DoctorCommands {
                 commands: vec![input[0].to_string(), input[1].to_string(),]
             },
             actual
@@ -93,10 +93,10 @@ mod tests {
         let input = vec!["echo 'foo'", "baz/qux", "./qux"];
 
         let actual =
-            DoctorCommand::from((base_path, input.iter().map(|cmd| cmd.to_string()).collect()));
+            DoctorCommands::from((base_path, input.iter().map(|cmd| cmd.to_string()).collect()));
 
         assert_eq!(
-            DoctorCommand {
+            DoctorCommands {
                 commands: vec![
                     "echo 'foo'".to_string(),
                     "baz/qux".to_string(),
@@ -116,7 +116,7 @@ mod tests {
             .map(|cmd| cmd.to_string())
             .collect::<Vec<String>>();
 
-        let actual = DoctorCommand::from_commands(containing_dir, working_dir, &commands)
+        let actual = DoctorCommands::from_commands(containing_dir, working_dir, &commands)
             .expect("Expected Ok");
 
         let templated_commands = commands
@@ -124,7 +124,7 @@ mod tests {
             .map(|cmd| substitute_templates(&working_dir, &cmd).unwrap())
             .collect::<Vec<String>>();
 
-        let expected = DoctorCommand::from((containing_dir, templated_commands));
+        let expected = DoctorCommands::from((containing_dir, templated_commands));
 
         assert_eq!(expected, actual)
     }

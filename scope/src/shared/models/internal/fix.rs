@@ -11,7 +11,7 @@ use derive_builder::Builder;
 #[builder(setter(into))]
 pub struct DoctorFix {
     #[builder(default)]
-    pub command: Option<DoctorCommand>,
+    pub command: Option<DoctorCommands>,
     #[builder(default)]
     pub help_text: Option<String>,
     #[builder(default)]
@@ -31,7 +31,7 @@ impl DoctorFix {
     }
 
     pub fn from_spec(containing_dir: &Path, working_dir: &str, fix: DoctorFixSpec) -> Result<Self> {
-        let commands = DoctorCommand::from_commands(containing_dir, working_dir, &fix.commands)?;
+        let commands = DoctorCommands::from_commands(containing_dir, working_dir, &fix.commands)?;
         let help_text = fix
             .help_text
             .as_ref()
@@ -125,7 +125,7 @@ mod tests {
 
         let expected = DoctorFix {
             command: Some(
-                DoctorCommand::from_commands(
+                DoctorCommands::from_commands(
                     Path::new("/some/dir"),
                     "/some/work/dir",
                     &spec.commands,

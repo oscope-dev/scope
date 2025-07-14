@@ -12,8 +12,8 @@ use crate::prelude::{
 };
 use crate::shared::analyze::{self, AnalyzeStatus};
 use crate::shared::prelude::{
-    CaptureError, CaptureOpts, DoctorCommand, DoctorGroup, DoctorGroupAction, DoctorGroupCachePath,
-    ExecutionProvider, OutputDestination,
+    CaptureError, CaptureOpts, DoctorCommands, DoctorGroup, DoctorGroupAction,
+    DoctorGroupCachePath, ExecutionProvider, OutputDestination,
 };
 use async_trait::async_trait;
 use derive_builder::Builder;
@@ -440,7 +440,7 @@ impl DefaultDoctorActionRun {
 
     async fn run_commands(
         &self,
-        commands: &DoctorCommand,
+        commands: &DoctorCommands,
     ) -> Result<(i32, Vec<ActionTaskReport>), RuntimeError> {
         let mut action_reports = Vec::new();
         let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
@@ -597,7 +597,7 @@ impl DefaultDoctorActionRun {
 
     async fn run_check_command(
         &self,
-        action_command: &DoctorCommand,
+        action_command: &DoctorCommands,
     ) -> Result<CacheResults, RuntimeError> {
         info!("Evaluating {:?}", action_command);
         let mut action_reports = Vec::new();
@@ -804,13 +804,13 @@ pub(crate) mod tests {
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .files(None)
-                    .command(Some(DoctorCommand::from(vec!["check"])))
+                    .command(Some(DoctorCommands::from(vec!["check"])))
                     .build()
                     .unwrap(),
             )
             .fix(
                 DoctorFixBuilder::default()
-                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .command(Some(DoctorCommands::from(vec!["fix"])))
                     .build()
                     .unwrap(),
             )
@@ -826,13 +826,13 @@ pub(crate) mod tests {
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .files(None)
-                    .command(Some(DoctorCommand::from(vec!["check"])))
+                    .command(Some(DoctorCommands::from(vec!["check"])))
                     .build()
                     .unwrap(),
             )
             .fix(
                 DoctorFixBuilder::default()
-                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .command(Some(DoctorCommands::from(vec!["fix"])))
                     .prompt(Some(DoctorFixPrompt {
                         text: "do you want to continue?".to_string(),
                         extra_context: Some("additional context here".to_string()),
@@ -858,7 +858,7 @@ pub(crate) mod tests {
             )
             .fix(
                 DoctorFixBuilder::default()
-                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .command(Some(DoctorCommands::from(vec!["fix"])))
                     .build()
                     .unwrap(),
             )
@@ -1141,7 +1141,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommand {
+                    .command(Some(DoctorCommands {
                         commands: vec![check_command.to_string()],
                     }))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
@@ -1150,7 +1150,7 @@ pub(crate) mod tests {
             )
             .fix(
                 DoctorFixBuilder::default()
-                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .command(Some(DoctorCommands::from(vec!["fix"])))
                     .build()
                     .unwrap(),
             )
@@ -1201,7 +1201,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommand {
+                    .command(Some(DoctorCommands {
                         commands: vec![check_command.to_string()],
                     }))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
@@ -1210,7 +1210,7 @@ pub(crate) mod tests {
             )
             .fix(
                 DoctorFixBuilder::default()
-                    .command(Some(DoctorCommand::from(vec!["fix"])))
+                    .command(Some(DoctorCommands::from(vec!["fix"])))
                     .build()
                     .unwrap(),
             )
@@ -1432,7 +1432,7 @@ pub(crate) mod tests {
             );
 
             let (_highest_status_code, reports) = run
-                .run_commands(&DoctorCommand {
+                .run_commands(&DoctorCommands {
                     commands: vec!["touch ~/.somefile".to_string()],
                 })
                 .await
@@ -1470,7 +1470,7 @@ pub(crate) mod tests {
                 MockGlobWalker::new(),
             );
 
-            let action_commands = DoctorCommandBuilder::default()
+            let action_commands = DoctorCommandsBuilder::default()
                 .commands(vec!["test -f ~/.somefile".to_string()])
                 .build()
                 .unwrap();

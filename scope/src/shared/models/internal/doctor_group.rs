@@ -7,7 +7,7 @@ use derive_builder::Builder;
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
 use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
-use crate::shared::models::internal::{DoctorCommand, DoctorFix};
+use crate::shared::models::internal::{DoctorCommands, DoctorFix};
 
 use super::substitute_templates;
 
@@ -43,7 +43,7 @@ impl From<(&str, Vec<&str>)> for DoctorGroupCachePath {
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorGroupActionCheck {
-    pub command: Option<DoctorCommand>,
+    pub command: Option<DoctorCommands>,
     pub files: Option<DoctorGroupCachePath>,
 }
 
@@ -111,7 +111,7 @@ fn parse_action(
     };
 
     let check_command = match spec_action.check.commands {
-        Some(ref check) => Some(DoctorCommand::from_commands(
+        Some(ref check) => Some(DoctorCommands::from_commands(
             containing_dir,
             &working_dir,
             check,
@@ -145,7 +145,7 @@ mod tests {
 
     use crate::shared::models::parse_models_from_string;
     use crate::shared::models::prelude::{
-        DoctorCommand, DoctorFix, DoctorGroupAction, DoctorGroupActionCheck,
+        DoctorCommands, DoctorFix, DoctorGroupAction, DoctorGroupActionCheck,
     };
     use crate::shared::prelude::DoctorGroupCachePath;
 
@@ -175,13 +175,13 @@ mod tests {
                 required: false,
                 description: "foo1".to_string(),
                 fix: DoctorFix {
-                    command: Some(DoctorCommand::from(vec!["/foo/bar/.scope/fix1.sh"])),
+                    command: Some(DoctorCommands::from(vec!["/foo/bar/.scope/fix1.sh"])),
                     prompt: None,
                     help_text: Some("There is a good way to fix this, maybe...".to_string()),
                     help_url: Some("https://go.example.com/fixit".to_string()),
                 },
                 check: DoctorGroupActionCheck {
-                    command: Some(DoctorCommand::from(vec!["/foo/bar/.scope/foo1.sh"])),
+                    command: Some(DoctorCommands::from(vec!["/foo/bar/.scope/foo1.sh"])),
                     files: Some(DoctorGroupCachePath::from((
                         "/foo/bar",
                         vec!["flig/bar/**/*"]
@@ -202,7 +202,7 @@ mod tests {
                     prompt: None,
                 },
                 check: DoctorGroupActionCheck {
-                    command: Some(DoctorCommand::from(vec!["sleep infinity"])),
+                    command: Some(DoctorCommands::from(vec!["sleep infinity"])),
                     files: Some(DoctorGroupCachePath::from(("/foo/bar", vec!["*/*.txt"])))
                 }
             }
