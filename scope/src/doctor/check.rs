@@ -1142,7 +1142,7 @@ pub(crate) mod tests {
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .command(Some(DoctorCommands {
-                        commands: vec![check_command.to_string()],
+                        commands: vec![DoctorCommand::from_str(check_command)],
                     }))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
@@ -1202,7 +1202,7 @@ pub(crate) mod tests {
             .check(
                 DoctorGroupActionCheckBuilder::default()
                     .command(Some(DoctorCommands {
-                        commands: vec![check_command.to_string()],
+                        commands: vec![DoctorCommand::from_str(check_command)],
                     }))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
@@ -1433,7 +1433,7 @@ pub(crate) mod tests {
 
             let (_highest_status_code, reports) = run
                 .run_commands(&DoctorCommands {
-                    commands: vec!["touch ~/.somefile".to_string()],
+                    commands: vec![DoctorCommand::from_str("touch ~/.somefile")],
                 })
                 .await
                 .unwrap();
@@ -1471,7 +1471,7 @@ pub(crate) mod tests {
             );
 
             let action_commands = DoctorCommandsBuilder::default()
-                .commands(vec!["test -f ~/.somefile".to_string()])
+                .commands(vec![DoctorCommand::from_str("test -f ~/.somefile")])
                 .build()
                 .unwrap();
 
