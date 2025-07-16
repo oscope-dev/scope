@@ -446,7 +446,7 @@ impl DefaultDoctorActionRun {
         let mut action_reports = Vec::new();
         let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
 
-        for command in &commands.commands {
+        for command in commands {
             let report = self.run_single_fix(command).await?;
             highest_exit_code = max(
                 highest_exit_code,
@@ -610,7 +610,7 @@ impl DefaultDoctorActionRun {
         let mut action_reports = Vec::new();
         let mut result: Option<CacheStatus> = None;
 
-        for command in &action_command.commands {
+        for command in action_command {
             let args = vec![command.text().to_string()];
             let path = format!(
                 "{}:{}",

@@ -138,7 +138,7 @@ async fn run_fix(
     let commands = fix.command.as_ref().expect("Expected a command");
 
     let mut outputs = Vec::<OutputCapture>::new();
-    for cmd in &commands.commands {
+    for cmd in commands {
         let capture_opts = CaptureOpts {
             working_dir,
             args: &[cmd.text().to_string()],

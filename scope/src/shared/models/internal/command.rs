@@ -64,6 +64,20 @@ impl DoctorCommands {
             .collect::<Result<Vec<_>>>()
             .map(|commands| DoctorCommands { commands })
     }
+
+    /// Returns an iterator over the commands
+    pub fn iter(&self) -> std::slice::Iter<'_, DoctorCommand> {
+        self.commands.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a DoctorCommands {
+    type Item = &'a DoctorCommand;
+    type IntoIter = std::slice::Iter<'a, DoctorCommand>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 #[cfg(test)]
@@ -352,6 +366,65 @@ mod tests {
                 home_dir, home_dir
             ));
             assert_eq!(expected, actual);
+        }
+    }
+
+    mod iterator_tests {
+        use super::*;
+
+        #[test]
+        fn iter_returns_command_references() {
+            let commands = DoctorCommands::from(vec!["echo hello", "ls -la", "pwd"]);
+
+            let command_refs: Vec<&DoctorCommand> = commands.iter().collect();
+
+            assert_eq!(command_refs.len(), 3);
+            assert_eq!(command_refs[0].text(), "echo hello");
+            assert_eq!(command_refs[1].text(), "ls -la");
+            assert_eq!(command_refs[2].text(), "pwd");
+        }
+
+        #[test]
+        fn into_iter_returns_command_references() {
+            let commands = DoctorCommands::from(vec!["echo hello", "ls -la", "pwd"]);
+
+            let command_refs: Vec<&DoctorCommand> = (&commands).into_iter().collect();
+
+            assert_eq!(command_refs.len(), 3);
+            assert_eq!(command_refs[0].text(), "echo hello");
+            assert_eq!(command_refs[1].text(), "ls -la");
+            assert_eq!(command_refs[2].text(), "pwd");
+        }
+
+        #[test]
+        fn iter_works_with_for_loop() {
+            let commands = DoctorCommands::from(vec!["echo hello", "ls -la", "pwd"]);
+            let mut collected = Vec::new();
+
+            for command in &commands {
+                collected.push(command.text());
+            }
+
+            assert_eq!(collected, vec!["echo hello", "ls -la", "pwd"]);
+        }
+
+        #[test]
+        fn iter_works_with_empty_commands() {
+            let commands = DoctorCommands::from(vec![]);
+
+            let command_refs: Vec<&DoctorCommand> = commands.iter().collect();
+
+            assert_eq!(command_refs.len(), 0);
+        }
+
+        #[test]
+        fn iter_works_with_single_command() {
+            let commands = DoctorCommands::from(vec!["single command"]);
+
+            let command_refs: Vec<&DoctorCommand> = commands.iter().collect();
+
+            assert_eq!(command_refs.len(), 1);
+            assert_eq!(command_refs[0].text(), "single command");
         }
     }
 }
