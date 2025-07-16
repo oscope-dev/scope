@@ -6,14 +6,15 @@ use super::{extract_command_path, substitute_templates};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 pub struct DoctorCommand {
-    text: String,
+    pub text: String,
 }
 
 impl DoctorCommand {
     pub fn try_new(containing_dir: &Path, working_dir: &str, command: &str) -> Result<Self> {
-        let rendered_cmd = substitute_templates(working_dir, command)?;
-        let qualified_cmd = extract_command_path(containing_dir, &rendered_cmd);
-        Ok(DoctorCommand::from_str(&qualified_cmd))
+        let cmd = substitute_templates(working_dir, command)?;
+        let cmd = extract_command_path(containing_dir, &cmd);
+        let cmd = Self::expand_command(&cmd);
+        Ok(DoctorCommand::from_str(&cmd))
     }
 
     /// Performs no template rendering, path qualification, or shell expansion.
@@ -26,12 +27,6 @@ impl DoctorCommand {
         DoctorCommand {
             text: cmd.to_string(),
         }
-    }
-
-    //TODO: I would prefer this to happen in the constructor
-    /// splits a commands and performs shell expansion its parts
-    pub fn expand(&self) -> String {
-        Self::expand_command(&self.text)
     }
 
     // keeping this to make it easier to do in a constructor later
@@ -63,11 +58,6 @@ impl DoctorCommands {
             .map(|command| DoctorCommand::try_new(containing_dir, working_dir, command))
             .collect::<Result<Vec<_>>>()
             .map(|commands| DoctorCommands { commands })
-    }
-
-    /// Performs shell expansion
-    pub fn expand(&self) -> Vec<String> {
-        self.commands.iter().map(|cmd| cmd.expand()).collect()
     }
 }
 
@@ -163,8 +153,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "echo hello";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("echo hello");
             assert_eq!(expected, actual);
@@ -176,8 +166,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "{{ working_dir }}/script.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("/some/working_dir/script.sh");
             assert_eq!(expected, actual);
@@ -189,8 +179,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "./script.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("/foo/bar/script.sh");
             assert_eq!(expected, actual);
@@ -202,8 +192,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "./script.sh --verbose";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("/foo/bar/script.sh --verbose");
             assert_eq!(expected, actual);
@@ -215,10 +205,10 @@ mod tests {
             let working_dir = "/build/dir";
             let command = "{{ working_dir }}/check.sh && ./validate.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
-            // extract_command_path only processes the first command/token, 
+            // extract_command_path only processes the first command/token,
             // not all relative paths in the entire command string
             // This is likely a BUG in the extract_command_path() implementation
             let expected = DoctorCommand::from_str("/build/dir/check.sh && ./validate.sh");
@@ -231,8 +221,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "/usr/bin/env python3 test.py";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("/usr/bin/env python3 test.py");
             assert_eq!(expected, actual);
@@ -244,8 +234,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "{{ unknown_template }}/script.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             // Unknown templates are erased (current behavior)
             // I can argue that this should error instead, but for now we document its behavior
@@ -259,8 +249,8 @@ mod tests {
             let working_dir = "/build/dir";
             let command = "./scripts/build.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             let expected = DoctorCommand::from_str("/project/root/scripts/build.sh");
             assert_eq!(expected, actual);
@@ -272,8 +262,8 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             // Empty string split produces a single empty string, not an empty iterator
             // This case should probably return an error instead of an empty command
@@ -288,8 +278,8 @@ mod tests {
             let working_dir = "/work";
             let command = "cd {{ working_dir }} && ./build.sh && echo 'done'";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             // extract_command_path only processes the first command/token,
             // not all relative paths in the entire command string
@@ -304,8 +294,8 @@ mod tests {
             let working_dir = "/build";
             let command = "{{ working_dir }}/setup.sh && {{ working_dir }}/build.sh";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             // Multiple templates should all be substituted
             let expected = DoctorCommand::from_str("/build/setup.sh && /build/build.sh");
@@ -318,11 +308,44 @@ mod tests {
             let working_dir = "/some/working_dir";
             let command = "   ";
 
-            let actual = DoctorCommand::try_new(containing_dir, working_dir, command)
-                .expect("Expected Ok");
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
 
             // Whitespace should be preserved
             let expected = DoctorCommand::from_str("   ");
+            assert_eq!(expected, actual);
+        }
+
+        #[test]
+        fn try_new_with_tilde_expansion() {
+            let containing_dir = Path::new("/project");
+            let working_dir = "/work";
+            let command = "~/script.sh";
+
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
+
+            // Currently, the tilde is NOT expanded, but we want it to be
+            let home_dir = std::env::var("HOME").expect("HOME environment variable should be set");
+            let expected = DoctorCommand::from_str(&format!("{}/script.sh", home_dir));
+            assert_eq!(expected, actual);
+        }
+
+        #[test]
+        fn try_new_with_tilde_in_arguments() {
+            let containing_dir = Path::new("/project");
+            let working_dir = "/work";
+            let command = "cp ~/source.txt ~/dest.txt";
+
+            let actual =
+                DoctorCommand::try_new(containing_dir, working_dir, command).expect("Expected Ok");
+
+            // Currently, the tildes are NOT expanded, but we want them to be
+            let home_dir = std::env::var("HOME").expect("HOME environment variable should be set");
+            let expected = DoctorCommand::from_str(&format!(
+                "cp {}/source.txt {}/dest.txt",
+                home_dir, home_dir
+            ));
             assert_eq!(expected, actual);
         }
     }
