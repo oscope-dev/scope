@@ -522,7 +522,8 @@ impl DefaultDoctorActionRun {
 
         info!(
             "fix ran {} and exited {:?}",
-            command.text(), capture.exit_code
+            command.text(),
+            capture.exit_code
         );
 
         Ok(ActionTaskReport::from(&capture))
@@ -632,7 +633,8 @@ impl DefaultDoctorActionRun {
 
             info!(
                 "check ran command {} and result was {:?}",
-                command.text(), output.exit_code
+                command.text(),
+                output.exit_code
             );
 
             let command_result = match output.exit_code {
@@ -1148,9 +1150,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommands {
-                        commands: vec![DoctorCommand::from_str(check_command)],
-                    }))
+                    .command(Some(DoctorCommands::from(vec![check_command])))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
                     .unwrap(),
@@ -1208,9 +1208,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommands {
-                        commands: vec![DoctorCommand::from_str(check_command)],
-                    }))
+                    .command(Some(DoctorCommands::from(vec![check_command])))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
                     .unwrap(),
@@ -1439,14 +1437,14 @@ pub(crate) mod tests {
             );
 
             let (_highest_status_code, reports) = run
-                .run_commands(&DoctorCommands {
-                    commands: vec![DoctorCommand::try_new(
+                .run_commands(
+                    &DoctorCommands::from_commands(
                         Path::new("/some/dir"),
                         "/some/working/dir",
-                        "touch ~/.somefile",
+                        &vec!["touch ~/.somefile".to_string()],
                     )
-                    .unwrap()],
-                })
+                    .unwrap(),
+                )
                 .await
                 .unwrap();
             let report = reports[0].clone();

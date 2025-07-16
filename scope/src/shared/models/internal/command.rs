@@ -48,14 +48,13 @@ impl DoctorCommand {
 #[derive(Debug, PartialEq, Clone, Builder)]
 #[builder(setter(into))]
 pub struct DoctorCommands {
-    pub commands: Vec<DoctorCommand>,
+    commands: Vec<DoctorCommand>,
 }
 
 impl DoctorCommands {
     pub fn from_commands(
         containing_dir: &Path,
         working_dir: &str,
-        // commands: &Vec<String>,
         commands: &[String],
     ) -> Result<DoctorCommands> {
         commands
@@ -103,15 +102,8 @@ mod tests {
 
         let actual = DoctorCommands::from(input.clone());
 
-        assert_eq!(
-            DoctorCommands {
-                commands: vec![
-                    DoctorCommand::from_str(input[0]),
-                    DoctorCommand::from_str(input[1]),
-                ]
-            },
-            actual
-        )
+        let expected = DoctorCommands::from(vec!["echo 'foo'", "false"]);
+        assert_eq!(expected, actual)
     }
 
     #[test]
@@ -129,16 +121,8 @@ mod tests {
         )
         .expect("Expected Ok");
 
-        assert_eq!(
-            DoctorCommands {
-                commands: vec![
-                    DoctorCommand::from_str("echo 'foo'"),
-                    DoctorCommand::from_str("baz/qux"),
-                    DoctorCommand::from_str("/foo/bar/qux"),
-                ]
-            },
-            actual
-        )
+        let expected = DoctorCommands::from(vec!["echo 'foo'", "baz/qux", "/foo/bar/qux"]);
+        assert_eq!(expected, actual)
     }
 
     #[test]
@@ -153,12 +137,7 @@ mod tests {
         let actual = DoctorCommands::from_commands(containing_dir, working_dir, &commands)
             .expect("Expected Ok");
 
-        let expected = DoctorCommands {
-            commands: vec![
-                DoctorCommand::from_str("/some/working_dir/foo.sh"),
-                DoctorCommand::from_str("/foo/bar/bar.sh"),
-            ],
-        };
+        let expected = DoctorCommands::from(vec!["/some/working_dir/foo.sh", "/foo/bar/bar.sh"]);
 
         assert_eq!(expected, actual)
     }
