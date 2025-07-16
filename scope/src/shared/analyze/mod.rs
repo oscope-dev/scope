@@ -141,7 +141,7 @@ async fn run_fix(
     for cmd in &commands.commands {
         let capture_opts = CaptureOpts {
             working_dir,
-            args: &[cmd.text.to_string()],
+            args: &[cmd.text().to_string()],
             output_dest: OutputDestination::StandardOutWithPrefix("fixing".to_string()),
             path: exec_path,
             env_vars: generate_env_vars(),

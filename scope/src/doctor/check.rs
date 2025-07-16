@@ -504,7 +504,7 @@ impl DefaultDoctorActionRun {
         &self,
         command: &DoctorCommand,
     ) -> Result<ActionTaskReport, RuntimeError> {
-        let args = vec![command.text.to_string()];
+        let args = vec![command.text().to_string()];
         let capture = self
             .exec_runner
             .run_command(CaptureOpts {
@@ -522,7 +522,7 @@ impl DefaultDoctorActionRun {
 
         info!(
             "fix ran {} and exited {:?}",
-            command.text, capture.exit_code
+            command.text(), capture.exit_code
         );
 
         Ok(ActionTaskReport::from(&capture))
@@ -611,7 +611,7 @@ impl DefaultDoctorActionRun {
         let mut result: Option<CacheStatus> = None;
 
         for command in &action_command.commands {
-            let args = vec![command.text.to_string()];
+            let args = vec![command.text().to_string()];
             let path = format!(
                 "{}:{}",
                 self.model.metadata().containing_dir(),
@@ -632,7 +632,7 @@ impl DefaultDoctorActionRun {
 
             info!(
                 "check ran command {} and result was {:?}",
-                command.text, output.exit_code
+                command.text(), output.exit_code
             );
 
             let command_result = match output.exit_code {

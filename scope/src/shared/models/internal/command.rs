@@ -6,7 +6,7 @@ use super::{extract_command_path, substitute_templates};
 
 #[derive(Debug, PartialEq, Clone, Builder)]
 pub struct DoctorCommand {
-    pub text: String,
+    text: String,
 }
 
 impl DoctorCommand {
@@ -27,6 +27,11 @@ impl DoctorCommand {
         DoctorCommand {
             text: cmd.to_string(),
         }
+    }
+
+    /// Returns the command text
+    pub fn text(&self) -> &str {
+        &self.text
     }
 
     // keeping this to make it easier to do in a constructor later
