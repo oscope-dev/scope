@@ -8,7 +8,8 @@ use tracing::debug;
 
 use crate::models::HelpMetadata;
 use crate::prelude::{
-    generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport, KnownError,
+    generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport, DoctorCommand,
+    KnownError,
 };
 use crate::shared::analyze::{self, AnalyzeStatus};
 use crate::shared::prelude::{
@@ -445,8 +446,8 @@ impl DefaultDoctorActionRun {
         let mut action_reports = Vec::new();
         let mut highest_exit_code = NO_COMMANDS_EXIT_CODE;
 
-        for command in commands.expand() {
-            let report = self.run_single_fix(&command).await?;
+        for command in commands {
+            let report = self.run_single_fix(command).await?;
             highest_exit_code = max(
                 highest_exit_code,
                 report.exit_code.unwrap_or(NO_COMMANDS_EXIT_CODE),
@@ -499,8 +500,11 @@ impl DefaultDoctorActionRun {
         }
     }
 
-    async fn run_single_fix(&self, command: &str) -> Result<ActionTaskReport, RuntimeError> {
-        let args = vec![command.to_string()];
+    async fn run_single_fix(
+        &self,
+        command: &DoctorCommand,
+    ) -> Result<ActionTaskReport, RuntimeError> {
+        let args = vec![command.text().to_string()];
         let capture = self
             .exec_runner
             .run_command(CaptureOpts {
@@ -516,7 +520,11 @@ impl DefaultDoctorActionRun {
             })
             .await?;
 
-        info!("fix ran {} and exited {:?}", command, capture.exit_code);
+        info!(
+            "fix ran {} and exited {:?}",
+            command.text(),
+            capture.exit_code
+        );
 
         Ok(ActionTaskReport::from(&capture))
     }
@@ -603,8 +611,8 @@ impl DefaultDoctorActionRun {
         let mut action_reports = Vec::new();
         let mut result: Option<CacheStatus> = None;
 
-        for command in &action_command.expand() {
-            let args = vec![command.clone()];
+        for command in action_command {
+            let args = vec![command.text().to_string()];
             let path = format!(
                 "{}:{}",
                 self.model.metadata().containing_dir(),
@@ -625,7 +633,8 @@ impl DefaultDoctorActionRun {
 
             info!(
                 "check ran command {} and result was {:?}",
-                command, output.exit_code
+                command.text(),
+                output.exit_code
             );
 
             let command_result = match output.exit_code {
@@ -1141,9 +1150,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommands {
-                        commands: vec![check_command.to_string()],
-                    }))
+                    .command(Some(DoctorCommands::from(vec![check_command])))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
                     .unwrap(),
@@ -1201,9 +1208,7 @@ pub(crate) mod tests {
             .required(true)
             .check(
                 DoctorGroupActionCheckBuilder::default()
-                    .command(Some(DoctorCommands {
-                        commands: vec![check_command.to_string()],
-                    }))
+                    .command(Some(DoctorCommands::from(vec![check_command])))
                     .files(Some(DoctorGroupCachePath::from(("/foo", vec!["**/*"]))))
                     .build()
                     .unwrap(),
@@ -1412,7 +1417,7 @@ pub(crate) mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn expands_tilde_to_home_dir() {
+        async fn reports_expanded_command_in_output() {
             let mut exec_runner = MockExecutionProvider::new();
             exec_runner
                 .expect_run_command()
@@ -1432,9 +1437,14 @@ pub(crate) mod tests {
             );
 
             let (_highest_status_code, reports) = run
-                .run_commands(&DoctorCommands {
-                    commands: vec!["touch ~/.somefile".to_string()],
-                })
+                .run_commands(
+                    &DoctorCommands::from_commands(
+                        Path::new("/some/dir"),
+                        "/some/working/dir",
+                        &vec!["touch ~/.somefile".to_string()],
+                    )
+                    .unwrap(),
+                )
                 .await
                 .unwrap();
             let report = reports[0].clone();
@@ -1451,7 +1461,7 @@ pub(crate) mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn expands_tilde_to_home_dir() {
+        async fn reports_expanded_command_in_output() {
             let mut exec_runner = MockExecutionProvider::new();
             exec_runner
                 .expect_run_command()
@@ -1471,7 +1481,12 @@ pub(crate) mod tests {
             );
 
             let action_commands = DoctorCommandsBuilder::default()
-                .commands(vec!["test -f ~/.somefile".to_string()])
+                .commands(vec![DoctorCommand::try_new(
+                    Path::new("/some/dir"),
+                    "/some/working/dir",
+                    "test -f ~/.somefile",
+                )
+                .unwrap()])
                 .build()
                 .unwrap();
 
