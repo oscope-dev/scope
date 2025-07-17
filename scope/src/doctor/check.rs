@@ -763,7 +763,7 @@ impl GlobWalker for DefaultGlobWalker {
 
             for path in files {
                 let file_result = file_cache
-                    .check_file(cache_name.to_string(), action_name.to_string(), &path)
+                    .check_file(cache_name, action_name, &path)
                     .await?;
                 debug!(target: "user", "CacheStatus for file {}: {:?}", path.display(), file_result);
                 let check_result = file_result == FileCacheStatus::FileMatches;
@@ -788,7 +788,7 @@ impl GlobWalker for DefaultGlobWalker {
             let glob_path = make_absolute(base_dir, glob_str);
             for path in self.file_system.find_files(&glob_path)? {
                 file_cache
-                    .update_cache_entry(cache_name.to_string(), action_name.to_string(), &path)
+                    .update_cache_entry(cache_name, action_name, &path)
                     .await?;
             }
         }

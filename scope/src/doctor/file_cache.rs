@@ -23,14 +23,14 @@ pub enum FileCacheStatus {
 pub trait FileCache: Sync + Send + Debug {
     async fn check_file(
         &self,
-        group_name: String,
-        action_name: String,
+        group_name: &str,
+        action_name: &str,
         path: &Path,
     ) -> Result<FileCacheStatus>;
     async fn update_cache_entry(
         &self,
-        group_name: String,
-        action_name: String,
+        group_name: &str,
+        action_name: &str,
         path: &Path,
     ) -> Result<()>;
     async fn persist(&self) -> Result<(), FileCacheError>;
@@ -43,8 +43,8 @@ pub struct NoOpCache {}
 impl FileCache for NoOpCache {
     async fn check_file(
         &self,
-        _group_name: String,
-        _action_name: String,
+        _group_name: &str,
+        _action_name: &str,
         _path: &Path,
     ) -> Result<FileCacheStatus> {
         Ok(FileCacheStatus::FileChanged)
@@ -52,8 +52,8 @@ impl FileCache for NoOpCache {
 
     async fn update_cache_entry(
         &self,
-        _group_name: String,
-        _action_name: String,
+        _group_name: &str,
+        _action_name: &str,
         _path: &Path,
     ) -> Result<()> {
         Ok(())
@@ -123,17 +123,17 @@ impl FileCache for FileBasedCache {
     #[tracing::instrument(skip_all, fields(group.name = %group_name, action.name = %action_name))]
     async fn check_file(
         &self,
-        group_name: String,
-        action_name: String,
+        group_name: &str,
+        action_name: &str,
         path: &Path,
     ) -> Result<FileCacheStatus> {
         match make_checksum(path).await {
             Ok(checksum) => {
                 let data = self.data.read().await;
-                let group_cache = data.checksums.get(&group_name).cloned().unwrap_or_default();
+                let group_cache = data.checksums.get(group_name).cloned().unwrap_or_default();
                 let action_cache = group_cache
                     .actions
-                    .get(&action_name)
+                    .get(action_name)
                     .cloned()
                     .unwrap_or_default();
                 if action_cache.files.get(&path.display().to_string()) == Some(&checksum) {
@@ -152,15 +152,18 @@ impl FileCache for FileBasedCache {
     #[tracing::instrument(skip_all, fields(group.name = %group_name, action.name = %action_name))]
     async fn update_cache_entry(
         &self,
-        group_name: String,
-        action_name: String,
+        group_name: &str,
+        action_name: &str,
         path: &Path,
     ) -> Result<()> {
         match make_checksum(path).await {
             Ok(checksum) => {
                 let mut data = self.data.write().await;
-                let group_cache = data.checksums.entry(group_name).or_default();
-                let action_cache = group_cache.actions.entry(action_name).or_default();
+                let group_cache = data.checksums.entry(group_name.to_string()).or_default();
+                let action_cache = group_cache
+                    .actions
+                    .entry(action_name.to_string())
+                    .or_default();
                 action_cache
                     .files
                     .insert(path.display().to_string(), checksum);
@@ -244,11 +247,7 @@ mod tests {
 
             // Should return FileChanged for any file since cache is empty
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &cache_path,
-                )
+                .check_file("test-group", "test-action", &cache_path)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -278,11 +277,7 @@ mod tests {
 
             // Should still create cache but with empty data
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &cache_path,
-                )
+                .check_file("test-group", "test-action", &cache_path)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -296,11 +291,7 @@ mod tests {
             let cache = FileBasedCache::new(&cache_path).unwrap();
 
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .check_file("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -315,21 +306,13 @@ mod tests {
 
             // First update the cache
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
             // Then check - should match
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .check_file("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileMatches);
@@ -344,11 +327,7 @@ mod tests {
 
             // Update cache with original content
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
@@ -357,11 +336,7 @@ mod tests {
 
             // Should detect change
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .check_file("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -375,11 +350,7 @@ mod tests {
             let cache = FileBasedCache::new(&cache_path).unwrap();
 
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &nonexistent_file,
-                )
+                .check_file("test-group", "test-action", &nonexistent_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -392,11 +363,7 @@ mod tests {
             let cache = FileBasedCache::new(&cache_path).unwrap();
 
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    temp_dir.path(),
-                )
+                .check_file("test-group", "test-action", temp_dir.path())
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -411,21 +378,13 @@ mod tests {
 
             // Update cache entry
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
             // Verify it was added
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .check_file("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileMatches);
@@ -440,21 +399,13 @@ mod tests {
 
             // Should not panic or error
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &nonexistent_file,
-                )
+                .update_cache_entry("test-group", "test-action", &nonexistent_file)
                 .await
                 .unwrap();
 
             // Check should return FileMatches since the file consistently doesn't exist
             let status = cache
-                .check_file(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &nonexistent_file,
-                )
+                .check_file("test-group", "test-action", &nonexistent_file)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileMatches);
@@ -470,21 +421,21 @@ mod tests {
 
             // Update different groups
             cache
-                .update_cache_entry("group1".to_string(), "action1".to_string(), &test_file1)
+                .update_cache_entry("group1", "action1", &test_file1)
                 .await
                 .unwrap();
             cache
-                .update_cache_entry("group2".to_string(), "action2".to_string(), &test_file2)
+                .update_cache_entry("group2", "action2", &test_file2)
                 .await
                 .unwrap();
 
             // Both should match their respective groups
             let status1 = cache
-                .check_file("group1".to_string(), "action1".to_string(), &test_file1)
+                .check_file("group1", "action1", &test_file1)
                 .await
                 .unwrap();
             let status2 = cache
-                .check_file("group2".to_string(), "action2".to_string(), &test_file2)
+                .check_file("group2", "action2", &test_file2)
                 .await
                 .unwrap();
 
@@ -502,17 +453,17 @@ mod tests {
 
             // Update different groups
             cache
-                .update_cache_entry("group1".to_string(), "action1".to_string(), &test_file1)
+                .update_cache_entry("group1", "action1", &test_file1)
                 .await
                 .unwrap();
             cache
-                .update_cache_entry("group2".to_string(), "action2".to_string(), &test_file2)
+                .update_cache_entry("group2", "action2", &test_file2)
                 .await
                 .unwrap();
 
             // Cross-group checks should fail
             let status_cross = cache
-                .check_file("group1".to_string(), "action1".to_string(), &test_file2)
+                .check_file("group1", "action1", &test_file2)
                 .await
                 .unwrap();
             assert_eq!(status_cross, FileCacheStatus::FileChanged);
@@ -527,21 +478,21 @@ mod tests {
 
             // Update same file in different groups
             cache
-                .update_cache_entry("group1".to_string(), "action1".to_string(), &test_file)
+                .update_cache_entry("group1", "action1", &test_file)
                 .await
                 .unwrap();
             cache
-                .update_cache_entry("group2".to_string(), "action2".to_string(), &test_file)
+                .update_cache_entry("group2", "action2", &test_file)
                 .await
                 .unwrap();
 
             // Both groups should match
             let status1 = cache
-                .check_file("group1".to_string(), "action1".to_string(), &test_file)
+                .check_file("group1", "action1", &test_file)
                 .await
                 .unwrap();
             let status2 = cache
-                .check_file("group2".to_string(), "action2".to_string(), &test_file)
+                .check_file("group2", "action2", &test_file)
                 .await
                 .unwrap();
 
@@ -556,11 +507,7 @@ mod tests {
 
             let cache = FileBasedCache::new(&cache_path).unwrap();
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
@@ -576,11 +523,7 @@ mod tests {
 
             let cache = FileBasedCache::new(&cache_path).unwrap();
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
@@ -606,11 +549,7 @@ mod tests {
             let cache = FileBasedCache::new(&nested_path).unwrap();
             let test_file = create_test_file(&temp_dir, "test.txt", "content");
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
@@ -631,11 +570,7 @@ mod tests {
             let cache = FileBasedCache::new(&nested_path).unwrap();
             let test_file = create_test_file(&temp_dir, "test.txt", "content");
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
@@ -666,11 +601,11 @@ mod tests {
             {
                 let cache = FileBasedCache::new(&cache_path).unwrap();
                 cache
-                    .update_cache_entry("group1".to_string(), "action1".to_string(), &test_file1)
+                    .update_cache_entry("group1", "action1", &test_file1)
                     .await
                     .unwrap();
                 cache
-                    .update_cache_entry("group2".to_string(), "action2".to_string(), &test_file2)
+                    .update_cache_entry("group2", "action2", &test_file2)
                     .await
                     .unwrap();
                 cache.persist().await.unwrap();
@@ -681,11 +616,11 @@ mod tests {
 
             // Should load previous data
             let status1 = cache2
-                .check_file("group1".to_string(), "action1".to_string(), &test_file1)
+                .check_file("group1", "action1", &test_file1)
                 .await
                 .unwrap();
             let status2 = cache2
-                .check_file("group2".to_string(), "action2".to_string(), &test_file2)
+                .check_file("group2", "action2", &test_file2)
                 .await
                 .unwrap();
 
@@ -738,11 +673,11 @@ mod tests {
 
             // Both groups should have the file
             let status1 = cache
-                .check_file("group1".to_string(), "action1".to_string(), &test_file)
+                .check_file("group1", "action1", &test_file)
                 .await
                 .unwrap();
             let status2 = cache
-                .check_file("group2".to_string(), "action2".to_string(), &test_file)
+                .check_file("group2", "action2", &test_file)
                 .await
                 .unwrap();
 
@@ -810,7 +745,7 @@ mod tests {
 
             // Should always return FileChanged
             let status = cache
-                .check_file("test".to_string(), "test-action".to_string(), &temp_path)
+                .check_file("test", "test-action", &temp_path)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -823,7 +758,7 @@ mod tests {
 
             // Should succeed but do nothing
             cache
-                .update_cache_entry("test".to_string(), "test-action".to_string(), &temp_path)
+                .update_cache_entry("test", "test-action", &temp_path)
                 .await
                 .unwrap();
             cache.persist().await.unwrap();
@@ -836,13 +771,13 @@ mod tests {
 
             // Update cache entry (should do nothing)
             cache
-                .update_cache_entry("test".to_string(), "test-action".to_string(), &temp_path)
+                .update_cache_entry("test", "test-action", &temp_path)
                 .await
                 .unwrap();
 
             // Still returns FileChanged after update
             let status = cache
-                .check_file("test".to_string(), "test-action".to_string(), &temp_path)
+                .check_file("test", "test-action", &temp_path)
                 .await
                 .unwrap();
             assert_eq!(status, FileCacheStatus::FileChanged);
@@ -861,21 +796,21 @@ mod tests {
 
             // Update same file for different actions in same group
             cache
-                .update_cache_entry("group1".to_string(), "action1".to_string(), &test_file)
+                .update_cache_entry("group1", "action1", &test_file)
                 .await
                 .unwrap();
             cache
-                .update_cache_entry("group1".to_string(), "action2".to_string(), &test_file)
+                .update_cache_entry("group1", "action2", &test_file)
                 .await
                 .unwrap();
 
             // Both actions should match for their specific action
             let status1 = cache
-                .check_file("group1".to_string(), "action1".to_string(), &test_file)
+                .check_file("group1", "action1", &test_file)
                 .await
                 .unwrap();
             let status2 = cache
-                .check_file("group1".to_string(), "action2".to_string(), &test_file)
+                .check_file("group1", "action2", &test_file)
                 .await
                 .unwrap();
 
@@ -884,7 +819,7 @@ mod tests {
 
             // Cross-action checks should fail (checking action1 cache with action2 name)
             let status_cross = cache
-                .check_file("group1".to_string(), "action3".to_string(), &test_file)
+                .check_file("group1", "action3", &test_file)
                 .await
                 .unwrap();
             assert_eq!(status_cross, FileCacheStatus::FileChanged);
@@ -923,11 +858,7 @@ mod tests {
             // Since the cache is effectively empty (old format was invalid),
             // any file check should return FileChanged
             let status = cache
-                .check_file(
-                    "any-group".to_string(),
-                    "any-action".to_string(),
-                    &test_file,
-                )
+                .check_file("any-group", "any-action", &test_file)
                 .await
                 .unwrap();
 
@@ -935,11 +866,7 @@ mod tests {
 
             // Verify that updating and persisting works with the new format
             cache
-                .update_cache_entry(
-                    "test-group".to_string(),
-                    "test-action".to_string(),
-                    &test_file,
-                )
+                .update_cache_entry("test-group", "test-action", &test_file)
                 .await
                 .unwrap();
 
