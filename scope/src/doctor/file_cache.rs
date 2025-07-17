@@ -49,7 +49,13 @@ struct FileCacheData {
     // group-name: { action-name: { file-path: checksum } }
     // checksums: BTreeMap<String, BTreeMap<String, BTreeMap<String, String>>>,
     #[serde(default)]
-    checksums: BTreeMap<String, BTreeMap<String, String>>,
+    checksums: BTreeMap<String, GroupCache>, // group-name -> file-path -> checksum
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+struct GroupCache {
+    #[serde(flatten)]
+    files: BTreeMap<String, String>, // file-path -> checksum
 }
 
 #[derive(Debug, Default)]
@@ -93,7 +99,7 @@ impl FileCache for FileBasedCache {
             Ok(checksum) => {
                 let data = self.data.read().await;
                 let check_cache = data.checksums.get(&check_name).cloned().unwrap_or_default();
-                if check_cache.get(&path.display().to_string()) == Some(&checksum) {
+                if check_cache.files.get(&path.display().to_string()) == Some(&checksum) {
                     Ok(FileCacheStatus::FileMatches)
                 } else {
                     Ok(FileCacheStatus::FileChanged)
@@ -112,7 +118,7 @@ impl FileCache for FileBasedCache {
             Ok(checksum) => {
                 let mut data = self.data.write().await;
                 let check_cache = data.checksums.entry(check_name).or_default();
-                check_cache.insert(path.display().to_string(), checksum);
+                check_cache.files.insert(path.display().to_string(), checksum);
             }
             Err(e) => {
                 info!("Unable to make checksum of file. {:?}", e);
@@ -591,6 +597,7 @@ mod tests {
                 data.checksums
                     .entry("group1".to_string())
                     .or_default()
+                    .files
                     .insert(file_path1.display().to_string(), checksum);
             });
 
@@ -600,6 +607,7 @@ mod tests {
                 data.checksums
                     .entry("group2".to_string())
                     .or_default()
+                    .files
                     .insert(file_path2.display().to_string(), checksum);
             });
 
