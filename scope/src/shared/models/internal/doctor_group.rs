@@ -6,7 +6,7 @@ use derive_builder::Builder;
 
 use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
-use crate::prelude::{DoctorGroupActionSpec, DoctorInclude};
+use crate::prelude::{DoctorGroupActionSpec, DoctorInclude, SkipSpec};
 use crate::shared::models::internal::{DoctorCommands, DoctorFix};
 
 use super::substitute_templates;
@@ -56,6 +56,8 @@ pub struct DoctorGroup {
     pub run_by_default: bool,
     pub actions: Vec<DoctorGroupAction>,
     pub extra_report_args: BTreeMap<String, String>,
+    #[builder(default)]
+    pub skip: SkipSpec,
 }
 
 impl HelpMetadata for DoctorGroup {
@@ -84,6 +86,7 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
             requires: model.spec.needs,
             run_by_default: model.spec.include == DoctorInclude::ByDefault,
             extra_report_args: model.spec.report_extra_details,
+            skip: model.spec.skip,
         })
     }
 }

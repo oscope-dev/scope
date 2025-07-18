@@ -1,0 +1,14 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: group-skip-default
+  description: Test group with skip field omitted (defaults to false)
+spec:
+  actions:
+    - name: should-run
+      check:
+        commands:
+          - echo "This check should run"
+      fix:
+        commands:
+          - echo "This fix should run"

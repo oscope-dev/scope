@@ -173,6 +173,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
 
         let container = GroupActionContainer {
             group_name: group.metadata.name().to_string(),
+            group: group.clone(),
             actions: action_runs,
             additional_report_details: group.extra_report_args.clone(),
             exec_provider: exec_runner.clone(),

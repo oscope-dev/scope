@@ -159,3 +159,91 @@ fn test_sub_command_works() {
     ));
     test_helper.clean_work_dir();
 }
+
+#[test]
+fn test_group_skip_boolean_true() {
+    let test_helper = ScopeTestHelper::new("test_group_skip_boolean_true", "group-skip-boolean");
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains(
+            "Group skipped, group: \"group-skip-boolean\"",
+        ))
+        .stdout(predicate::str::contains("This check should not run").not())
+        .stdout(predicate::str::contains("This fix should not run").not())
+        .stdout(predicate::str::contains(
+            "Summary: 0 groups succeeded, 1 groups skipped",
+        ));
+
+    test_helper.clean_work_dir();
+}
+
+#[test]
+fn test_group_skip_boolean_false() {
+    let test_helper =
+        ScopeTestHelper::new("test_group_skip_boolean_false", "group-skip-boolean-false");
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains("Group skipped").not())
+        .stdout(predicate::str::contains(
+            "Check was successful, group: \"group-skip-boolean-false\", name: \"should-run\"",
+        ))
+        .stdout(predicate::str::contains("Summary: 1 groups succeeded"));
+
+    test_helper.clean_work_dir();
+}
+
+#[test]
+fn test_group_skip_default() {
+    let test_helper = ScopeTestHelper::new("test_group_skip_default", "group-skip-default");
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains("Group skipped").not())
+        .stdout(predicate::str::contains(
+            "Check was successful, group: \"group-skip-default\", name: \"should-run\"",
+        ))
+        .stdout(predicate::str::contains("Summary: 1 groups succeeded"));
+
+    test_helper.clean_work_dir();
+}
+
+#[test]
+fn test_group_skip_command_success() {
+    let test_helper = ScopeTestHelper::new("test_group_skip_command_success", "group-skip-command");
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains(
+            "Group skipped, group: \"group-skip-command\"",
+        ))
+        .stdout(predicate::str::contains("This check should not run").not())
+        .stdout(predicate::str::contains("This fix should not run").not())
+        .stdout(predicate::str::contains(
+            "Summary: 0 groups succeeded, 1 groups skipped",
+        ));
+
+    test_helper.clean_work_dir();
+}
+
+#[test]
+fn test_group_skip_command_fail() {
+    let test_helper =
+        ScopeTestHelper::new("test_group_skip_command_fail", "group-skip-command-fail");
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains("Group skipped").not())
+        .stdout(predicate::str::contains(
+            "Check was successful, group: \"group-skip-command-fail\", name: \"should-run\"",
+        ))
+        .stdout(predicate::str::contains("Summary: 1 groups succeeded"));
+
+    test_helper.clean_work_dir();
+}
