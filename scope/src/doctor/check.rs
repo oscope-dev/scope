@@ -268,6 +268,7 @@ impl DefaultDoctorActionRun {
                     &cache_path.base_path,
                     &cache_path.paths,
                     &self.model.metadata.name(),
+                    &self.action.name,
                     self.file_cache.clone(),
                 )
                 .await;
@@ -592,6 +593,7 @@ impl DefaultDoctorActionRun {
                 &paths.base_path,
                 &paths.paths,
                 &self.model.metadata.name(),
+                &self.action.name,
                 self.file_cache.clone(),
             )
             .await?;
@@ -682,6 +684,7 @@ pub trait GlobWalker: Send + Sync {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
+        action_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError>;
 
@@ -690,6 +693,7 @@ pub trait GlobWalker: Send + Sync {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
+        action_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<(), RuntimeError>;
 }
@@ -746,6 +750,7 @@ impl GlobWalker for DefaultGlobWalker {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
+        action_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<bool, RuntimeError> {
         for glob_str in paths {
@@ -757,7 +762,9 @@ impl GlobWalker for DefaultGlobWalker {
             }
 
             for path in files {
-                let file_result = file_cache.check_file(cache_name.to_string(), &path).await?;
+                let file_result = file_cache
+                    .check_file(cache_name, action_name, &path)
+                    .await?;
                 debug!(target: "user", "CacheStatus for file {}: {:?}", path.display(), file_result);
                 let check_result = file_result == FileCacheStatus::FileMatches;
                 if !check_result {
@@ -774,13 +781,14 @@ impl GlobWalker for DefaultGlobWalker {
         base_dir: &Path,
         paths: &[String],
         cache_name: &str,
+        action_name: &str,
         file_cache: Arc<dyn FileCache>,
     ) -> Result<(), RuntimeError> {
         for glob_str in paths {
             let glob_path = make_absolute(base_dir, glob_str);
             for path in self.file_system.find_files(&glob_path)? {
                 file_cache
-                    .update_cache_entry(cache_name.to_string(), &path)
+                    .update_cache_entry(cache_name, action_name, &path)
                     .await?;
             }
         }
@@ -1068,11 +1076,11 @@ pub(crate) mod tests {
         glob_walker
             .expect_have_globs_changed()
             .times(1)
-            .returning(|_, _, _, _| Ok(false));
+            .returning(|_, _, _, _, _| Ok(false));
         glob_walker
             .expect_update_cache()
             .times(1)
-            .returning(|_, _, _, _| Ok(()));
+            .returning(|_, _, _, _, _| Ok(()));
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
@@ -1098,11 +1106,11 @@ pub(crate) mod tests {
         glob_walker
             .expect_have_globs_changed()
             .times(1)
-            .returning(|_, _, _, _| Ok(false));
+            .returning(|_, _, _, _, _| Ok(false));
         glob_walker
             .expect_update_cache()
             .times(1)
-            .returning(|_, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
+            .returning(|_, _, _, _, _| Err(RuntimeError::AnyError(anyhow!("bogus error"))));
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
 
@@ -1128,7 +1136,7 @@ pub(crate) mod tests {
         glob_walker
             .expect_have_globs_changed()
             .times(1)
-            .returning(|_, _, _, _| Ok(false));
+            .returning(|_, _, _, _, _| Ok(false));
         glob_walker.expect_update_cache().never();
 
         let run = setup_test(vec![action], exec_runner, glob_walker);
@@ -1170,11 +1178,11 @@ pub(crate) mod tests {
         glob_walker
             .expect_have_globs_changed()
             .times(1)
-            .returning(|_, _, _, _| Ok(true));
+            .returning(|_, _, _, _, _| Ok(true));
         glob_walker
             .expect_update_cache()
             .once()
-            .returning(|_, _, _, _| Ok(()));
+            .returning(|_, _, _, _, _| Ok(()));
 
         exec_runner
             .expect_run_command()
@@ -1228,11 +1236,11 @@ pub(crate) mod tests {
         glob_walker
             .expect_have_globs_changed()
             .times(1)
-            .returning(|_, _, _, _| Ok(false));
+            .returning(|_, _, _, _, _| Ok(false));
         glob_walker
             .expect_update_cache()
             .once()
-            .returning(|_, _, _, _| Ok(()));
+            .returning(|_, _, _, _, _| Ok(()));
 
         exec_runner
             .expect_run_command()
@@ -1267,9 +1275,10 @@ pub(crate) mod tests {
             .once()
             .with(
                 predicate::eq("file_cache".to_string()),
+                predicate::eq("action_name".to_string()),
                 predicate::eq(Path::new("/foo/bar")),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         file_system
             .expect_find_files()
@@ -1286,6 +1295,7 @@ pub(crate) mod tests {
                 Path::new("/foo/root"),
                 &["*.txt".to_string()],
                 "file_cache",
+                "action_name",
                 Arc::new(file_cache),
             )
             .await;
@@ -1302,9 +1312,10 @@ pub(crate) mod tests {
             .once()
             .with(
                 predicate::eq("file_cache".to_string()),
+                predicate::eq("action_name".to_string()),
                 predicate::eq(Path::new("/foo/bar")),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         file_system
             .expect_find_files()
@@ -1321,6 +1332,7 @@ pub(crate) mod tests {
                 Path::new("/foo/root"),
                 &["/a/abs/path/*.txt".to_string()],
                 "file_cache",
+                "action_name",
                 Arc::new(file_cache),
             )
             .await;
@@ -1340,9 +1352,10 @@ pub(crate) mod tests {
             .once()
             .with(
                 predicate::eq("group_name".to_string()),
+                predicate::eq("action_name".to_string()),
                 predicate::eq(resolved_path.clone()),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         file_system
             .expect_find_files()
@@ -1367,6 +1380,7 @@ pub(crate) mod tests {
                 Path::new("/foo/root"),
                 &["~/path/*.txt".to_string()],
                 "group_name",
+                "action_name",
                 Arc::new(file_cache),
             )
             .await;
@@ -1385,9 +1399,10 @@ pub(crate) mod tests {
             .once()
             .with(
                 predicate::eq("group_name".to_string()),
+                predicate::eq("action_name".to_string()),
                 predicate::eq(Path::new("/foo/path/foo.txt")),
             )
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         file_system
             .expect_find_files()
@@ -1407,6 +1422,7 @@ pub(crate) mod tests {
                 Path::new("/foo/root"),
                 &["../path/*.txt".to_string()],
                 "group_name",
+                "action_name",
                 Arc::new(file_cache),
             )
             .await;

@@ -674,6 +674,7 @@ dependencies = [
  "shellexpand",
  "strip-ansi-escapes",
  "strum",
+ "tempfile",
  "thiserror",
  "time",
  "tokio",
