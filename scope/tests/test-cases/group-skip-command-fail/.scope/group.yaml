@@ -1,0 +1,16 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: group-skip-command-fail
+  description: Test group with skip command that returns failure
+spec:
+  skip: 
+    command: "false"
+  actions:
+    - name: should-run
+      check:
+        commands:
+          - echo "This check should run"
+      fix:
+        commands:
+          - echo "This fix should run"

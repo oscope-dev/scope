@@ -1,4 +1,5 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
+use crate::models::HelpMetadata;
 use crate::prelude::{
     progress_bar_without_pos, ActionReport, ActionTaskReport, ExecutionProvider, GroupReport,
 };
@@ -68,7 +69,11 @@ impl PathRunResult {
             }
             GroupExecutionStatus::Skipped => {
                 self.skipped_group.insert(group_name);
-                self.did_succeed = false;
+                self.did_succeed = false; // User-denied fixes should cause failure
+            }
+            GroupExecutionStatus::GroupSkipped => {
+                self.skipped_group.insert(group_name);
+                // Note: Group skips via configuration do not cause the overall command to fail
             }
         };
 
@@ -81,6 +86,7 @@ enum GroupExecutionStatus {
     Succeeded,
     Failed,
     Skipped,
+    GroupSkipped,
 }
 
 #[derive(Debug)]
@@ -96,6 +102,7 @@ where
     T: DoctorActionRun,
 {
     pub group_name: String,
+    pub group: DoctorGroup,
     pub actions: Vec<T>,
     pub additional_report_details: BTreeMap<String, String>,
     pub exec_provider: Arc<dyn ExecutionProvider>,
@@ -112,6 +119,36 @@ where
             .exec_provider
             .run_for_output(&self.sys_path, &self.exec_working_dir, command)
             .await)
+    }
+
+    pub async fn should_skip_group(&self) -> Result<bool, crate::doctor::check::RuntimeError> {
+        use crate::prelude::SkipSpec;
+
+        match &self.group.skip {
+            SkipSpec::Skip(should_skip) => Ok(*should_skip),
+            SkipSpec::Command { command } => {
+                let args = vec![command.clone()];
+                let path = format!(
+                    "{}:{}",
+                    self.group.metadata().containing_dir(),
+                    self.group.metadata().exec_path()
+                );
+
+                let output = self
+                    .exec_provider
+                    .run_command(crate::shared::prelude::CaptureOpts {
+                        working_dir: &self.exec_working_dir,
+                        args: &args,
+                        output_dest: crate::shared::prelude::OutputDestination::Logging,
+                        path: &path,
+                        env_vars: crate::prelude::generate_env_vars(),
+                    })
+                    .await?;
+
+                // Skip if command returns success (exit code 0)
+                Ok(output.exit_code == Some(0))
+            }
+        }
     }
 }
 
@@ -204,6 +241,13 @@ where
             status: GroupExecutionStatus::Succeeded,
             group_report: GroupReport::new(&container.group_name),
         };
+
+        // Check if the group should be skipped
+        if container.should_skip_group().await? {
+            warn!(target: "always", "Group skipped, group: \"{}\"", container.group_name);
+            results.status = GroupExecutionStatus::GroupSkipped;
+            return Ok(results);
+        }
 
         for action in &container.actions {
             group_span.pb_inc(1);
@@ -657,10 +701,18 @@ mod tests {
         name: &str,
         result: Vec<T>,
     ) -> (String, GroupActionContainer<T>) {
+        // Create a minimal test group
+        let test_group = crate::doctor::tests::make_root_model_additional(
+            vec![],
+            |meta| meta.name(name),
+            |group| group,
+        );
+
         (
             name.to_string(),
             GroupActionContainer {
                 group_name: name.to_string(),
+                group: test_group,
                 actions: result,
                 additional_report_details: Default::default(),
                 exec_provider: Arc::new(MockExecutionProvider::new()),
@@ -917,5 +969,107 @@ mod tests {
         let task_reports = action_task_reports_for_display(&action_report);
         let actual = task_reports.first().unwrap();
         assert_eq!(actual.output, Some("validate output".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_execute_group_skips_when_should_skip_group_returns_true() -> Result<()> {
+        let mut mock_action = MockDoctorActionRun::new();
+        mock_action.expect_run_action().never(); // Should not be called
+        mock_action.expect_help_text().return_const(None);
+        mock_action.expect_help_url().return_const(None);
+        mock_action
+            .expect_name()
+            .returning(|| "test action".to_string());
+        mock_action.expect_required().return_const(false);
+        mock_action
+            .expect_description()
+            .returning(|| "test description".to_string());
+
+        // Create a test group with skip = true
+        let test_group = crate::doctor::tests::make_root_model_additional(
+            vec![],
+            |meta| meta.name("test-group"),
+            |group| group.skip(crate::prelude::SkipSpec::Skip(true)),
+        );
+
+        let container = GroupActionContainer {
+            group_name: "test-group".to_string(),
+            group: test_group,
+            actions: vec![mock_action],
+            additional_report_details: Default::default(),
+            exec_provider: Arc::new(MockExecutionProvider::new()),
+            exec_working_dir: Default::default(),
+            sys_path: "".to_string(),
+        };
+
+        let run_groups = RunGroups {
+            group_actions: BTreeMap::new(),
+            all_paths: Vec::new(),
+        };
+
+        let group_span = info_span!("test_group", "indicatif.pb_show" = true);
+        let result = run_groups.execute_group(&group_span, &container).await?;
+
+        // Verify the group was skipped
+        assert_eq!(result.group_name, "test-group");
+        assert!(matches!(result.status, GroupExecutionStatus::GroupSkipped));
+        assert!(!result.skip_remaining);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_group_runs_actions_when_should_skip_group_returns_false() -> Result<()> {
+        let mut mock_action = MockDoctorActionRun::new();
+        mock_action.expect_run_action().returning(|_| {
+            Ok(ActionRunResult::new(
+                "test action",
+                ActionRunStatus::CheckSucceeded,
+                None,
+                None,
+                None,
+            ))
+        });
+        mock_action.expect_help_text().return_const(None);
+        mock_action.expect_help_url().return_const(None);
+        mock_action
+            .expect_name()
+            .returning(|| "test action".to_string());
+        mock_action.expect_required().return_const(false);
+        mock_action
+            .expect_description()
+            .returning(|| "test description".to_string());
+
+        // Create a test group with skip = false
+        let test_group = crate::doctor::tests::make_root_model_additional(
+            vec![],
+            |meta| meta.name("test-group"),
+            |group| group.skip(crate::prelude::SkipSpec::Skip(false)),
+        );
+
+        let container = GroupActionContainer {
+            group_name: "test-group".to_string(),
+            group: test_group,
+            actions: vec![mock_action],
+            additional_report_details: Default::default(),
+            exec_provider: Arc::new(MockExecutionProvider::new()),
+            exec_working_dir: Default::default(),
+            sys_path: "".to_string(),
+        };
+
+        let run_groups = RunGroups {
+            group_actions: BTreeMap::new(),
+            all_paths: Vec::new(),
+        };
+
+        let group_span = info_span!("test_group", "indicatif.pb_show" = true);
+        let result = run_groups.execute_group(&group_span, &container).await?;
+
+        // Verify the group was executed normally
+        assert_eq!(result.group_name, "test-group");
+        assert!(matches!(result.status, GroupExecutionStatus::Succeeded));
+        assert!(!result.skip_remaining);
+
+        Ok(())
     }
 }
