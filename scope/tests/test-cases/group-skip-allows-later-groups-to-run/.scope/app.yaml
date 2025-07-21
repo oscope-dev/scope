@@ -1,0 +1,10 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: app
+  description: Imports a group that is skipped and another that should run 
+spec:
+  needs: 
+    - group-skipped
+    - group-runs
+  actions: []

@@ -1,0 +1,15 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: group-runs
+  description: This group should be run even if a previous group is skipped
+spec:
+  include: when-required
+  actions:
+    - name: should-run
+      check:
+        commands:
+          - echo "This check should run"
+      fix:
+        commands:
+          - echo "This fix should run"

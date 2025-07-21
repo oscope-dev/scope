@@ -247,3 +247,26 @@ fn test_group_skip_command_fail() {
 
     test_helper.clean_work_dir();
 }
+
+#[test]
+fn test_group_skip_subsequent_groups_run() {
+    let test_helper = ScopeTestHelper::new(
+        "test_group_skip_subsequent_groups_run",
+        "group-skip-allows-later-groups-to-run",
+    );
+    let result = test_helper.doctor_run(None);
+
+    result
+        .success()
+        .stdout(predicate::str::contains(
+            "Group skipped, group: \"group-skipped\"",
+        ))
+        .stdout(predicate::str::contains(
+            "Check was successful, group: \"group-runs\", name: \"should-run\"",
+        ))
+        .stdout(predicate::str::contains(
+            "Summary: 2 groups succeeded, 1 groups skipped",
+        ));
+
+    test_helper.clean_work_dir();
+}
