@@ -101,10 +101,8 @@ pub struct GroupActionContainer<T>
 where
     T: DoctorActionRun,
 {
-    pub group_name: String,
     pub group: DoctorGroup,
     pub actions: Vec<T>,
-    pub additional_report_details: BTreeMap<String, String>,
     pub exec_provider: Arc<dyn ExecutionProvider>,
     pub exec_working_dir: PathBuf,
     pub sys_path: String,
@@ -114,6 +112,30 @@ impl<T> GroupActionContainer<T>
 where
     T: DoctorActionRun,
 {
+    pub fn new(
+        group: DoctorGroup,
+        actions: Vec<T>,
+        exec_provider: Arc<dyn ExecutionProvider>,
+        exec_working_dir: PathBuf,
+        sys_path: String,
+    ) -> Self {
+        Self {
+            group: group.clone(),
+            actions,
+            exec_provider,
+            exec_working_dir,
+            sys_path,
+        }
+    }
+
+    pub fn group_name(&self) -> &str {
+        &self.group.metadata.name
+    }
+
+    pub fn additional_report_details(&self) -> &BTreeMap<String, String> {
+        &self.group.extra_report_args
+    }
+
     pub async fn execute_command(&self, command: &str) -> Result<String> {
         Ok(self
             .exec_provider
@@ -192,7 +214,7 @@ where
         };
 
         for group_container in groups {
-            let group_name = group_container.group_name.clone();
+            let group_name = group_container.group_name();
             header_span.pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
@@ -236,15 +258,15 @@ where
         container: &GroupActionContainer<T>,
     ) -> Result<GroupExecutionResult> {
         let mut results = GroupExecutionResult {
-            group_name: container.group_name.to_string(),
+            group_name: container.group_name().to_string(),
             skip_remaining: false,
             status: GroupExecutionStatus::Succeeded,
-            group_report: GroupReport::new(&container.group_name),
+            group_report: GroupReport::new(&container.group_name()),
         };
 
         // Check if the group should be skipped
         if container.should_skip_group().await? {
-            warn!(target: "always", "Group skipped, group: \"{}\"", container.group_name);
+            warn!(target: "always", "Group skipped, group: \"{}\"", container.group_name());
             results.status = GroupExecutionStatus::GroupSkipped;
             return Ok(results);
         }
@@ -252,7 +274,7 @@ where
         for action in &container.actions {
             group_span.pb_inc(1);
             if results.skip_remaining {
-                info!(target: "user", "Check `{}/{}` was skipped.", container.group_name.bold(), action.name());
+                info!(target: "user", "Check `{}/{}` was skipped.", container.group_name().bold(), action.name());
                 continue;
             }
 
@@ -260,7 +282,7 @@ where
                 parent: group_span,
                 "action",
                 "indicatif.pb_show" = true,
-                "group.name" = container.group_name,
+                "group.name" = container.group_name(),
                 "action.name" = action.name(),
                 "otel.name" = format!("action {}", action.name())
             );
@@ -290,7 +312,7 @@ where
                 .add_action(&action_result.action_report);
 
             // ignore the result, because reporting shouldn't cause app to crash
-            report_action_output(&container.group_name, action, &action_result)
+            report_action_output(&container.group_name(), action, &action_result)
                 .await
                 .ok();
 
@@ -313,7 +335,7 @@ where
             };
         }
 
-        for (name, command) in &container.additional_report_details {
+        for (name, command) in container.additional_report_details() {
             let output = container.execute_command(command).await.ok();
             results.group_report.add_additional_details(
                 name,
@@ -711,10 +733,8 @@ mod tests {
         (
             name.to_string(),
             GroupActionContainer {
-                group_name: name.to_string(),
                 group: test_group,
                 actions: result,
-                additional_report_details: Default::default(),
                 exec_provider: Arc::new(MockExecutionProvider::new()),
                 exec_working_dir: Default::default(),
                 sys_path: "".to_string(),
@@ -993,10 +1013,8 @@ mod tests {
         );
 
         let container = GroupActionContainer {
-            group_name: "test-group".to_string(),
             group: test_group,
             actions: vec![mock_action],
-            additional_report_details: Default::default(),
             exec_provider: Arc::new(MockExecutionProvider::new()),
             exec_working_dir: Default::default(),
             sys_path: "".to_string(),
@@ -1048,10 +1066,8 @@ mod tests {
         );
 
         let container = GroupActionContainer {
-            group_name: "test-group".to_string(),
             group: test_group,
             actions: vec![mock_action],
-            additional_report_details: Default::default(),
             exec_provider: Arc::new(MockExecutionProvider::new()),
             exec_working_dir: Default::default(),
             sys_path: "".to_string(),

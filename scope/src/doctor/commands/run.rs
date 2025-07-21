@@ -171,20 +171,19 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
             action_runs.push(run);
         }
 
-        let container = GroupActionContainer {
-            group_name: group.metadata.name().to_string(),
-            group: group.clone(),
-            actions: action_runs,
-            additional_report_details: group.extra_report_args.clone(),
-            exec_provider: exec_runner.clone(),
-            exec_working_dir: found_config.working_dir.clone(),
-            sys_path: found_config.bin_path.clone(),
-        };
+        let container = GroupActionContainer::new(
+            group.clone(),
+            action_runs,
+             exec_runner.clone(),
+            found_config.working_dir.clone(),
+            found_config.bin_path.clone(),
+        );
 
-        groups.insert(group.metadata.name().to_string(), container);
+        let group_name = container.group_name().to_string();
+        groups.insert(group_name.clone(), container);
 
         if should_group_run {
-            desired_groups.insert(group.metadata.name().to_string());
+            desired_groups.insert(group_name);
         }
     }
 
