@@ -1,6 +1,9 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
+use crate::doctor::check::RuntimeError;
+use crate::models::HelpMetadata;
 use crate::prelude::{
-    progress_bar_without_pos, ActionReport, ActionTaskReport, ExecutionProvider, GroupReport,
+    generate_env_vars, progress_bar_without_pos, ActionReport, ActionTaskReport, CaptureOpts,
+    ExecutionProvider, GroupReport, OutputDestination, SkipSpec,
 };
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
@@ -68,7 +71,11 @@ impl PathRunResult {
             }
             GroupExecutionStatus::Skipped => {
                 self.skipped_group.insert(group_name);
-                self.did_succeed = false;
+                self.did_succeed = false; // User-denied fixes should cause failure
+            }
+            GroupExecutionStatus::GroupSkipped => {
+                self.skipped_group.insert(group_name);
+                // Note: Group skips via configuration do not cause the overall command to fail
             }
         };
 
@@ -81,6 +88,7 @@ enum GroupExecutionStatus {
     Succeeded,
     Failed,
     Skipped,
+    GroupSkipped,
 }
 
 #[derive(Debug)]
@@ -95,9 +103,8 @@ pub struct GroupActionContainer<T>
 where
     T: DoctorActionRun,
 {
-    pub group_name: String,
+    pub group: DoctorGroup,
     pub actions: Vec<T>,
-    pub additional_report_details: BTreeMap<String, String>,
     pub exec_provider: Arc<dyn ExecutionProvider>,
     pub exec_working_dir: PathBuf,
     pub sys_path: String,
@@ -107,11 +114,63 @@ impl<T> GroupActionContainer<T>
 where
     T: DoctorActionRun,
 {
+    pub fn new(
+        group: DoctorGroup,
+        actions: Vec<T>,
+        exec_provider: Arc<dyn ExecutionProvider>,
+        exec_working_dir: PathBuf,
+        sys_path: String,
+    ) -> Self {
+        Self {
+            group: group.clone(),
+            actions,
+            exec_provider,
+            exec_working_dir,
+            sys_path,
+        }
+    }
+
+    pub fn group_name(&self) -> &str {
+        &self.group.metadata.name
+    }
+
+    pub fn additional_report_details(&self) -> &BTreeMap<String, String> {
+        &self.group.extra_report_args
+    }
+
     pub async fn execute_command(&self, command: &str) -> Result<String> {
         Ok(self
             .exec_provider
             .run_for_output(&self.sys_path, &self.exec_working_dir, command)
             .await)
+    }
+
+    pub async fn should_skip_group(&self) -> Result<bool, RuntimeError> {
+        match &self.group.skip {
+            SkipSpec::Skip(should_skip) => Ok(*should_skip),
+            SkipSpec::Command { command } => {
+                let args = vec![command.clone()];
+                let path = format!(
+                    "{}:{}",
+                    self.group.metadata().containing_dir(),
+                    self.group.metadata().exec_path()
+                );
+
+                let output = self
+                    .exec_provider
+                    .run_command(CaptureOpts {
+                        working_dir: &self.exec_working_dir,
+                        args: &args,
+                        output_dest: OutputDestination::Logging,
+                        path: &path,
+                        env_vars: generate_env_vars(),
+                    })
+                    .await?;
+
+                // Skip if command returns success (exit code 0)
+                Ok(output.exit_code == Some(0))
+            }
+        }
     }
 }
 
@@ -155,7 +214,7 @@ where
         };
 
         for group_container in groups {
-            let group_name = group_container.group_name.clone();
+            let group_name = group_container.group_name();
             header_span.pb_inc(1);
             debug!(target: "user", "Running check {}", group_name);
 
@@ -199,16 +258,23 @@ where
         container: &GroupActionContainer<T>,
     ) -> Result<GroupExecutionResult> {
         let mut results = GroupExecutionResult {
-            group_name: container.group_name.to_string(),
+            group_name: container.group_name().to_string(),
             skip_remaining: false,
             status: GroupExecutionStatus::Succeeded,
-            group_report: GroupReport::new(&container.group_name),
+            group_report: GroupReport::new(container.group_name()),
         };
+
+        // Check if the group should be skipped
+        if container.should_skip_group().await? {
+            warn!(target: "always", "Group skipped, group: \"{}\"", container.group_name());
+            results.status = GroupExecutionStatus::GroupSkipped;
+            return Ok(results);
+        }
 
         for action in &container.actions {
             group_span.pb_inc(1);
             if results.skip_remaining {
-                info!(target: "user", "Check `{}/{}` was skipped.", container.group_name.bold(), action.name());
+                info!(target: "user", "Check `{}/{}` was skipped.", container.group_name().bold(), action.name());
                 continue;
             }
 
@@ -216,7 +282,7 @@ where
                 parent: group_span,
                 "action",
                 "indicatif.pb_show" = true,
-                "group.name" = container.group_name,
+                "group.name" = container.group_name(),
                 "action.name" = action.name(),
                 "otel.name" = format!("action {}", action.name())
             );
@@ -246,7 +312,7 @@ where
                 .add_action(&action_result.action_report);
 
             // ignore the result, because reporting shouldn't cause app to crash
-            report_action_output(&container.group_name, action, &action_result)
+            report_action_output(container.group_name(), action, &action_result)
                 .await
                 .ok();
 
@@ -269,7 +335,7 @@ where
             };
         }
 
-        for (name, command) in &container.additional_report_details {
+        for (name, command) in container.additional_report_details() {
             let output = container.execute_command(command).await.ok();
             results.group_report.add_additional_details(
                 name,
@@ -657,12 +723,14 @@ mod tests {
         name: &str,
         result: Vec<T>,
     ) -> (String, GroupActionContainer<T>) {
+        // Create a minimal test group
+        let test_group = make_root_model_additional(vec![], |meta| meta.name(name), |group| group);
+
         (
             name.to_string(),
             GroupActionContainer {
-                group_name: name.to_string(),
+                group: test_group,
                 actions: result,
-                additional_report_details: Default::default(),
                 exec_provider: Arc::new(MockExecutionProvider::new()),
                 exec_working_dir: Default::default(),
                 sys_path: "".to_string(),
@@ -917,5 +985,103 @@ mod tests {
         let task_reports = action_task_reports_for_display(&action_report);
         let actual = task_reports.first().unwrap();
         assert_eq!(actual.output, Some("validate output".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_execute_group_skips_when_should_skip_group_returns_true() -> Result<()> {
+        let mut mock_action = MockDoctorActionRun::new();
+        mock_action.expect_run_action().never(); // Should not be called
+        mock_action.expect_help_text().return_const(None);
+        mock_action.expect_help_url().return_const(None);
+        mock_action
+            .expect_name()
+            .returning(|| "test action".to_string());
+        mock_action.expect_required().return_const(false);
+        mock_action
+            .expect_description()
+            .returning(|| "test description".to_string());
+
+        // Create a test group with skip = true
+        let test_group = make_root_model_additional(
+            vec![],
+            |meta| meta.name("test-group"),
+            |group| group.skip(SkipSpec::Skip(true)),
+        );
+
+        let container = GroupActionContainer {
+            group: test_group,
+            actions: vec![mock_action],
+            exec_provider: Arc::new(MockExecutionProvider::new()),
+            exec_working_dir: Default::default(),
+            sys_path: "".to_string(),
+        };
+
+        let run_groups = RunGroups {
+            group_actions: BTreeMap::new(),
+            all_paths: Vec::new(),
+        };
+
+        let group_span = info_span!("test_group", "indicatif.pb_show" = true);
+        let result = run_groups.execute_group(&group_span, &container).await?;
+
+        // Verify the group was skipped
+        assert_eq!(result.group_name, "test-group");
+        assert!(matches!(result.status, GroupExecutionStatus::GroupSkipped));
+        assert!(!result.skip_remaining);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_execute_group_runs_actions_when_should_skip_group_returns_false() -> Result<()> {
+        let mut mock_action = MockDoctorActionRun::new();
+        mock_action.expect_run_action().returning(|_| {
+            Ok(ActionRunResult::new(
+                "test action",
+                ActionRunStatus::CheckSucceeded,
+                None,
+                None,
+                None,
+            ))
+        });
+        mock_action.expect_help_text().return_const(None);
+        mock_action.expect_help_url().return_const(None);
+        mock_action
+            .expect_name()
+            .returning(|| "test action".to_string());
+        mock_action.expect_required().return_const(false);
+        mock_action
+            .expect_description()
+            .returning(|| "test description".to_string());
+
+        // Create a test group with skip = false
+        let test_group = make_root_model_additional(
+            vec![],
+            |meta| meta.name("test-group"),
+            |group| group.skip(SkipSpec::Skip(false)),
+        );
+
+        let container = GroupActionContainer {
+            group: test_group,
+            actions: vec![mock_action],
+            exec_provider: Arc::new(MockExecutionProvider::new()),
+            exec_working_dir: Default::default(),
+            sys_path: "".to_string(),
+        };
+
+        let run_groups = RunGroups {
+            group_actions: BTreeMap::new(),
+            all_paths: Vec::new(),
+        };
+
+        let group_span = info_span!("test_group", "indicatif.pb_show" = true);
+        let result = run_groups.execute_group(&group_span, &container).await?;
+
+        // Verify the group was executed normally
+        assert_eq!(result.group_name, "test-group");
+        assert!(matches!(result.status, GroupExecutionStatus::Succeeded));
+        assert!(!result.skip_remaining);
+
+        Ok(())
     }
 }

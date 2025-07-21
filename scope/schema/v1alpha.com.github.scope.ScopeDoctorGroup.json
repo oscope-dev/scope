@@ -213,6 +213,11 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "skip": {
+          "description": "Defines conditions under which the group should be skipped. `skip` can be a boolean, in which case the group will be skipped if `true`. Alternatively, it can be a command that will be run to determine if the group should be skipped. If the command returns a zero exit code, the group will be skipped. If the command returns a non-zero exit code, the group will not be skipped.",
+          "default": false,
+          "$ref": "#/definitions/SkipSpec"
         }
       },
       "additionalProperties": false
@@ -492,6 +497,24 @@
         }
       },
       "additionalProperties": false
+    },
+    "SkipSpec": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "V1AlphaApiVersion": {
       "description": "Version of the Scope API",

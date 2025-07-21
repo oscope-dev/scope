@@ -1,0 +1,15 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: group-skip-boolean-false
+  description: Test group with skip boolean set to false
+spec:
+  skip: false
+  actions:
+    - name: should-run
+      check:
+        commands:
+          - echo "This check should run"
+      fix:
+        commands:
+          - echo "This fix should run"
