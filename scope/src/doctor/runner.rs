@@ -1,7 +1,9 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
+use crate::doctor::check::RuntimeError;
 use crate::models::HelpMetadata;
 use crate::prelude::{
-    progress_bar_without_pos, ActionReport, ActionTaskReport, ExecutionProvider, GroupReport,
+    generate_env_vars, progress_bar_without_pos, ActionReport, ActionTaskReport, CaptureOpts,
+    ExecutionProvider, GroupReport, OutputDestination,
 };
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
@@ -143,7 +145,7 @@ where
             .await)
     }
 
-    pub async fn should_skip_group(&self) -> Result<bool, crate::doctor::check::RuntimeError> {
+    pub async fn should_skip_group(&self) -> Result<bool, RuntimeError> {
         use crate::prelude::SkipSpec;
 
         match &self.group.skip {
@@ -158,12 +160,12 @@ where
 
                 let output = self
                     .exec_provider
-                    .run_command(crate::shared::prelude::CaptureOpts {
+                    .run_command(CaptureOpts {
                         working_dir: &self.exec_working_dir,
                         args: &args,
-                        output_dest: crate::shared::prelude::OutputDestination::Logging,
+                        output_dest: OutputDestination::Logging,
                         path: &path,
-                        env_vars: crate::prelude::generate_env_vars(),
+                        env_vars: generate_env_vars(),
                     })
                     .await?;
 
@@ -261,7 +263,7 @@ where
             group_name: container.group_name().to_string(),
             skip_remaining: false,
             status: GroupExecutionStatus::Succeeded,
-            group_report: GroupReport::new(&container.group_name()),
+            group_report: GroupReport::new(container.group_name()),
         };
 
         // Check if the group should be skipped
@@ -312,7 +314,7 @@ where
                 .add_action(&action_result.action_report);
 
             // ignore the result, because reporting shouldn't cause app to crash
-            report_action_output(&container.group_name(), action, &action_result)
+            report_action_output(container.group_name(), action, &action_result)
                 .await
                 .ok();
 
@@ -517,7 +519,7 @@ mod tests {
     };
     use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
-    use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider};
+    use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider, SkipSpec};
     use anyhow::Result;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
@@ -724,11 +726,7 @@ mod tests {
         result: Vec<T>,
     ) -> (String, GroupActionContainer<T>) {
         // Create a minimal test group
-        let test_group = crate::doctor::tests::make_root_model_additional(
-            vec![],
-            |meta| meta.name(name),
-            |group| group,
-        );
+        let test_group = make_root_model_additional(vec![], |meta| meta.name(name), |group| group);
 
         (
             name.to_string(),
@@ -1006,10 +1004,10 @@ mod tests {
             .returning(|| "test description".to_string());
 
         // Create a test group with skip = true
-        let test_group = crate::doctor::tests::make_root_model_additional(
+        let test_group = make_root_model_additional(
             vec![],
             |meta| meta.name("test-group"),
-            |group| group.skip(crate::prelude::SkipSpec::Skip(true)),
+            |group| group.skip(SkipSpec::Skip(true)),
         );
 
         let container = GroupActionContainer {
@@ -1059,10 +1057,10 @@ mod tests {
             .returning(|| "test description".to_string());
 
         // Create a test group with skip = false
-        let test_group = crate::doctor::tests::make_root_model_additional(
+        let test_group = make_root_model_additional(
             vec![],
             |meta| meta.name("test-group"),
-            |group| group.skip(crate::prelude::SkipSpec::Skip(false)),
+            |group| group.skip(SkipSpec::Skip(false)),
         );
 
         let container = GroupActionContainer {

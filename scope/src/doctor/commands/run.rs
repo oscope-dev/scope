@@ -174,7 +174,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
         let container = GroupActionContainer::new(
             group.clone(),
             action_runs,
-             exec_runner.clone(),
+            exec_runner.clone(),
             found_config.working_dir.clone(),
             found_config.bin_path.clone(),
         );
