@@ -3,7 +3,7 @@ use crate::doctor::check::RuntimeError;
 use crate::models::HelpMetadata;
 use crate::prelude::{
     generate_env_vars, progress_bar_without_pos, ActionReport, ActionTaskReport, CaptureOpts,
-    ExecutionProvider, GroupReport, OutputDestination,
+    ExecutionProvider, GroupReport, OutputDestination, SkipSpec,
 };
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
@@ -146,8 +146,6 @@ where
     }
 
     pub async fn should_skip_group(&self) -> Result<bool, RuntimeError> {
-        use crate::prelude::SkipSpec;
-
         match &self.group.skip {
             SkipSpec::Skip(should_skip) => Ok(*should_skip),
             SkipSpec::Command { command } => {
@@ -519,7 +517,7 @@ mod tests {
     };
     use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
-    use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider, SkipSpec};
+    use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider};
     use anyhow::Result;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
