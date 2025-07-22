@@ -65,17 +65,20 @@ where
         let mut schema_gen = make_schema_generator();
         let schema = schema_gen.root_schema_for::<Self>();
         let schema_json = serde_json::to_value(&schema)?;
-        let compiled_schema = jsonschema::JSONSchema::compile(&schema_json)
-            .expect("internal json schema to be valid");
-        if let Err(err_iter) = compiled_schema.validate(input) {
-            let mut errors = Vec::new();
-            for err in err_iter {
-                errors.push(err.to_string());
-            }
-            return Err(anyhow!(errors.join("\n")));
-        };
+        let validator =
+            jsonschema::validator_for(&schema_json).expect("internal json schema to be valid");
 
-        Ok(())
+        match validator.validate(input) {
+            Ok(_) => Ok(()),
+            Err(_first_error) => {
+                let error_messages = validator
+                    .iter_errors(input)
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Err(anyhow!(error_messages))
+            }
+        }
     }
 
     #[cfg(test)]
@@ -131,12 +134,12 @@ where
 
     let schema = serde_json::from_str(schema_json)?;
 
-    let compiled_schema = jsonschema::JSONSchema::compile(&schema).expect("A valid schema");
+    let validator = jsonschema::validator_for(&schema).expect("A valid schema");
 
     let parsed_json = serde_json::to_value(&parsed)?;
-    if let Err(err_iter) = compiled_schema.validate(&parsed_json) {
+    if let Err(_first_error) = validator.validate(&parsed_json) {
         println!("{}", serde_json::to_string_pretty(&parsed_json).unwrap());
-        for e in err_iter {
+        for e in validator.iter_errors(&parsed_json) {
             println!("error: {}", e);
         }
         unreachable!();

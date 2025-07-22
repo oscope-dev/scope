@@ -84,7 +84,7 @@ serde_json = "1.0"
 schemars = "0.8"
 derive_builder = "0.20"
 strum = { version = "0.26", features = ["derive"] }
-jsonschema = "0.17"
+jsonschema = "0.30"
 tracing = "0.1.40"
 ignore = "0.4.23"
 tracing-indicatif = "0.3.9"
