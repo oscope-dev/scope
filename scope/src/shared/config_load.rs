@@ -1,11 +1,11 @@
 use crate::models::prelude::ModelRoot;
 use crate::models::HelpMetadata;
 use crate::shared::models::prelude::{DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation};
+use crate::shared::directories;
 use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
-use directories::{BaseDirs, UserDirs};
 use ignore::Walk;
 use itertools::Itertools;
 use serde::Deserialize;
@@ -335,12 +335,12 @@ pub fn build_config_path(working_dir: &Path) -> Vec<PathBuf> {
         scope_path.push(scope_dir)
     }
 
-    if let Some(user_dirs) = UserDirs::new() {
-        scope_path.push(user_dirs.home_dir().join(".scope"));
+    if let Some(home_dir) = directories::home() {
+        scope_path.push(home_dir.join(".scope"));
     }
 
-    if let Some(base_dirs) = BaseDirs::new() {
-        scope_path.push(base_dirs.config_dir().join(".scope"));
+    if let Some(config_dir) = directories::config() {
+        scope_path.push(config_dir.join(".scope"));
     }
 
     scope_path
@@ -383,7 +383,7 @@ mod tests {
         let config_paths = build_config_path(temp_dir.path());
 
         // Should include user home directory .scope path on macOS
-        if let Some(home) = std::env::home_dir() {
+        if let Some(home) = directories::home() {
             let expected_home_path = home.join(".scope");
             assert!(config_paths.contains(&expected_home_path), 
                     "Expected to find user home .scope directory in paths: {:?}", config_paths);
@@ -399,12 +399,12 @@ mod tests {
         let config_paths = build_config_path(temp_dir.path());
 
         // Should include system config directory .scope path on macOS
-        if let Some(home) = std::env::home_dir() {
-            let expected_config_path = home.join("Library").join("Application Support").join(".scope");
+        if let Some(config_dir) = directories::config() {
+            let expected_config_path = config_dir.join(".scope");
             assert!(config_paths.contains(&expected_config_path),
                     "Expected to find system config .scope directory in paths: {:?}", config_paths);
         } else {
-            panic!("home_dir() returned None");
+            panic!("config_dir() returned None");
         }
     }
 
@@ -415,12 +415,12 @@ mod tests {
         let config_paths = build_config_path(temp_dir.path());
 
         // Should include system config directory .scope path on Linux
-        if let Some(home) = std::env::home_dir() {
-            let expected_config_path = home.join(".config").join(".scope");
+        if let Some(config_dir) = directories::config() {
+            let expected_config_path = config_dir.join(".scope");
             assert!(config_paths.contains(&expected_config_path),
                     "Expected to find system config .scope directory in paths: {:?}", config_paths);
         } else {
-            panic!("home_dir() returned None");
+            panic!("config_dir() returned None");
         }
     }
 

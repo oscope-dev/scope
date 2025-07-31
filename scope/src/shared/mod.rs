@@ -13,6 +13,7 @@ pub(crate) mod analyze;
 mod models;
 mod redact;
 mod report;
+pub mod directories;
 
 pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
 pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
