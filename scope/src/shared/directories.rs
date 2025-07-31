@@ -98,123 +98,135 @@ pub fn cache() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_config_unix_path() {
-        use std::env;
-        // Test without XDG_CONFIG_HOME set
-        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
-        env::remove_var("XDG_CONFIG_HOME");
+    mod home {
+        use super::*;
 
-        let config_dir = config().unwrap();
-        let path_str = config_dir.to_string_lossy();
-        assert!(
-            path_str.ends_with("/.config"),
-            "Config directory should end with '/.config', got: {}",
-            path_str
-        );
-
-        // Restore original XDG_CONFIG_HOME if it existed
-        if let Some(xdg_config) = original_xdg {
-            env::set_var("XDG_CONFIG_HOME", xdg_config);
+        #[test]
+        fn consistency() {
+            // Test that multiple calls return the same result
+            let home1 = home();
+            let home2 = home();
+            assert_eq!(home1, home2, "home should return consistent results");
         }
     }
 
-    #[test]
-    fn test_config_unix_xdg_config_home() {
-        use std::env;
-        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
-        let test_xdg_path = "/tmp/test_xdg_config";
+    mod config {
+        use super::*;
 
-        env::set_var("XDG_CONFIG_HOME", test_xdg_path);
+        #[test]
+        fn unix_path() {
+            use std::env;
+            // Test without XDG_CONFIG_HOME set
+            let original_xdg = env::var("XDG_CONFIG_HOME").ok();
+            env::remove_var("XDG_CONFIG_HOME");
 
-        let config_dir = config().unwrap();
-        assert_eq!(
-            config_dir,
-            PathBuf::from(test_xdg_path),
-            "Should use XDG_CONFIG_HOME when set"
-        );
+            let config_dir = config().unwrap();
+            let path_str = config_dir.to_string_lossy();
+            assert!(
+                path_str.ends_with("/.config"),
+                "Config directory should end with '/.config', got: {}",
+                path_str
+            );
 
-        // Restore original XDG_CONFIG_HOME
-        match original_xdg {
-            Some(xdg_config) => env::set_var("XDG_CONFIG_HOME", xdg_config),
-            None => env::remove_var("XDG_CONFIG_HOME"),
+            // Restore original XDG_CONFIG_HOME if it existed
+            if let Some(xdg_config) = original_xdg {
+                env::set_var("XDG_CONFIG_HOME", xdg_config);
+            }
+        }
+
+        #[test]
+        fn xdg_config_home() {
+            use std::env;
+            let original_xdg = env::var("XDG_CONFIG_HOME").ok();
+            let test_xdg_path = "/tmp/test_xdg_config";
+
+            env::set_var("XDG_CONFIG_HOME", test_xdg_path);
+
+            let config_dir = config().unwrap();
+            assert_eq!(
+                config_dir,
+                PathBuf::from(test_xdg_path),
+                "Should use XDG_CONFIG_HOME when set"
+            );
+
+            // Restore original XDG_CONFIG_HOME
+            match original_xdg {
+                Some(xdg_config) => env::set_var("XDG_CONFIG_HOME", xdg_config),
+                None => env::remove_var("XDG_CONFIG_HOME"),
+            }
+        }
+
+        #[test]
+        fn consistency() {
+            // Test that multiple calls return the same result
+            let config1 = config();
+            let config2 = config();
+            assert_eq!(config1, config2, "config should return consistent results");
         }
     }
 
-    #[test]
-    fn test_config_dir_consistency() {
-        // Test that multiple calls return the same result
-        let config1 = config();
-        let config2 = config();
-        assert_eq!(config1, config2, "config should return consistent results");
-    }
+    mod cache {
+        use super::*;
 
-    #[test]
-    fn test_home_dir_consistency() {
-        // Test that multiple calls return the same result
-        let home1 = home();
-        let home2 = home();
-        assert_eq!(home1, home2, "home should return consistent results");
-    }
+        #[test]
+        fn unix_path() {
+            use std::env;
+            // Test without XDG_CACHE_HOME set
+            let original_xdg = env::var("XDG_CACHE_HOME").ok();
+            env::remove_var("XDG_CACHE_HOME");
 
-    #[test]
-    fn test_cache_unix_path() {
-        use std::env;
-        // Test without XDG_CACHE_HOME set
-        let original_xdg = env::var("XDG_CACHE_HOME").ok();
-        env::remove_var("XDG_CACHE_HOME");
+            let cache_dir = cache().unwrap();
+            let path_str = cache_dir.to_string_lossy();
+            assert!(
+                path_str.ends_with("/.cache"),
+                "Cache directory should end with '/.cache', got: {}",
+                path_str
+            );
 
-        let cache_dir = cache().unwrap();
-        let path_str = cache_dir.to_string_lossy();
-        assert!(
-            path_str.ends_with("/.cache"),
-            "Cache directory should end with '/.cache', got: {}",
-            path_str
-        );
-
-        // Restore original XDG_CACHE_HOME if it existed
-        if let Some(xdg_cache) = original_xdg {
-            env::set_var("XDG_CACHE_HOME", xdg_cache);
+            // Restore original XDG_CACHE_HOME if it existed
+            if let Some(xdg_cache) = original_xdg {
+                env::set_var("XDG_CACHE_HOME", xdg_cache);
+            }
         }
-    }
 
-    #[test]
-    fn test_cache_unix_xdg_cache_home() {
-        use std::env;
-        let original_xdg = env::var("XDG_CACHE_HOME").ok();
-        let test_xdg_path = "/tmp/test_xdg_cache";
+        #[test]
+        fn xdg_cache_home() {
+            use std::env;
+            let original_xdg = env::var("XDG_CACHE_HOME").ok();
+            let test_xdg_path = "/tmp/test_xdg_cache";
 
-        env::set_var("XDG_CACHE_HOME", test_xdg_path);
+            env::set_var("XDG_CACHE_HOME", test_xdg_path);
 
-        let cache_dir = cache().unwrap();
-        assert_eq!(
-            cache_dir,
-            PathBuf::from(test_xdg_path),
-            "Should use XDG_CACHE_HOME when set"
-        );
+            let cache_dir = cache().unwrap();
+            assert_eq!(
+                cache_dir,
+                PathBuf::from(test_xdg_path),
+                "Should use XDG_CACHE_HOME when set"
+            );
 
-        // Restore original XDG_CACHE_HOME
-        match original_xdg {
-            Some(xdg_cache) => env::set_var("XDG_CACHE_HOME", xdg_cache),
-            None => env::remove_var("XDG_CACHE_HOME"),
+            // Restore original XDG_CACHE_HOME
+            match original_xdg {
+                Some(xdg_cache) => env::set_var("XDG_CACHE_HOME", xdg_cache),
+                None => env::remove_var("XDG_CACHE_HOME"),
+            }
         }
-    }
 
-    #[test]
-    fn test_cache_dir_consistency() {
-        use std::env;
-        // Save and clean any XDG environment variables that might affect the test
-        let original_xdg_cache = env::var("XDG_CACHE_HOME").ok();
-        env::remove_var("XDG_CACHE_HOME");
+        #[test]
+        fn consistency() {
+            use std::env;
+            // Save and clean any XDG environment variables that might affect the test
+            let original_xdg_cache = env::var("XDG_CACHE_HOME").ok();
+            env::remove_var("XDG_CACHE_HOME");
 
-        // Test that multiple calls return the same result
-        let cache1 = cache();
-        let cache2 = cache();
-        assert_eq!(cache1, cache2, "cache should return consistent results");
+            // Test that multiple calls return the same result
+            let cache1 = cache();
+            let cache2 = cache();
+            assert_eq!(cache1, cache2, "cache should return consistent results");
 
-        // Restore original environment
-        if let Some(xdg_cache) = original_xdg_cache {
-            env::set_var("XDG_CACHE_HOME", xdg_cache);
+            // Restore original environment
+            if let Some(xdg_cache) = original_xdg_cache {
+                env::set_var("XDG_CACHE_HOME", xdg_cache);
+            }
         }
     }
 }
