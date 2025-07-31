@@ -241,4 +241,104 @@ mod test {
         let transform = transform_inputs(&fc, &args);
         assert!(transform.desired_groups.is_empty());
     }
+
+    mod get_cache_tests {
+        use tempfile::tempdir;
+
+        use super::super::*;
+
+        #[test]
+        fn test_get_cache_returns_noop_when_no_cache_is_true() {
+            let args = DoctorRunArgs {
+                no_cache: true,
+                cache_dir: None,
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // NoOpCache should return None for path()
+            assert_eq!(cache.path(), None);
+        }
+
+        #[test]
+        fn test_get_cache_uses_default_path_when_cache_dir_is_none() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: None,
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should create a FileBasedCache with default path
+            assert_eq!(cache.path(), Some("/tmp/scope/cache-file.json".to_string()));
+        }
+
+        #[test]
+        fn test_get_cache_uses_provided_cache_dir() {
+            let temp_dir = tempdir().unwrap();
+            let cache_dir_path = temp_dir.path().to_string_lossy().to_string();
+
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some(cache_dir_path.clone()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should create a FileBasedCache with the provided path
+            let expected_path = format!("{}/cache-file.json", cache_dir_path);
+            assert_eq!(cache.path(), Some(expected_path));
+        }
+
+        #[test]
+        fn test_get_cache_no_cache_takes_precedence_over_cache_dir() {
+            let temp_dir = tempdir().unwrap();
+            let cache_dir_path = temp_dir.path().to_string_lossy().to_string();
+
+            let args = DoctorRunArgs {
+                no_cache: true,
+                cache_dir: Some(cache_dir_path),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should return NoOpCache (None path) even when cache_dir is provided
+            assert_eq!(cache.path(), None);
+        }
+
+        #[test]
+        fn test_get_cache_path_construction() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("/custom/path".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Verify the path is constructed correctly as cache_dir + "cache-file.json"
+            assert_eq!(
+                cache.path(),
+                Some("/custom/path/cache-file.json".to_string())
+            );
+        }
+
+        #[test]
+        fn test_get_cache_empty_cache_dir_uses_default() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Empty string should still result in a path being created
+            assert_eq!(cache.path(), Some("cache-file.json".to_string()));
+        }
+    }
 }

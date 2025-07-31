@@ -34,6 +34,9 @@ pub trait FileCache: Sync + Send + Debug {
         path: &Path,
     ) -> Result<()>;
     async fn persist(&self) -> Result<(), FileCacheError>;
+    /// Get the cache file path, if applicable
+    #[cfg(test)]
+    fn path(&self) -> Option<String>;
 }
 
 #[derive(Default, Debug)]
@@ -61,6 +64,11 @@ impl FileCache for NoOpCache {
 
     async fn persist(&self) -> Result<(), FileCacheError> {
         Ok(())
+    }
+
+    #[cfg(test)]
+    fn path(&self) -> Option<String> {
+        None
     }
 }
 
@@ -201,6 +209,11 @@ impl FileCache for FileBasedCache {
         }
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    fn path(&self) -> Option<String> {
+        Some(self.path.clone())
     }
 }
 
