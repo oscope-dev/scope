@@ -806,9 +806,9 @@ pub(crate) mod tests {
     };
     use crate::doctor::file_cache::{FileCache, MockFileCache, NoOpCache};
     use crate::doctor::tests::build_root_model;
+    use crate::shared::directories;
     use crate::shared::prelude::*;
     use anyhow::{anyhow, Result};
-    use crate::shared::directories;
     use predicates::prelude::predicate;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;

@@ -10,10 +10,10 @@ mod config_load;
 mod logging;
 
 pub(crate) mod analyze;
+pub mod directories;
 mod models;
 mod redact;
 mod report;
-pub mod directories;
 
 pub const CONFIG_FILE_PATH_ENV: &str = "SCOPE_CONFIG_JSON";
 pub const RUN_ID_ENV_VAR: &str = "SCOPE_RUN_ID";
