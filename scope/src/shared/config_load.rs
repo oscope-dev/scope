@@ -345,3 +345,149 @@ pub fn build_config_path(working_dir: &Path) -> Vec<PathBuf> {
 
     scope_path
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_build_config_path_includes_ancestors() {
+        // Create a temporary directory structure
+        let temp_dir = tempdir().unwrap();
+        let nested_dir = temp_dir.path().join("parent").join("child").join("grandchild");
+        fs::create_dir_all(&nested_dir).unwrap();
+
+        let config_paths = build_config_path(&nested_dir);
+
+        // Canonicalize the nested_dir to match what the function does
+        let canonical_nested = fs::canonicalize(&nested_dir).unwrap();
+
+        // Should include .scope directories for all ancestors
+        let expected_paths = vec![
+            canonical_nested.join(".scope"),
+            canonical_nested.parent().unwrap().join(".scope"), // child
+            canonical_nested.parent().unwrap().parent().unwrap().join(".scope"), // parent
+            canonical_nested.parent().unwrap().parent().unwrap().parent().unwrap().join(".scope"), // temp_dir
+        ];
+
+        // Check that all expected ancestor paths are present (in order)
+        for (i, expected_path) in expected_paths.iter().enumerate() {
+            assert_eq!(config_paths[i], *expected_path);
+        }
+    }
+
+    #[test]
+    fn test_build_config_path_includes_user_home() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        // Should include user home directory .scope path on macOS
+        if let Some(home) = std::env::home_dir() {
+            let expected_home_path = home.join(".scope");
+            assert!(config_paths.contains(&expected_home_path), 
+                    "Expected to find user home .scope directory in paths: {:?}", config_paths);
+        } else {
+            panic!("home_dir() returned None");
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_build_config_path_includes_system_config() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        // Should include system config directory .scope path on macOS
+        if let Some(home) = std::env::home_dir() {
+            let expected_config_path = home.join("Library").join("Application Support").join(".scope");
+            assert!(config_paths.contains(&expected_config_path),
+                    "Expected to find system config .scope directory in paths: {:?}", config_paths);
+        } else {
+            panic!("home_dir() returned None");
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_build_config_path_includes_system_config() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        // Should include system config directory .scope path on Linux
+        if let Some(home) = std::env::home_dir() {
+            let expected_config_path = home.join(".config").join(".scope");
+            assert!(config_paths.contains(&expected_config_path),
+                    "Expected to find system config .scope directory in paths: {:?}", config_paths);
+        } else {
+            panic!("home_dir() returned None");
+        }
+    }
+
+    #[test]
+    fn test_build_config_path_canonicalizes_working_dir() {
+        let temp_dir = tempdir().unwrap();
+        let nested_dir = temp_dir.path().join("test_dir");
+        fs::create_dir_all(&nested_dir).unwrap();
+
+        // Create a path with .. in it
+        let complex_path = nested_dir.join("..").join("test_dir");
+        
+        let config_paths = build_config_path(&complex_path);
+
+        // The first path should be the canonicalized version
+        let canonical_nested = fs::canonicalize(&nested_dir).unwrap();
+        let expected_first_path = canonical_nested.join(".scope");
+        assert_eq!(config_paths[0], expected_first_path);
+    }
+
+    #[test]
+    fn test_build_config_path_root_directory() {
+        // Test with root directory
+        let root_path = Path::new("/");
+        let config_paths = build_config_path(root_path);
+
+        // Should at least include the root .scope directory
+        assert!(config_paths.contains(&PathBuf::from("/.scope")));
+    }
+
+    #[test]
+    fn test_build_config_path_single_directory() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        // Canonicalize the temp directory to match what the function does
+        let canonical_temp = fs::canonicalize(temp_dir.path()).unwrap();
+
+        // First path should be the working directory's .scope
+        assert_eq!(config_paths[0], canonical_temp.join(".scope"));
+        
+        // Should have more than just the working directory (ancestors + user/system dirs)
+        assert!(config_paths.len() > 1);
+    }
+
+    #[test]
+    fn test_build_config_path_preserves_order() {
+        let temp_dir = tempdir().unwrap();
+        let deeply_nested = temp_dir.path().join("a").join("b").join("c").join("d");
+        fs::create_dir_all(&deeply_nested).unwrap();
+
+        let config_paths = build_config_path(&deeply_nested);
+
+        // Canonicalize the path to match what the function does
+        let canonical_nested = fs::canonicalize(&deeply_nested).unwrap();
+
+        // First few paths should be ancestors in order from most specific to least specific
+        assert_eq!(config_paths[0], canonical_nested.join(".scope"));
+        assert_eq!(config_paths[1], canonical_nested.parent().unwrap().join(".scope")); // c
+        assert_eq!(config_paths[2], canonical_nested.parent().unwrap().parent().unwrap().join(".scope")); // b
+        assert_eq!(config_paths[3], canonical_nested.parent().unwrap().parent().unwrap().parent().unwrap().join(".scope")); // a
+    }
+
+    #[test]
+    #[should_panic(expected = "working dir to be a path")]
+    fn test_build_config_path_nonexistent_directory() {
+        let nonexistent_path = Path::new("/this/path/does/not/exist/hopefully");
+        build_config_path(nonexistent_path);
+    }
+}
