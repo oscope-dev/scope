@@ -402,8 +402,7 @@ mod tests {
             let expected_home_path = home.join(".scope");
             assert!(
                 config_paths.contains(&expected_home_path),
-                "Expected to find user home .scope directory in paths: {:?}",
-                config_paths
+                "Expected to find user home .scope directory in paths: {config_paths:?}"
             );
         } else {
             panic!("home_dir() returned None");
@@ -419,8 +418,7 @@ mod tests {
             let expected_config_path = config_dir.join(".scope");
             assert!(
                 config_paths.contains(&expected_config_path),
-                "Expected to find system config .scope directory in paths: {:?}",
-                config_paths
+                "Expected to find system config .scope directory in paths: {config_paths:?}"
             );
         } else {
             panic!("config_dir() returned None");

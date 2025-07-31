@@ -124,8 +124,7 @@ mod tests {
             let path_str = config_dir.to_string_lossy();
             assert!(
                 path_str.ends_with("/.config"),
-                "Config directory should end with '/.config', got: {}",
-                path_str
+                "Config directory should end with '/.config', got: {path_str}"
             );
 
             // Restore original XDG_CONFIG_HOME if it existed
@@ -179,8 +178,7 @@ mod tests {
             let path_str = cache_dir.to_string_lossy();
             assert!(
                 path_str.ends_with("/.cache"),
-                "Cache directory should end with '/.cache', got: {}",
-                path_str
+                "Cache directory should end with '/.cache', got: {path_str}"
             );
 
             // Restore original XDG_CACHE_HOME if it existed
