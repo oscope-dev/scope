@@ -118,7 +118,7 @@ async fn exec_sub_command(found_config: &FoundConfig, args: &[String]) -> Result
     let command = match args.first() {
         None => return Err(anyhow::anyhow!("Sub command not provided")),
         Some(cmd) => {
-            format!("scope-{}", cmd)
+            format!("scope-{cmd}")
         }
     };
     let _ = std::mem::replace(&mut args[0], command);
@@ -171,10 +171,7 @@ async fn print_commands(found_config: &FoundConfig) {
             let command_name = command.file_name().unwrap().to_str().unwrap().to_string();
             let command_name = command_name.replace("scope-", "");
             command_map.entry(command_name.clone()).or_insert_with(|| {
-                format!(
-                    "External sub-command, run `scope {}` for help",
-                    command_name
-                )
+                format!("External sub-command, run `scope {command_name}` for help")
             });
         }
         for command in Cli::command().get_subcommands() {

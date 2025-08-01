@@ -145,7 +145,7 @@ mod tests {
             let working_dir = "/some/path";
             let command = "{{ working_dir }}/foo.sh";
 
-            let actual = substitute_templates(&working_dir, &command).unwrap();
+            let actual = substitute_templates(working_dir, command).unwrap();
 
             assert_eq!("/some/path/foo.sh".to_string(), actual)
         }
@@ -155,7 +155,7 @@ mod tests {
             let working_dir = "/some/path";
             let command = "./foo.sh";
 
-            let actual = substitute_templates(&working_dir, &command).unwrap();
+            let actual = substitute_templates(working_dir, command).unwrap();
 
             assert_eq!("./foo.sh".to_string(), actual)
         }
@@ -167,7 +167,7 @@ mod tests {
             let working_dir = "/some/path";
             let command = "{{ not_a_thing }}/foo.sh";
 
-            let actual = substitute_templates(&working_dir, &command).unwrap();
+            let actual = substitute_templates(working_dir, command).unwrap();
 
             assert_eq!("/foo.sh".to_string(), actual)
         }

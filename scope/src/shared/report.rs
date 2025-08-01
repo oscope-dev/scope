@@ -44,7 +44,7 @@ impl ReportUploadLocationDestination {
             ReportUploadLocationDestination::Local { destination } => {
                 let id = nanoid::nanoid!(10, &nanoid::alphabet::SAFE);
                 fs::create_dir_all(destination)?;
-                let file_path = format!("{}/scope-{}.md", destination, id);
+                let file_path = format!("{destination}/scope-{id}.md");
                 let mut file = File::create(&file_path)?;
                 file.write_all(report.as_bytes())?;
 

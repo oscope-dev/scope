@@ -59,7 +59,7 @@ where
         let mut description = resource.description().to_string();
         if description.len() > 55 {
             description.truncate(55);
-            description = format!("{}...", description);
+            description = format!("{description}...");
         }
 
         let mut loc = resource.metadata().file_path();

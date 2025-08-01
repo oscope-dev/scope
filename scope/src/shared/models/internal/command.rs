@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn from_commands_inserts_execution_path() {
         let base_path = Path::new("/foo/bar");
-        let input = vec!["echo 'foo'", "baz/qux", "./qux"];
+        let input = ["echo 'foo'", "baz/qux", "./qux"];
 
         let actual = DoctorCommands::from_commands(
             base_path,
@@ -129,7 +129,7 @@ mod tests {
     fn from_commands_inserts_working_dir() {
         let containing_dir = Path::new("/foo/bar");
         let working_dir = "/some/working_dir";
-        let commands = vec!["{{ working_dir }}/foo.sh", "./bar.sh"]
+        let commands = ["{{ working_dir }}/foo.sh", "./bar.sh"]
             .iter()
             .map(|cmd| cmd.to_string())
             .collect::<Vec<String>>();
@@ -325,7 +325,7 @@ mod tests {
 
             // Currently, the tilde is NOT expanded, but we want it to be
             let home_dir = std::env::var("HOME").expect("HOME environment variable should be set");
-            let expected = DoctorCommand::from_str(&format!("{}/script.sh", home_dir));
+            let expected = DoctorCommand::from_str(&format!("{home_dir}/script.sh"));
             assert_eq!(expected, actual);
         }
 
@@ -340,10 +340,8 @@ mod tests {
 
             // Currently, the tildes are NOT expanded, but we want them to be
             let home_dir = std::env::var("HOME").expect("HOME environment variable should be set");
-            let expected = DoctorCommand::from_str(&format!(
-                "cp {}/source.txt {}/dest.txt",
-                home_dir, home_dir
-            ));
+            let expected =
+                DoctorCommand::from_str(&format!("cp {home_dir}/source.txt {home_dir}/dest.txt"));
             assert_eq!(expected, actual);
         }
     }
