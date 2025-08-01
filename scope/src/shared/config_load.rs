@@ -388,9 +388,10 @@ mod tests {
         ];
 
         // Check that all expected ancestor paths are present (in order)
-        for (i, expected_path) in expected_paths.iter().enumerate() {
-            assert_eq!(config_paths[i], *expected_path);
-        }
+        assert_eq!(config_paths[0], expected_paths[0]);
+        assert_eq!(config_paths[1], expected_paths[1]);
+        assert_eq!(config_paths[2], expected_paths[2]);
+        assert_eq!(config_paths[3], expected_paths[3]);
     }
 
     #[test]
@@ -398,15 +399,13 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config_paths = build_config_path(temp_dir.path());
 
-        if let Some(home) = directories::home() {
-            let expected_home_path = home.join(".scope");
-            assert!(
-                config_paths.contains(&expected_home_path),
-                "Expected to find user home .scope directory in paths: {config_paths:?}"
-            );
-        } else {
-            panic!("home_dir() returned None");
-        }
+        let expected_config_path = directories::home()
+            .expect("home_dir() returned None")
+            .join(".scope");
+        assert!(
+            config_paths.contains(&expected_config_path),
+            "Expected to find user home .scope directory in paths: {config_paths:?}"
+        );
     }
 
     #[test]
@@ -414,15 +413,13 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config_paths = build_config_path(temp_dir.path());
 
-        if let Some(config_dir) = directories::config() {
-            let expected_config_path = config_dir.join(".scope");
-            assert!(
-                config_paths.contains(&expected_config_path),
-                "Expected to find system config .scope directory in paths: {config_paths:?}"
-            );
-        } else {
-            panic!("config_dir() returned None");
-        }
+        let expected_config_path = directories::config()
+            .expect("config_dir() returned None")
+            .join(".scope");
+        assert!(
+            config_paths.contains(&expected_config_path),
+            "Expected to find system config .scope directory in paths: {config_paths:?}"
+        );
     }
 
     #[test]
