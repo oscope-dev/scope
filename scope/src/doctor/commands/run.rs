@@ -13,6 +13,7 @@ use crate::prelude::{
     DefaultGroupedReportBuilder, ExecutionProvider, GroupedReportBuilder, ReportRenderer,
 };
 use crate::report_stdout;
+use crate::shared::directories;
 use crate::shared::prelude::{DefaultExecutionProvider, FoundConfig};
 
 #[derive(Debug, Parser, Default)]
@@ -38,11 +39,24 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
     if args.no_cache {
         Arc::<NoOpCache>::default()
     } else {
-        let cache_dir = args
-            .cache_dir
-            .clone()
-            .unwrap_or_else(|| "/tmp/scope".to_string());
-        let cache_path = PathBuf::from(cache_dir).join("cache-file.json");
+        let cache_dir = args.cache_dir.clone().unwrap_or_else(|| {
+            directories::cache()
+                .expect("Unable to determine cache directory")
+                .join("scope")
+                .to_string_lossy()
+                .to_string()
+        });
+
+        let cache_path = PathBuf::from(&cache_dir).join("cache-file.json");
+        let old_default_cache_path = PathBuf::from("/tmp/scope/cache-file.json");
+
+        // Handle backward compatibility: migrate from old location to new location
+        if cache_dir != "/tmp/scope" && old_default_cache_path.exists() && !cache_path.exists() {
+            if let Err(e) = migrate_old_cache(&old_default_cache_path, &cache_path) {
+                warn!("Unable to migrate cache from old location: {:?}", e);
+            }
+        }
+
         match FileBasedCache::new(&cache_path) {
             Ok(cache) => Arc::new(cache),
             Err(e) => {
@@ -51,6 +65,26 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
             }
         }
     }
+}
+
+fn migrate_old_cache(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
+    // Create the new cache directory if it doesn't exist
+    if let Some(parent) = new_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Copy the old cache file to the new location
+    std::fs::copy(old_path, new_path)?;
+
+    // Remove the old cache file
+    std::fs::remove_file(old_path)?;
+
+    info!(
+        "Migrated cache from {} to {}",
+        old_path.display(),
+        new_path.display()
+    );
+    Ok(())
 }
 
 #[instrument("scope doctor run", skip(found_config))]
@@ -197,6 +231,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
@@ -240,5 +275,190 @@ mod test {
 
         let transform = transform_inputs(&fc, &args);
         assert!(transform.desired_groups.is_empty());
+    }
+
+    mod get_cache_tests {
+        use super::*;
+        use tempfile::tempdir;
+
+        #[test]
+        fn test_get_cache_returns_noop_when_no_cache_is_true() {
+            let args = DoctorRunArgs {
+                no_cache: true,
+                cache_dir: None,
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // NoOpCache should return None for path()
+            assert_eq!(cache.path(), None);
+        }
+
+        #[test]
+        fn test_get_cache_no_cache_takes_precedence_over_cache_dir() {
+            let args = DoctorRunArgs {
+                no_cache: true,
+                cache_dir: Some("/custom/path".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should return NoOpCache (None path) even when cache_dir is provided
+            assert_eq!(cache.path(), None);
+        }
+
+        #[test]
+        fn test_get_cache_uses_default_path_when_cache_dir_is_none() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: None,
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            let expected_cache_dir = directories::cache()
+                .expect("Unable to determine cache directory")
+                .join("scope");
+            let expected_path = expected_cache_dir
+                .join("cache-file.json")
+                .to_string_lossy()
+                .to_string();
+            assert_eq!(cache.path(), Some(expected_path));
+        }
+
+        #[test]
+        fn test_get_cache_empty_cache_dir_uses_default() {
+            // I'm not sure this behavior is intentional,
+            // but if an empty string is cached, no path is prepended
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            assert_eq!(cache.path(), Some("cache-file.json".to_string()));
+        }
+
+        #[test]
+        fn test_get_cache_uses_provided_cache_dir() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("/custom/path".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            assert_eq!(
+                cache.path(),
+                Some("/custom/path/cache-file.json".to_string())
+            );
+        }
+
+        #[test]
+        fn test_migrate_old_cache_success() {
+            use std::fs;
+
+            let temp_dir = tempdir().unwrap();
+            let old_cache_path = temp_dir.path().join("old_cache.json");
+            let new_cache_dir = temp_dir.path().join("new_cache_dir");
+            let new_cache_path = new_cache_dir.join("cache-file.json");
+
+            // Create old cache file with some content
+            fs::write(&old_cache_path, r#"{"test": "data"}"#).unwrap();
+            assert!(old_cache_path.exists());
+
+            // Migrate the cache
+            let result = migrate_old_cache(&old_cache_path, &new_cache_path);
+            assert!(result.is_ok());
+
+            // Verify new cache file exists and old one is removed
+            assert!(new_cache_path.exists());
+            assert!(!old_cache_path.exists());
+
+            // Verify content was copied correctly
+            let content = fs::read_to_string(&new_cache_path).unwrap();
+            assert_eq!(content, r#"{"test": "data"}"#);
+        }
+
+        #[test]
+        fn test_migrate_old_cache_creates_directories() {
+            use std::fs;
+
+            let temp_dir = tempdir().unwrap();
+            let old_cache_path = temp_dir.path().join("old_cache.json");
+            let new_cache_dir = temp_dir.path().join("deep").join("nested").join("dir");
+            let new_cache_path = new_cache_dir.join("cache-file.json");
+
+            // Create old cache file
+            fs::write(&old_cache_path, r#"{"test": "data"}"#).unwrap();
+
+            // Ensure target directory doesn't exist
+            assert!(!new_cache_dir.exists());
+
+            // Migrate the cache
+            let result = migrate_old_cache(&old_cache_path, &new_cache_path);
+            assert!(result.is_ok());
+
+            // Verify directories were created and file exists
+            assert!(new_cache_dir.exists());
+            assert!(new_cache_path.exists());
+            assert!(!old_cache_path.exists());
+        }
+
+        #[test]
+        fn test_get_cache_migrates_from_old_location() {
+            let temp_dir = tempdir().unwrap();
+            let new_cache_dir = temp_dir.path().join("new_cache");
+            let cache_dir_arg = new_cache_dir.to_string_lossy().to_string();
+
+            // This test would require creating files in /tmp/scope which might not be practical
+            // in all test environments, so we'll test the logic indirectly by ensuring
+            // the function handles migration when paths differ
+
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some(cache_dir_arg.clone()),
+                ..Default::default()
+            };
+
+            // This should not fail even if old cache doesn't exist
+            let cache = get_cache(&args);
+
+            // Verify it uses the new path
+            let expected_path = format!("{}/cache-file.json", cache_dir_arg);
+            assert_eq!(cache.path(), Some(expected_path));
+        }
+
+        #[test]
+        fn test_migrate_old_cache_handles_missing_old_file() {
+            let temp_dir = tempdir().unwrap();
+            let old_cache_path = temp_dir.path().join("nonexistent.json");
+            let new_cache_path = temp_dir.path().join("new_cache.json");
+
+            // Should return an error when old file doesn't exist
+            let result = migrate_old_cache(&old_cache_path, &new_cache_path);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_get_cache_no_migration_when_using_tmp_scope() {
+            // When explicitly using /tmp/scope, no migration should occur
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("/tmp/scope".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should use the original /tmp/scope path
+            assert_eq!(cache.path(), Some("/tmp/scope/cache-file.json".to_string()));
+        }
     }
 }

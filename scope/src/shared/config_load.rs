@@ -1,11 +1,11 @@
 use crate::models::prelude::ModelRoot;
 use crate::models::HelpMetadata;
+use crate::shared::directories;
 use crate::shared::models::prelude::{DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation};
 use crate::shared::RUN_ID_ENV_VAR;
 use anyhow::{anyhow, Result};
 use clap::{ArgGroup, Parser};
 use colored::*;
-use directories::{BaseDirs, UserDirs};
 use ignore::Walk;
 use itertools::Itertools;
 use serde::Deserialize;
@@ -335,13 +335,177 @@ pub fn build_config_path(working_dir: &Path) -> Vec<PathBuf> {
         scope_path.push(scope_dir)
     }
 
-    if let Some(user_dirs) = UserDirs::new() {
-        scope_path.push(user_dirs.home_dir().join(".scope"));
+    if let Some(home_dir) = directories::home() {
+        scope_path.push(home_dir.join(".scope"));
     }
 
-    if let Some(base_dirs) = BaseDirs::new() {
-        scope_path.push(base_dirs.config_dir().join(".scope"));
+    if let Some(config_dir) = directories::config() {
+        scope_path.push(config_dir.join(".scope"));
     }
 
     scope_path
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_build_config_path_includes_ancestors() {
+        // Create a temporary directory structure
+        let temp_dir = tempdir().unwrap();
+        let nested_dir = temp_dir
+            .path()
+            .join("parent")
+            .join("child")
+            .join("grandchild");
+        fs::create_dir_all(&nested_dir).unwrap();
+
+        let config_paths = build_config_path(&nested_dir);
+
+        // Canonicalize the nested_dir to match what the function does
+        let canonical_nested = fs::canonicalize(&nested_dir).unwrap();
+
+        // Should include .scope directories for all ancestors
+        let expected_paths = vec![
+            canonical_nested.join(".scope"),
+            canonical_nested.parent().unwrap().join(".scope"), // child
+            canonical_nested
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(".scope"), // parent
+            canonical_nested
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(".scope"), // temp_dir
+        ];
+
+        // Check that all expected ancestor paths are present (in order)
+        assert_eq!(config_paths[0], expected_paths[0]);
+        assert_eq!(config_paths[1], expected_paths[1]);
+        assert_eq!(config_paths[2], expected_paths[2]);
+        assert_eq!(config_paths[3], expected_paths[3]);
+    }
+
+    #[test]
+    fn test_build_config_path_includes_user_home() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        let expected_config_path = directories::home()
+            .expect("home_dir() returned None")
+            .join(".scope");
+        assert!(
+            config_paths.contains(&expected_config_path),
+            "Expected to find user home .scope directory in paths: {config_paths:?}"
+        );
+    }
+
+    #[test]
+    fn test_build_config_path_includes_system_config() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        let expected_config_path = directories::config()
+            .expect("config_dir() returned None")
+            .join(".scope");
+        assert!(
+            config_paths.contains(&expected_config_path),
+            "Expected to find system config .scope directory in paths: {config_paths:?}"
+        );
+    }
+
+    #[test]
+    fn test_build_config_path_canonicalizes_working_dir() {
+        let temp_dir = tempdir().unwrap();
+        let nested_dir = temp_dir.path().join("test_dir");
+        fs::create_dir_all(&nested_dir).unwrap();
+
+        let complex_path = nested_dir.join("..").join("test_dir");
+
+        let config_paths = build_config_path(&complex_path);
+
+        // The first path should be the canonicalized version
+        let canonical_nested = fs::canonicalize(&nested_dir).unwrap();
+        let expected_first_path = canonical_nested.join(".scope");
+        assert_eq!(config_paths[0], expected_first_path);
+    }
+
+    #[test]
+    fn test_build_config_path_root_directory() {
+        // Test with root directory
+        let root_path = Path::new("/");
+        let config_paths = build_config_path(root_path);
+
+        // Should at least include the root .scope directory
+        assert!(config_paths.contains(&PathBuf::from("/.scope")));
+    }
+
+    #[test]
+    fn test_build_config_path_single_directory() {
+        let temp_dir = tempdir().unwrap();
+        let config_paths = build_config_path(temp_dir.path());
+
+        // Canonicalize the temp directory to match what the function does
+        let canonical_temp = fs::canonicalize(temp_dir.path()).unwrap();
+
+        // First path should be the working directory's .scope
+        assert_eq!(config_paths[0], canonical_temp.join(".scope"));
+
+        // Should have more than just the working directory (ancestors + user/system dirs)
+        assert!(config_paths.len() > 1);
+    }
+
+    #[test]
+    fn test_build_config_path_preserves_order() {
+        let temp_dir = tempdir().unwrap();
+        let deeply_nested = temp_dir.path().join("a").join("b").join("c").join("d");
+        fs::create_dir_all(&deeply_nested).unwrap();
+
+        let config_paths = build_config_path(&deeply_nested);
+
+        // Canonicalize the path to match what the function does
+        let canonical_nested = fs::canonicalize(&deeply_nested).unwrap();
+
+        // First few paths should be ancestors in order from most specific to least specific
+        assert_eq!(config_paths[0], canonical_nested.join(".scope"));
+        assert_eq!(
+            config_paths[1],
+            canonical_nested.parent().unwrap().join(".scope")
+        ); // c
+        assert_eq!(
+            config_paths[2],
+            canonical_nested
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(".scope")
+        ); // b
+        assert_eq!(
+            config_paths[3],
+            canonical_nested
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(".scope")
+        ); // a
+    }
+
+    #[test]
+    #[should_panic(expected = "working dir to be a path")]
+    fn test_build_config_path_nonexistent_directory() {
+        let nonexistent_path = Path::new("/this/path/does/not/exist/hopefully");
+        build_config_path(nonexistent_path);
+    }
 }

@@ -806,9 +806,9 @@ pub(crate) mod tests {
     };
     use crate::doctor::file_cache::{FileCache, MockFileCache, NoOpCache};
     use crate::doctor::tests::build_root_model;
+    use crate::shared::directories;
     use crate::shared::prelude::*;
     use anyhow::{anyhow, Result};
-    use directories::UserDirs;
     use predicates::prelude::predicate;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
@@ -939,8 +939,7 @@ pub(crate) mod tests {
     }
 
     fn home_dir() -> PathBuf {
-        let user_dirs = UserDirs::new().expect("Couldn't initialize UserDirs");
-        user_dirs.home_dir().to_owned()
+        directories::home().expect("Couldn't get home directory")
     }
 
     #[tokio::test]

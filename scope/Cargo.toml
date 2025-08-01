@@ -38,7 +38,6 @@ tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 chrono.workspace = true
 nanoid.workspace = true
-directories.workspace = true
 derivative.workspace = true
 reqwest.workspace = true
 time.workspace = true
