@@ -48,11 +48,11 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
         });
 
         let cache_path = PathBuf::from(&cache_dir).join("cache-file.json");
-        let old_cache_path = PathBuf::from("/tmp/scope/cache-file.json");
+        let old_default_cache_path = PathBuf::from("/tmp/scope/cache-file.json");
 
         // Handle backward compatibility: migrate from old location to new location
-        if cache_dir != "/tmp/scope" && old_cache_path.exists() && !cache_path.exists() {
-            if let Err(e) = migrate_old_cache(&old_cache_path, &cache_path) {
+        if cache_dir != "/tmp/scope" && old_default_cache_path.exists() && !cache_path.exists() {
+            if let Err(e) = migrate_old_cache(&old_default_cache_path, &cache_path) {
                 warn!("Unable to migrate cache from old location: {:?}", e);
             }
         }
@@ -231,6 +231,7 @@ fn transform_inputs(found_config: &FoundConfig, args: &DoctorRunArgs) -> RunTran
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
@@ -277,9 +278,8 @@ mod test {
     }
 
     mod get_cache_tests {
+        use super::*;
         use tempfile::tempdir;
-
-        use super::super::*;
 
         #[test]
         fn test_get_cache_returns_noop_when_no_cache_is_true() {
@@ -296,6 +296,20 @@ mod test {
         }
 
         #[test]
+        fn test_get_cache_no_cache_takes_precedence_over_cache_dir() {
+            let args = DoctorRunArgs {
+                no_cache: true,
+                cache_dir: Some("/custom/path".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            // Should return NoOpCache (None path) even when cache_dir is provided
+            assert_eq!(cache.path(), None);
+        }
+
+        #[test]
         fn test_get_cache_uses_default_path_when_cache_dir_is_none() {
             let args = DoctorRunArgs {
                 no_cache: false,
@@ -305,7 +319,6 @@ mod test {
 
             let cache = get_cache(&args);
 
-            // Should create a FileBasedCache with directories::cache() based path
             let expected_cache_dir = directories::cache()
                 .expect("Unable to determine cache directory")
                 .join("scope");
@@ -317,59 +330,9 @@ mod test {
         }
 
         #[test]
-        fn test_get_cache_uses_provided_cache_dir() {
-            let temp_dir = tempdir().unwrap();
-            let cache_dir_path = temp_dir.path().to_string_lossy().to_string();
-
-            let args = DoctorRunArgs {
-                no_cache: false,
-                cache_dir: Some(cache_dir_path.clone()),
-                ..Default::default()
-            };
-
-            let cache = get_cache(&args);
-
-            // Should create a FileBasedCache with the provided path
-            let expected_path = format!("{}/cache-file.json", cache_dir_path);
-            assert_eq!(cache.path(), Some(expected_path));
-        }
-
-        #[test]
-        fn test_get_cache_no_cache_takes_precedence_over_cache_dir() {
-            let temp_dir = tempdir().unwrap();
-            let cache_dir_path = temp_dir.path().to_string_lossy().to_string();
-
-            let args = DoctorRunArgs {
-                no_cache: true,
-                cache_dir: Some(cache_dir_path),
-                ..Default::default()
-            };
-
-            let cache = get_cache(&args);
-
-            // Should return NoOpCache (None path) even when cache_dir is provided
-            assert_eq!(cache.path(), None);
-        }
-
-        #[test]
-        fn test_get_cache_path_construction() {
-            let args = DoctorRunArgs {
-                no_cache: false,
-                cache_dir: Some("/custom/path".to_string()),
-                ..Default::default()
-            };
-
-            let cache = get_cache(&args);
-
-            // Verify the path is constructed correctly as cache_dir + "cache-file.json"
-            assert_eq!(
-                cache.path(),
-                Some("/custom/path/cache-file.json".to_string())
-            );
-        }
-
-        #[test]
         fn test_get_cache_empty_cache_dir_uses_default() {
+            // I'm not sure this behavior is intentional,
+            // but if an empty string is cached, no path is prepended
             let args = DoctorRunArgs {
                 no_cache: false,
                 cache_dir: Some("".to_string()),
@@ -378,8 +341,23 @@ mod test {
 
             let cache = get_cache(&args);
 
-            // Empty string should still result in a path being created
             assert_eq!(cache.path(), Some("cache-file.json".to_string()));
+        }
+
+        #[test]
+        fn test_get_cache_uses_provided_cache_dir() {
+            let args = DoctorRunArgs {
+                no_cache: false,
+                cache_dir: Some("/custom/path".to_string()),
+                ..Default::default()
+            };
+
+            let cache = get_cache(&args);
+
+            assert_eq!(
+                cache.path(),
+                Some("/custom/path/cache-file.json".to_string())
+            );
         }
 
         #[test]
@@ -481,28 +459,6 @@ mod test {
 
             // Should use the original /tmp/scope path
             assert_eq!(cache.path(), Some("/tmp/scope/cache-file.json".to_string()));
-        }
-
-        #[test]
-        fn test_get_cache_uses_directories_cache() {
-            // This test verifies that directories::cache() is used for the default path
-            let args = DoctorRunArgs {
-                no_cache: false,
-                cache_dir: None,
-                ..Default::default()
-            };
-
-            let cache = get_cache(&args);
-
-            // Should return the exact path from directories::cache()
-            let expected_path = directories::cache()
-                .expect("Unable to determine cache directory")
-                .join("scope")
-                .join("cache-file.json")
-                .to_string_lossy()
-                .to_string();
-
-            assert_eq!(cache.path(), Some(expected_path));
         }
     }
 }
