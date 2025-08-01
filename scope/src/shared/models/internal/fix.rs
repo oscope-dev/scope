@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn from_spec_translates_to_fix() {
         let spec = DoctorFixSpec {
-            commands: vec![
+            commands: [
                 "some/command",
                 "./other_command",
                 "{{ working_dir }}/.foo.sh",

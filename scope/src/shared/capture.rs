@@ -76,7 +76,7 @@ impl<R: io::AsyncRead + Unpin> StreamCapture<R> {
                     _ => info!("{}", line),
                 },
                 OutputDestination::StandardOut => {
-                    writeln!(self.writer.write().await, "{}\r", line).ok();
+                    writeln!(self.writer.write().await, "{line}\r").ok();
                 }
                 OutputDestination::StandardOutWithPrefix(prefix) => {
                     writeln!(
@@ -224,7 +224,7 @@ impl OutputCapture {
             .iter()
             .map(|(time, line)| {
                 let offset: Duration = *time - self.start_time;
-                (*time, format!("{} OUT: {}", offset, line))
+                (*time, format!("{offset} OUT: {line}"))
             })
             .collect();
 
@@ -233,7 +233,7 @@ impl OutputCapture {
             .iter()
             .map(|(time, line)| {
                 let offset: Duration = *time - self.start_time;
-                (*time, format!("{} ERR: {}", offset, line))
+                (*time, format!("{offset} ERR: {line}"))
             })
             .collect();
 

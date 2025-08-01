@@ -103,7 +103,7 @@ pub mod commands {
         };
 
         ActionReport {
-            action_name: format!("{} {}", prefix, idx),
+            action_name: format!("{prefix} {idx}"),
             check: vec![action_report()],
             fix: vec![action_report()],
             validate: vec![action_report(), action_report()],
@@ -111,7 +111,7 @@ pub mod commands {
     }
 
     fn make_group(offset: i64) -> GroupReport {
-        let group_name = format!("group {}", offset);
+        let group_name = format!("group {offset}");
         let mut group = GroupReport::new(&group_name);
         group.add_action(&make_action_report(&group_name, offset * 10 + 1));
         group.add_action(&make_action_report(&group_name, offset * 10 + 2));

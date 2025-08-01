@@ -316,15 +316,12 @@ impl LoggingOpts {
     }
 
     pub async fn configure_logging(&self, run_id: &str, prefix: &str) -> ConfiguredLogger {
-        let file_name = format!("scope-{}-{}.log", prefix, run_id);
-        let full_file_name = format!("/tmp/scope/{}", file_name);
+        let file_name = format!("scope-{prefix}-{run_id}.log");
+        let full_file_name = format!("/tmp/scope/{file_name}");
         std::fs::create_dir_all("/tmp/scope").expect("to be able to create tmp dir");
 
         let otel_props = self.setup_otel(run_id).unwrap_or_else(|e| {
-            println!(
-                "opentelemetry configuration failed. Events will not be sent. {:?}",
-                e
-            );
+            println!("opentelemetry configuration failed. Events will not be sent. {e:?}");
             None
         });
 

@@ -52,7 +52,7 @@ impl ConfigOptions {
         let id = nanoid::nanoid!(4, &nanoid::alphabet::SAFE);
         let now = chrono::Local::now();
         let current_time = now.format("%Y%m%d");
-        format!("{}-{}", current_time, id)
+        format!("{current_time}-{id}")
     }
     pub fn get_run_id(&self) -> String {
         self.run_id.clone().unwrap_or_else(Self::generate_run_id)

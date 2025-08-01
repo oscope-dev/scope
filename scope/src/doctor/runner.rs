@@ -231,7 +231,7 @@ where
                 "otel.name" = format!("group {}", group_name)
             );
             group_span.pb_set_length(group_container.actions.len() as u64);
-            group_span.pb_set_message(&format!("group {}", group_name));
+            group_span.pb_set_message(&format!("group {group_name}"));
             let _span = group_span.enter();
 
             let group_result = self.execute_group(&group_span, group_container).await?;
@@ -435,7 +435,7 @@ async fn print_pretty_result(
     let task_reports = action_task_reports_for_display(&result.action_report);
     for task in task_reports {
         if let Some(text) = task.output {
-            let line_prefix = format!("{}/{}", group_name, action_name);
+            let line_prefix = format!("{group_name}/{action_name}");
             for line in text.lines() {
                 let output_line = format!("{}:  {}", line_prefix.dimmed(), line);
                 report_stdout!("{}", output_line);

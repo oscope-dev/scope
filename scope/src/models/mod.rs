@@ -140,7 +140,7 @@ where
     if let Err(_first_error) = validator.validate(&parsed_json) {
         println!("{}", serde_json::to_string_pretty(&parsed_json).unwrap());
         for e in validator.iter_errors(&parsed_json) {
-            println!("error: {}", e);
+            println!("error: {e}");
         }
         unreachable!();
     };
@@ -173,7 +173,7 @@ mod schema_gen {
         let mut schema_gen = crate::models::make_schema_generator();
         let merged_schema = schema_gen.root_schema_for::<ScopeTypes>();
         let merged_schema_json = serde_json::to_string_pretty(&merged_schema).unwrap();
-        std::fs::write(format!("{}/merged.json", out_dir), &merged_schema_json).unwrap();
+        std::fs::write(format!("{out_dir}/merged.json"), &merged_schema_json).unwrap();
 
         V1AlphaReportLocation::create_and_validate(&mut schema_gen, &out_dir, &merged_schema_json)
             .unwrap();

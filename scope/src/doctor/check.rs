@@ -1457,7 +1457,7 @@ pub(crate) mod tests {
                     &DoctorCommands::from_commands(
                         Path::new("/some/dir"),
                         "/some/working/dir",
-                        &vec!["touch ~/.somefile".to_string()],
+                        &["touch ~/.somefile".to_string()],
                     )
                     .unwrap(),
                 )
