@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use tracing::{debug, enabled, error, info, instrument, Level};
+use tracing::{Level, debug, enabled, error, info, instrument};
 
 /// scope
 ///

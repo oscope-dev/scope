@@ -14,8 +14,8 @@ pub mod commands {
     };
     use anyhow::Result;
     use chrono::DateTime;
-    use fake::faker::lorem::en::*;
     use fake::Fake;
+    use fake::faker::lorem::en::*;
     use std::sync::Arc;
     use tracing::info;
 

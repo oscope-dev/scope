@@ -8,7 +8,7 @@ use tracing::{info, instrument, warn};
 
 use crate::doctor::check::{DefaultDoctorActionRun, DefaultGlobWalker};
 use crate::doctor::file_cache::{FileBasedCache, FileCache, NoOpCache};
-use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
+use crate::doctor::runner::{GroupActionContainer, RunGroups, compute_group_order};
 use crate::prelude::{
     DefaultGroupedReportBuilder, ExecutionProvider, GroupedReportBuilder, ReportRenderer,
 };
@@ -51,10 +51,12 @@ fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
         let old_default_cache_path = PathBuf::from("/tmp/scope/cache-file.json");
 
         // Handle backward compatibility: migrate from old location to new location
-        if cache_dir != "/tmp/scope" && old_default_cache_path.exists() && !cache_path.exists() {
-            if let Err(e) = migrate_old_cache(&old_default_cache_path, &cache_path) {
-                warn!("Unable to migrate cache from old location: {:?}", e);
-            }
+        if cache_dir != "/tmp/scope"
+            && old_default_cache_path.exists()
+            && !cache_path.exists()
+            && let Err(e) = migrate_old_cache(&old_default_cache_path, &cache_path)
+        {
+            warn!("Unable to migrate cache from old location: {:?}", e);
         }
 
         match FileBasedCache::new(&cache_path) {
@@ -160,11 +162,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
         }
     }
 
-    if result.did_succeed {
-        Ok(0)
-    } else {
-        Ok(1)
-    }
+    if result.did_succeed { Ok(0) } else { Ok(1) }
 }
 
 struct RunTransform {
@@ -235,8 +233,8 @@ mod test {
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    use crate::doctor::commands::run::transform_inputs;
     use crate::doctor::commands::DoctorRunArgs;
+    use crate::doctor::commands::run::transform_inputs;
     use crate::doctor::tests::{group_noop, make_root_model_additional, meta_noop};
     use crate::prelude::FoundConfig;
 

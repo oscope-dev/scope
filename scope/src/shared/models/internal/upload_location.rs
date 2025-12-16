@@ -1,5 +1,5 @@
-use crate::models::prelude::{ModelMetadata, V1AlphaReportLocation};
 use crate::models::HelpMetadata;
+use crate::models::prelude::{ModelMetadata, V1AlphaReportLocation};
 use crate::prelude::{ReportDestinationSpec, ReportDestinationTemplates};
 use derivative::Derivative;
 use minijinja::Environment;

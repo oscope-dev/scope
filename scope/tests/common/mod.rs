@@ -1,7 +1,7 @@
-use assert_cmd::assert::Assert;
 use assert_cmd::Command;
-use assert_fs::prelude::PathCopy;
+use assert_cmd::assert::Assert;
 use assert_fs::TempDir;
+use assert_fs::prelude::PathCopy;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

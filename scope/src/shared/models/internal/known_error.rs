@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::models::prelude::{ModelMetadata, V1AlphaKnownError};
 use crate::models::HelpMetadata;
+use crate::models::prelude::{ModelMetadata, V1AlphaKnownError};
 use derivative::Derivative;
 use regex::Regex;
 
@@ -97,7 +97,10 @@ spec:
 
         assert_eq!("error-exists", model.metadata.name);
         assert_eq!("ScopeKnownError/error-exists", model.full_name);
-        assert_eq!("The command had an error, try reading the logs around there to find out what happened.", model.help_text);
+        assert_eq!(
+            "The command had an error, try reading the logs around there to find out what happened.",
+            model.help_text
+        );
         assert_eq!("error", model.pattern);
     }
 

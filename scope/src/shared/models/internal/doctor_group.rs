@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use derive_builder::Builder;
 
-use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::models::HelpMetadata;
+use crate::models::prelude::{ModelMetadata, V1AlphaDoctorGroup};
 use crate::prelude::{DoctorGroupActionSpec, DoctorInclude, SkipSpec};
 use crate::shared::models::internal::{DoctorCommands, DoctorFix};
 

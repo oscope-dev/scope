@@ -1,9 +1,9 @@
-use crate::models::prelude::ModelRoot;
 use crate::models::HelpMetadata;
+use crate::models::prelude::ModelRoot;
+use crate::shared::RUN_ID_ENV_VAR;
 use crate::shared::directories;
 use crate::shared::models::prelude::{DoctorGroup, KnownError, ParsedConfig, ReportUploadLocation};
-use crate::shared::RUN_ID_ENV_VAR;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{ArgGroup, Parser};
 use colored::*;
 use ignore::Walk;

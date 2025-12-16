@@ -3,7 +3,7 @@ use dev_scope::prelude::*;
 use human_panic::setup_panic;
 use std::env;
 use std::sync::Arc;
-use tracing::{debug, enabled, error, info, warn, Level};
+use tracing::{Level, debug, enabled, error, info, warn};
 
 /// A wrapper CLI that can be used to capture output from a program, check if there are known errors
 /// and let the user know.

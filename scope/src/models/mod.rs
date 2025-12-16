@@ -86,7 +86,7 @@ where
 
     #[cfg(test)]
     fn create_and_validate(
-        schema_gen: &mut schemars::gen::SchemaGenerator,
+        schema_gen: &mut schemars::r#gen::SchemaGenerator,
         out_dir: &str,
         merged_schema: &str,
     ) -> anyhow::Result<()> {
@@ -112,8 +112,8 @@ where
     }
 }
 
-pub(crate) fn make_schema_generator() -> schemars::gen::SchemaGenerator {
-    let settings = schemars::gen::SchemaSettings::draft2019_09().with(|s| {
+pub(crate) fn make_schema_generator() -> schemars::r#gen::SchemaGenerator {
+    let settings = schemars::r#gen::SchemaSettings::draft2019_09().with(|s| {
         s.option_nullable = true;
     });
     settings.into_generator()
@@ -150,8 +150,8 @@ where
 
 #[cfg(test)]
 mod schema_gen {
-    use crate::models::v1alpha::prelude::*;
     use crate::models::InternalScopeModel;
+    use crate::models::v1alpha::prelude::*;
 
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};

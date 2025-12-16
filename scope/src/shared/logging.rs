@@ -4,15 +4,15 @@ use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 
 use opentelemetry::{
-    trace::{TraceError, TracerProvider as _},
     KeyValue,
+    trace::{TraceError, TracerProvider as _},
 };
 use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig, WithTonicConfig};
 use opentelemetry_sdk::{
+    Resource,
     metrics::{MetricError, PeriodicReader, SdkMeterProvider},
     runtime,
     trace::{RandomIdGenerator, Sampler, TracerProvider},
-    Resource,
 };
 use url::Url;
 
@@ -27,16 +27,16 @@ use tonic::metadata::MetadataMap;
 
 use tracing::level_filters::LevelFilter;
 use tracing::warn;
-use tracing_indicatif::filter::{hide_indicatif_span_fields, IndicatifFilter};
 use tracing_indicatif::IndicatifLayer;
+use tracing_indicatif::filter::{IndicatifFilter, hide_indicatif_span_fields};
 use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::fmt::format::DefaultFields;
-use tracing_subscriber::{filter::filter_fn, prelude::*};
 use tracing_subscriber::{
+    Registry,
     fmt::format::{Format, PrettyFields},
     layer::SubscriberExt,
-    Registry,
 };
+use tracing_subscriber::{filter::filter_fn, prelude::*};
 
 lazy_static! {
     static ref IGNORED_MODULES: &'static [&'static str] = &[

@@ -1,7 +1,7 @@
 [package]
 name = "dev-scope"
 version = "2024.2.92"
-edition = "2021"
+edition = "2024"
 default-run = "scope"
 repository =  "https://github.com/oscope-dev/scope"
 license = "BSD-3-Clause"

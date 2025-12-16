@@ -23,8 +23,8 @@ pub mod prelude {
         CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider,
         MockExecutionProvider, OutputCapture, OutputCaptureBuilder, OutputDestination,
     };
-    pub use super::config_load::{build_config_path, ConfigOptions, FoundConfig};
-    pub use super::logging::{progress_bar_without_pos, LoggingOpts, STDERR_WRITER, STDOUT_WRITER};
+    pub use super::config_load::{ConfigOptions, FoundConfig, build_config_path};
+    pub use super::logging::{LoggingOpts, STDERR_WRITER, STDOUT_WRITER, progress_bar_without_pos};
     pub use super::models::prelude::*;
     pub use super::print_details;
     pub use super::report::{

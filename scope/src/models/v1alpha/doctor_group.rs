@@ -144,20 +144,15 @@ impl Default for SkipSpec {
 }
 
 /// Configure how a groups will be used when determining the task graph.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum DoctorInclude {
     /// Default option, the group will be included by default when determining which groups should
     /// run.
+    #[default]
     ByDefault,
     /// Useful for shared configuration. The group will not run unless another group depends on it.
     WhenRequired,
-}
-
-impl Default for DoctorInclude {
-    fn default() -> Self {
-        Self::ByDefault
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, strum::Display, Clone, PartialEq, JsonSchema)]
