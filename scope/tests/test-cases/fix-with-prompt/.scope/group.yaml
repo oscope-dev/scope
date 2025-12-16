@@ -1,0 +1,18 @@
+apiVersion: scope.github.com/v1alpha
+kind: ScopeDoctorGroup
+metadata:
+  name: prompt-test
+  description: Test fix that requires user confirmation
+spec:
+  actions:
+    - name: needs-approval
+      description: A fix that needs user approval before running
+      check:
+        commands:
+          - test -f {{ working_dir }}/approved-file.txt
+      fix:
+        prompt:
+          text: "Do you want to create the file?"
+          extraContext: "This will create approved-file.txt"
+        commands:
+          - touch {{ working_dir }}/approved-file.txt

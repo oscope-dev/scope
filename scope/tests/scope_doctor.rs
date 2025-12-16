@@ -270,3 +270,23 @@ fn test_group_skip_subsequent_groups_run() {
 
     test_helper.clean_work_dir();
 }
+
+#[test]
+fn test_yolo_flag_auto_approves_fix_prompts() {
+    let test_helper = ScopeTestHelper::new(
+        "test_yolo_flag_auto_approves_fix_prompts",
+        "fix-with-prompt",
+    );
+
+    // Without --yolo, the fix would be skipped because user can't confirm in non-interactive mode.
+    // With --yolo, the fix should run automatically and succeed.
+    let result = test_helper.doctor_run(Some(&["--yolo"]));
+
+    result
+        .success()
+        .stdout(predicate::str::contains(
+            "Check initially failed, fix was successful, group: \"prompt-test\", name: \"needs-approval\"",
+        ));
+
+    test_helper.clean_work_dir();
+}
