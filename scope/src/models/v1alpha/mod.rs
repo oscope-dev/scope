@@ -18,8 +18,8 @@ pub enum V1AlphaApiVersion {
 }
 
 pub mod prelude {
+    pub use super::V1AlphaApiVersion;
     pub use super::doctor_group::*;
     pub use super::known_error::*;
     pub use super::report_location::*;
-    pub use super::V1AlphaApiVersion;
 }

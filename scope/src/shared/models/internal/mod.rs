@@ -1,11 +1,11 @@
+use crate::models::InternalScopeModel;
 use crate::models::prelude::{
     ModelRoot, V1AlphaDoctorGroup, V1AlphaKnownError, V1AlphaReportLocation,
 };
-use crate::models::InternalScopeModel;
 use crate::shared::prelude::*;
-use anyhow::anyhow;
 use anyhow::Result;
-use minijinja::{context, Environment};
+use anyhow::anyhow;
+use minijinja::{Environment, context};
 use path_clean::PathClean;
 use serde_yaml::Value;
 use std::collections::{BTreeMap, VecDeque};
@@ -21,8 +21,8 @@ use self::known_error::KnownError;
 use self::upload_location::ReportUploadLocation;
 
 pub mod prelude {
-    pub use super::generate_env_vars;
     pub use super::ParsedConfig;
+    pub use super::generate_env_vars;
     pub use super::{command::*, doctor_group::*, fix::*, known_error::*, upload_location::*};
 }
 

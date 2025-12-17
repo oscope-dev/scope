@@ -231,7 +231,7 @@ async fn make_checksum(path: &Path) -> Result<String> {
 mod tests {
     use super::*;
     use std::fs;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     /// Helper function to create a temporary directory and file for testing
     fn setup_temp_cache() -> (TempDir, PathBuf) {

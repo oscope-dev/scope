@@ -119,19 +119,25 @@ mod tests {
         }
 
         fn set(&self, value: &str) {
-            env::set_var(&self.var_name, value);
+            // SAFETY: This is test-only code. Tests using this are not run in parallel
+            // with other tests that depend on these environment variables.
+            unsafe { env::set_var(&self.var_name, value) };
         }
 
         fn remove(&self) {
-            env::remove_var(&self.var_name);
+            // SAFETY: This is test-only code. Tests using this are not run in parallel
+            // with other tests that depend on these environment variables.
+            unsafe { env::remove_var(&self.var_name) };
         }
     }
 
     impl Drop for EnvGuard {
         fn drop(&mut self) {
+            // SAFETY: This is test-only code. Tests using this are not run in parallel
+            // with other tests that depend on these environment variables.
             match &self.original_value {
-                Some(value) => env::set_var(&self.var_name, value),
-                None => env::remove_var(&self.var_name),
+                Some(value) => unsafe { env::set_var(&self.var_name, value) },
+                None => unsafe { env::remove_var(&self.var_name) },
             }
         }
     }

@@ -1,7 +1,7 @@
 use crate::models::HelpMetadata;
 use crate::prelude::{
-    generate_env_vars, CaptureOpts, DefaultExecutionProvider, DoctorFix, ExecutionProvider,
-    KnownError, OutputCapture, OutputDestination,
+    CaptureOpts, DefaultExecutionProvider, DoctorFix, ExecutionProvider, KnownError, OutputCapture,
+    OutputDestination, generate_env_vars,
 };
 use anyhow::Result;
 use inquire::InquireError;
@@ -11,7 +11,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tracing::{debug, error, info, warn};
 
 mod status;
-pub use crate::shared::analyze::status::{report_result, AnalyzeStatus};
+pub use crate::shared::analyze::status::{AnalyzeStatus, report_result};
 
 pub async fn process_lines<T>(
     known_errors: &BTreeMap<String, KnownError>,

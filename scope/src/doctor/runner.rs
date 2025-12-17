@@ -2,8 +2,8 @@ use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
 use crate::doctor::check::RuntimeError;
 use crate::models::HelpMetadata;
 use crate::prelude::{
-    generate_env_vars, progress_bar_without_pos, ActionReport, ActionTaskReport, CaptureOpts,
-    ExecutionProvider, GroupReport, OutputDestination, SkipSpec,
+    ActionReport, ActionTaskReport, CaptureOpts, ExecutionProvider, GroupReport, OutputDestination,
+    SkipSpec, generate_env_vars, progress_bar_without_pos,
 };
 use crate::report_stdout;
 use crate::shared::prelude::DoctorGroup;
@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, info, info_span, warn, Instrument, Span};
+use tracing::{Instrument, Span, debug, error, info, info_span, warn};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -515,7 +515,7 @@ mod tests {
     use crate::doctor::check::{
         ActionRunResult, ActionRunStatus, DoctorActionRun, MockDoctorActionRun,
     };
-    use crate::doctor::runner::{compute_group_order, GroupActionContainer, RunGroups};
+    use crate::doctor::runner::{GroupActionContainer, RunGroups, compute_group_order};
     use crate::doctor::tests::{group_noop, make_root_model_additional};
     use crate::prelude::{ActionReport, ActionTaskReport, MockExecutionProvider};
     use anyhow::Result;

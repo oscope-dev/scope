@@ -14,7 +14,7 @@ use thiserror::Error;
 use tokio::io;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, instrument, Level};
+use tracing::{Level, debug, error, info, instrument};
 use which::which_in;
 
 #[derive(Debug, Default)]

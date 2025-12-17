@@ -8,8 +8,8 @@ use tracing::debug;
 
 use crate::models::HelpMetadata;
 use crate::prelude::{
-    generate_env_vars, ActionReport, ActionReportBuilder, ActionTaskReport, DoctorCommand,
-    KnownError,
+    ActionReport, ActionReportBuilder, ActionTaskReport, DoctorCommand, KnownError,
+    generate_env_vars,
 };
 use crate::shared::analyze::{self, AnalyzeStatus};
 use crate::shared::prelude::{
@@ -23,7 +23,7 @@ use mockall::automock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, instrument};
+use tracing::{info, instrument};
 
 mod string_vec_reader;
 use string_vec_reader::StringVecReader;
@@ -808,7 +808,7 @@ pub(crate) mod tests {
     use crate::doctor::tests::build_root_model;
     use crate::shared::directories;
     use crate::shared::prelude::*;
-    use anyhow::{anyhow, Result};
+    use anyhow::{Result, anyhow};
     use predicates::prelude::predicate;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
@@ -1496,12 +1496,14 @@ pub(crate) mod tests {
             );
 
             let action_commands = DoctorCommandsBuilder::default()
-                .commands(vec![DoctorCommand::try_new(
-                    Path::new("/some/dir"),
-                    "/some/working/dir",
-                    "test -f ~/.somefile",
-                )
-                .unwrap()])
+                .commands(vec![
+                    DoctorCommand::try_new(
+                        Path::new("/some/dir"),
+                        "/some/working/dir",
+                        "test -f ~/.somefile",
+                    )
+                    .unwrap(),
+                ])
                 .build()
                 .unwrap();
 
