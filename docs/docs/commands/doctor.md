@@ -36,6 +36,7 @@ Options:
   -o, --only <ONLY>                  When set, only the checks listed will run
   -f, --fix <FIX>                    When set, if a fix is specified it will also run [default: true] [possible values: true, false]
   -n, --no-cache                     When set cache will be disabled, forcing all file based checks to run
+      --yolo                         Automatically approve all fix prompts without asking
 (excluded default args)
 ```
 

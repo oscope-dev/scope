@@ -33,6 +33,9 @@ pub struct DoctorRunArgs {
     /// Do not ask, create report on failure
     #[arg(long, default_value = "false", env = "SCOPE_DOCTOR_AUTO_PUBLISH")]
     pub auto_publish_report: bool,
+    /// Automatically approve all fix prompts without asking
+    #[arg(long, short = 'y', default_value = "false")]
+    pub yolo: bool,
 }
 
 fn get_cache(args: &DoctorRunArgs) -> Arc<dyn FileCache> {
@@ -101,6 +104,7 @@ pub async fn doctor_run(found_config: &FoundConfig, args: &DoctorRunArgs) -> Res
     let run_groups = RunGroups {
         group_actions: transform.groups,
         all_paths,
+        yolo: args.yolo,
     };
 
     let result = run_groups.execute().await?;

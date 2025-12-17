@@ -180,6 +180,7 @@ where
 {
     pub(crate) group_actions: BTreeMap<String, GroupActionContainer<T>>,
     pub(crate) all_paths: Vec<String>,
+    pub(crate) yolo: bool,
 }
 
 impl<T> RunGroups<T>
@@ -293,8 +294,9 @@ where
             ));
             action_span.pb_set_style(&progress_bar_without_pos());
 
+            let prompt_fn = if self.yolo { auto_approve } else { prompt_user };
             let action_result = action
-                .run_action(prompt_user)
+                .run_action(prompt_fn)
                 .instrument(action_span.clone())
                 .await?;
 
@@ -360,6 +362,14 @@ fn prompt_user(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
 
         prompt.prompt().unwrap_or(false)
     })
+}
+
+fn auto_approve(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
+    println!("{} Yes (auto-approved)", prompt_text);
+    if let Some(help_text) = maybe_help_text {
+        println!("[{}]", help_text);
+    }
+    true
 }
 
 async fn report_action_output<T>(
@@ -753,6 +763,7 @@ mod tests {
                 "group_2".to_string(),
                 "group_3".to_string(),
             ],
+            yolo: false,
         };
 
         let exit_code = run_groups.execute().await?;
@@ -784,6 +795,7 @@ mod tests {
                 "skipped_1".to_string(),
                 "skipped_2".to_string(),
             ],
+            yolo: false,
         };
 
         let exit_code = run_groups.execute().await?;
@@ -821,6 +833,7 @@ mod tests {
                 "user_denies".to_string(),
                 "skipped".to_string(),
             ],
+            yolo: false,
         };
 
         let exit_code = run_groups.execute().await?;
@@ -868,6 +881,7 @@ mod tests {
                 "user_denies".to_string(),
                 "succeeds_2".to_string(),
             ],
+            yolo: false,
         };
 
         let exit_code = run_groups.execute().await?;
@@ -911,6 +925,7 @@ mod tests {
                 "fails".to_string(),
                 "succeeds_2".to_string(),
             ],
+            yolo: false,
         };
 
         let exit_code = run_groups.execute().await?;
@@ -1019,6 +1034,7 @@ mod tests {
         let run_groups = RunGroups {
             group_actions: BTreeMap::new(),
             all_paths: Vec::new(),
+            yolo: false,
         };
 
         let group_span = info_span!("test_group", "indicatif.pb_show" = true);
@@ -1072,6 +1088,7 @@ mod tests {
         let run_groups = RunGroups {
             group_actions: BTreeMap::new(),
             all_paths: Vec::new(),
+            yolo: false,
         };
 
         let group_span = info_span!("test_group", "indicatif.pb_show" = true);
