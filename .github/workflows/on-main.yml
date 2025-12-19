@@ -57,7 +57,27 @@ jobs:
           git config --global user.email "oscope-release-bot[bot]@users.noreply.github.com"
           git config --global user.name "oscope-release-bot[bot]"
 
+      - name: Calculate calver version
+        id: version
+        run: |
+          # Find existing tags for this month and determine next patch number
+          # Pattern: YYYY.M.patch
+          DATE="$(date +%Y.%-m)."
+          EXISTING_TAGS=$(git tag -l "${DATE}*" | sort -t. -k3 -n | tail -1)
+
+          if [ -z "$EXISTING_TAGS" ]; then
+            PATCH=1
+          else
+            # Extract the patch number from the last tag
+            LAST_PATCH=$(echo "$EXISTING_TAGS" | sed "s/${DATE}//")
+            PATCH=$((LAST_PATCH + 1))
+          fi
+
+          NEW_VERSION="${DATE}${PATCH}"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Calculated version: ${NEW_VERSION}"
+
       - name: Release latest version
-        run: cargo release --execute --no-confirm --no-verify --no-publish patch
+        run: cargo release --execute --no-confirm --no-verify --no-publish ${{ steps.version.outputs.version }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
