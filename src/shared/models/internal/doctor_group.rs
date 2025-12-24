@@ -75,8 +75,8 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
 
     fn try_from(model: V1AlphaDoctorGroup) -> Result<Self, Self::Error> {
         let mut actions: Vec<_> = Default::default();
-        for (count, spec_action) in model.spec.actions.iter().enumerate() {
-            actions.push(parse_action(count, &model, spec_action)?);
+        for spec_action in model.spec.actions.iter() {
+            actions.push(parse_action(&model, spec_action)?);
         }
 
         Ok(DoctorGroup {
@@ -92,7 +92,6 @@ impl TryFrom<V1AlphaDoctorGroup> for DoctorGroup {
 }
 
 fn parse_action(
-    idx: usize,
     group_model: &V1AlphaDoctorGroup,
     action: &DoctorGroupActionSpec,
 ) -> Result<DoctorGroupAction> {
@@ -123,7 +122,7 @@ fn parse_action(
     };
 
     Ok(DoctorGroupAction {
-        name: spec_action.name.unwrap_or_else(|| format!("{}", idx + 1)),
+        name: spec_action.name,
         required: spec_action.required,
         description: spec_action
             .description
@@ -174,7 +173,7 @@ mod tests {
         assert_eq!(
             dg.actions[0],
             DoctorGroupAction {
-                name: "1".to_string(),
+                name: "action1".to_string(),
                 required: false,
                 description: "foo1".to_string(),
                 fix: DoctorFix {
@@ -195,7 +194,7 @@ mod tests {
         assert_eq!(
             dg.actions[1],
             DoctorGroupAction {
-                name: "2".to_string(),
+                name: "action2".to_string(),
                 required: true,
                 description: "foo2".to_string(),
                 fix: DoctorFix {

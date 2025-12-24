@@ -130,7 +130,8 @@
       "description": "An action is a single step used to check in a group. This is most commonly used to build a series of tasks for a system, like `ruby`, `python`, and databases.",
       "type": "object",
       "required": [
-        "check"
+        "check",
+        "name"
       ],
       "properties": {
         "check": {
@@ -158,12 +159,8 @@
           "nullable": true
         },
         "name": {
-          "description": "Name of the \"action\". When not provided, it will be the index of the action within the group. This is used when reporting status to the users.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "nullable": true
+          "description": "Name of the \"action\" used when reporting status to the users.",
+          "type": "string"
         },
         "required": {
           "description": "If false, the action is allowed to fail and let other actions in the group execute. Defaults to `true`.",

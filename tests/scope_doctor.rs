@@ -100,7 +100,7 @@ fn test_cache_invalidation() {
     result
         .success()
         .stdout(predicate::str::contains(
-            "Check initially failed, fix was successful, group: \"setup\", name: \"1\"",
+            "Check initially failed, fix was successful, group: \"setup\", name: \"install\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
@@ -109,7 +109,7 @@ fn test_cache_invalidation() {
     result
         .success()
         .stdout(predicate::str::contains(
-            "Check was successful, group: \"setup\", name: \"1\"",
+            "Check was successful, group: \"setup\", name: \"install\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 
@@ -124,7 +124,7 @@ fn test_cache_invalidation() {
     result
         .success()
         .stdout(predicate::str::contains(
-            "Check initially failed, fix was successful, group: \"setup\", name: \"1\"",
+            "Check initially failed, fix was successful, group: \"setup\", name: \"install\"",
         ))
         .stdout(predicate::str::contains("Failed to write updated cache to disk").not());
 }
