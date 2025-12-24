@@ -5,7 +5,8 @@ metadata:
   description: Run dep install
 spec:
   actions:
-    - check:
+    - name: install
+      check:
         paths:
           - '**/requirements.txt'
       fix:

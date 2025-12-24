@@ -8,7 +8,8 @@ spec:
   needs:
     - bar
   actions:
-    - description: foo1
+    - name: action1
+      description: foo1
       check:
         paths:
           - 'flig/bar/**/*'
@@ -21,7 +22,8 @@ spec:
           There is a good way to fix this, maybe...
         helpUrl: https://go.example.com/fixit
       required: false
-    - description: foo2
+    - name: action2
+      description: foo2
       check:
         paths:
           - '*/*.txt'
