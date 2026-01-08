@@ -61,15 +61,15 @@ jobs:
         id: version
         run: |
           # Find existing tags for this month and determine next patch number
-          # Pattern: YYYY.M.patch
+          # Pattern: vYYYY.M.patch (cargo-release adds the 'v' prefix)
           DATE="$(date +%Y.%-m)."
-          EXISTING_TAGS=$(git tag -l "${DATE}*" | sort -t. -k3 -n | tail -1)
+          EXISTING_TAGS=$(git tag -l "v${DATE}*" | sort -t. -k3 -n | tail -1)
 
           if [ -z "$EXISTING_TAGS" ]; then
             PATCH=1
           else
-            # Extract the patch number from the last tag
-            LAST_PATCH=$(echo "$EXISTING_TAGS" | sed "s/${DATE}//")
+            # Extract the patch number from the last tag (removing 'v' prefix)
+            LAST_PATCH=$(echo "$EXISTING_TAGS" | sed "s/v${DATE}//")
             PATCH=$((LAST_PATCH + 1))
           fi
 
