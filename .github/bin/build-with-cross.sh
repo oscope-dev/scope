@@ -14,7 +14,6 @@ rm -rf $ARTIFACT_DIR || true
 mkdir $ARTIFACT_DIR
 cp $DIR/../../LICENSE $ARTIFACT_DIR
 cp $DIR/../../README.md $ARTIFACT_DIR
-cp $DIR/../../scope/CHANGELOG.md $ARTIFACT_DIR
 cp $DIR/../../target/$1/release/scope $ARTIFACT_DIR
 cp $DIR/../../target/$1/release/scope-intercept $ARTIFACT_DIR
 
