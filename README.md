@@ -15,12 +15,6 @@ For full documentation, please visit [our website](https://oscope-dev.github.io/
 
 ## Install
 
-**Homebrew**
-
-```shell
-brew install oscope-dev/homebrew-formulas/dev-scope
-```
-
 **Install Script**
 
 Review the [latest release](https://github.com/oscope-dev/scope/releases/latest) to find the install command.
