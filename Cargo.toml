@@ -57,7 +57,7 @@ which = { version = "6.0", features = ["regex"] }
 regex = "1.11.0"
 lazy_static = "1.5.0"
 inquire = {  version = "0.6", features = ["editor"]}
-tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
+tracing-subscriber = { version = "*", features = ["time", "json", "local-time" ] }
 tracing-appender = "0.2.3"
 chrono = "0.4"
 nanoid = "0.4"
