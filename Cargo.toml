@@ -41,7 +41,7 @@ gethostname = "0.4.3"
 glob = "0.3"
 human-panic = "2.0.2"
 ignore = "0.4.23"
-indicatif = "0.17"
+indicatif = "*"
 inquire = {  version = "0.6", features = ["editor"]}
 itertools = { version = "0.13", features = [] }
 json = "0.12"
@@ -76,7 +76,7 @@ tokio = { version = "1", features = ["full"] }
 tonic = "0.12.0"
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
-tracing-indicatif = "0.3.9"
+tracing-indicatif = "*"
 tracing-opentelemetry = "0.28.0"
 tracing-subscriber = { version = "*", features = ["time", "json", "local-time" ] }
 url = "2.5.2"
