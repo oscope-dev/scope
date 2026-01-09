@@ -23,7 +23,7 @@ use mockall::automock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, instrument};
+use tracing::{info, instrument};
 
 mod string_vec_reader;
 use string_vec_reader::StringVecReader;
