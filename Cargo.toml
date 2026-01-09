@@ -78,7 +78,7 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-indicatif = "0.3.9"
 tracing-opentelemetry = "0.28.0"
-tracing-subscriber = { version = "0.3", features = ["time", "json", "local-time" ] }
+tracing-subscriber = { version = "*", features = ["time", "json", "local-time" ] }
 url = "2.5.2"
 which = { version = "6.0", features = ["regex"] }
 
