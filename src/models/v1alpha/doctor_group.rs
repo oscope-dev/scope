@@ -69,9 +69,8 @@ pub struct DoctorFixPromptSpec {
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct DoctorGroupActionSpec {
-    /// Name of the "action". When not provided, it will be the index of the action within the group.
-    /// This is used when reporting status to the users.
-    pub name: Option<String>,
+    /// Name of the "action" used when reporting status to the users.
+    pub name: String,
 
     /// A description of this specific action, used for information to the users.
     pub description: Option<String>,
