@@ -65,6 +65,17 @@ It also allows the engineer to upload a bug report immediately.
 > `scope` will redact anything it finds as "sensitive".
 > This allows you to fetch env-vars, and no leak GH API tokens for example.
 
+## Viewing Telemetry Locally
+
+```sh
+# start the jaeger container
+gdev services start jaeger
+# open the UI
+open http://localhost:16686
+# send the telemetry to local instead of datadog
+SCOPE_OTEL_ENDPOINT=http://localhost:14317 scope doctor run --only <target>
+```
+
 ## Special Thanks
 
 We took our redaction string from [sirwart/ripsecrets](https://github.com/sirwart/ripsecrets).
