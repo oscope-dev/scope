@@ -13,7 +13,6 @@ use normpath::PathExt;
 use octocrab::Octocrab;
 use octocrab::models::{AppId, InstallationToken};
 use octocrab::params::apps::CreateInstallationAccessToken;
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -160,10 +159,7 @@ async fn get_octocrab(repo: &str) -> Result<Octocrab> {
 
             Ok(Octocrab::builder().personal_token(access.token).build()?)
         }
-        (_, _, Ok(token)) => {
-            let token = SecretString::new(token);
-            Ok(Octocrab::builder().personal_token(token).build()?)
-        }
+        (_, _, Ok(token)) => Ok(Octocrab::builder().personal_token(token).build()?),
         (_, _, _) => Err(anyhow!("No GitHub auth configured")),
     }
 }
