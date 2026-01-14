@@ -3,17 +3,17 @@ use gethostname::gethostname;
 use indicatif::ProgressStyle;
 use lazy_static::lazy_static;
 
-use opentelemetry::{
-    KeyValue,
-    trace::{TraceError, TracerProvider as _},
+use opentelemetry::{KeyValue, trace::TracerProvider as _};
+use opentelemetry_otlp::{
+    ExporterBuildError, MetricExporter, SpanExporter, WithExportConfig, WithTonicConfig,
 };
-use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig, WithTonicConfig};
 use opentelemetry_sdk::{
     Resource,
-    metrics::{MetricError, PeriodicReader, SdkMeterProvider},
+    metrics::{SdkMeterProvider, periodic_reader_with_async_runtime::PeriodicReader},
     runtime,
-    trace::{RandomIdGenerator, Sampler, TracerProvider},
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
 };
+use tonic::metadata::MetadataMap;
 use url::Url;
 
 use std::env;
@@ -23,7 +23,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tonic::metadata::MetadataMap;
 
 use tracing::level_filters::LevelFilter;
 use tracing::warn;
@@ -156,7 +155,7 @@ pub struct ConfiguredLogger {
 
 /// RAII wrapper that ensures metrics and traces are flushed on shutdown
 struct OtelProperties {
-    tracer: TracerProvider,
+    tracer: SdkTracerProvider,
     metrics: SdkMeterProvider,
 }
 
@@ -215,7 +214,7 @@ impl LoggingOpts {
         metadata_map: &MetadataMap,
         endpoint: &str,
         timeout: &Duration,
-    ) -> Result<TracerProvider, TraceError> {
+    ) -> Result<SdkTracerProvider, ExporterBuildError> {
         let span_exporter = match self.otel_protocol {
             OtelProtocol::Grpc => SpanExporter::builder()
                 .with_tonic()
@@ -240,8 +239,8 @@ impl LoggingOpts {
             }
         };
 
-        let tracer = TracerProvider::builder()
-            .with_batch_exporter(span_exporter?, runtime::Tokio)
+        let tracer = SdkTracerProvider::builder()
+            .with_batch_exporter(span_exporter?)
             .with_sampler(Sampler::AlwaysOn)
             .with_id_generator(RandomIdGenerator::default())
             .with_max_attributes_per_span(16)
@@ -258,7 +257,7 @@ impl LoggingOpts {
         metadata_map: &MetadataMap,
         endpoint: &str,
         timeout: &Duration,
-    ) -> Result<SdkMeterProvider, MetricError> {
+    ) -> Result<SdkMeterProvider, ExporterBuildError> {
         let metric_exporter = match self.otel_protocol {
             OtelProtocol::Grpc => MetricExporter::builder()
                 .with_tonic()
@@ -287,17 +286,19 @@ impl LoggingOpts {
     }
 
     fn resource(&self, run_id: &str) -> Resource {
-        Resource::new(vec![
-            KeyValue::new("service.name", self.otel_service.clone()),
-            KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
-            KeyValue::new(
-                "host.name",
-                gethostname()
-                    .into_string()
-                    .unwrap_or_else(|_| "unknown".to_string()),
-            ),
-            KeyValue::new("scope.id", run_id.to_string()),
-        ])
+        Resource::builder_empty()
+            .with_attributes([
+                KeyValue::new("service.name", self.otel_service.clone()),
+                KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                KeyValue::new(
+                    "host.name",
+                    gethostname()
+                        .into_string()
+                        .unwrap_or_else(|_| "unknown".to_string()),
+                ),
+                KeyValue::new("scope.id", run_id.to_string()),
+            ])
+            .build()
     }
 
     fn metadata_map(&self, run_id: &str) -> MetadataMap {
