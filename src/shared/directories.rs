@@ -102,39 +102,45 @@ pub fn cache() -> Option<PathBuf> {
 mod tests {
     use super::*;
     use std::env;
+    use std::sync::Mutex;
+
+    // Mutex to serialize tests that modify environment variables.
+    // Rust tests run in parallel by default, so we need to prevent concurrent
+    // modification of shared environment variables.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     // Guard struct to ensure environment variables are restored even on panic
-    struct EnvGuard {
+    struct EnvGuard<'a> {
         var_name: String,
         original_value: Option<String>,
+        _lock: std::sync::MutexGuard<'a, ()>,
     }
 
-    impl EnvGuard {
+    impl<'a> EnvGuard<'a> {
         fn new(var_name: &str) -> Self {
+            let lock = ENV_MUTEX.lock().unwrap();
             let original_value = env::var(var_name).ok();
             Self {
                 var_name: var_name.to_string(),
                 original_value,
+                _lock: lock,
             }
         }
 
         fn set(&self, value: &str) {
-            // SAFETY: This is test-only code. Tests using this are not run in parallel
-            // with other tests that depend on these environment variables.
+            // SAFETY: This is test-only code. Access is serialized by ENV_MUTEX.
             unsafe { env::set_var(&self.var_name, value) };
         }
 
         fn remove(&self) {
-            // SAFETY: This is test-only code. Tests using this are not run in parallel
-            // with other tests that depend on these environment variables.
+            // SAFETY: This is test-only code. Access is serialized by ENV_MUTEX.
             unsafe { env::remove_var(&self.var_name) };
         }
     }
 
-    impl Drop for EnvGuard {
+    impl Drop for EnvGuard<'_> {
         fn drop(&mut self) {
-            // SAFETY: This is test-only code. Tests using this are not run in parallel
-            // with other tests that depend on these environment variables.
+            // SAFETY: This is test-only code. Access is serialized by ENV_MUTEX.
             match &self.original_value {
                 Some(value) => unsafe { env::set_var(&self.var_name, value) },
                 None => unsafe { env::remove_var(&self.var_name) },
