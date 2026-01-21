@@ -51,7 +51,6 @@ pub enum ReportDestinationSpec {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
-#[schemars(deny_unknown_fields)]
 pub struct ReportDestinationTemplates {
     /// Title to use when creating the issue. This is a Jinja2 style template. `entrypoint` is
     /// provided as a variable, which is the scope command run.

@@ -10,12 +10,18 @@ pub const FILE_EXEC_PATH_ANNOTATION: &str = "scope.github.com/bin-path";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, Builder, JsonSchema)]
 pub struct ModelMetadataAnnotations {
-    #[serde(rename = "scope.github.com/file-path")]
+    #[serde(
+        rename = "scope.github.com/file-path",
+        skip_serializing_if = "Option::is_none"
+    )]
     #[schemars(skip)]
     /// File path for the resource, generated automatically.
     pub file_path: Option<String>,
 
-    #[serde(rename = "scope.github.com/file-dir")]
+    #[serde(
+        rename = "scope.github.com/file-dir",
+        skip_serializing_if = "Option::is_none"
+    )]
     #[schemars(skip)]
     /// Directory containing the resource, generated automatically.
     pub file_dir: Option<String>,
