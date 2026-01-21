@@ -621,8 +621,11 @@ async fn handle_doctor(config: &config::FoundConfig, args: &DoctorArgs) -> Resul
 The binary becomes **minimal** - just setup and delegation:
 
 ```rust
+// Binaries can access modules in src/ directly, even if not in lib.rs
+mod cli;
+
 use clap::Parser;
-use dev_scope::cli::{Cli, commands};
+use cli::{Cli, commands};
 use dev_scope::config;
 use human_panic::setup_panic;
 
@@ -639,10 +642,10 @@ async fn main() {
     // Parse CLI args
     let cli = Cli::parse();
     
-    // Setup logging (CLI-specific utility)
-    let _logger = dev_scope::cli::logging::configure(&cli.logging, &cli.config.get_run_id(), "root").await;
+    // Setup logging (CLI-specific utility from cli module)
+    let _logger = cli::logging::configure(&cli.logging, &cli.config.get_run_id(), "root").await;
     
-    // Load config using public API
+    // Load config using public library API
     let cfg = match config::load(cli.config.config_path.clone()).await {
         Ok(c) => c,
         Err(e) => {
@@ -663,7 +666,9 @@ async fn main() {
 }
 ```
 
-**That's it!** Binary is now ~40 lines instead of 232.
+**That's it!** Binary is now ~45 lines instead of 232.
+
+**Note:** The `cli` module lives in `src/cli/` but isn't exported through `lib.rs`, so only binaries in the same crate can access it - external crates cannot.
 
 #### **`src/lib.rs`** - Library Root (Updated)
 
@@ -725,21 +730,13 @@ pub mod models;
 // Anything CLI-specific has been moved to the `cli` module.
 // Anything useful for library consumers has been made public.
 pub(crate) mod internal;
-
-// ============================================================================
-// CLI module - Only available to binaries in src/bin/
-// Not exported in lib.rs, so external crates cannot access it
-// ============================================================================
-
-#[cfg(not(doc))]  // Hide from documentation
-pub mod cli;
 ```
 
 **Key changes:**
 - **NO prelude!** Direct module exports only
 - Feature modules (`doctor`, `analyze`, `report`, `lint`) are **public**
 - `internal` is `pub(crate)` - truly internal utilities only
-- `cli` is public but not documented (for binaries only, includes logging)
+- **`cli` module is NOT in lib.rs** - only accessible to binaries
 - Clear documentation about what's public vs internal
 - Utilities extracted to appropriate locations (`config`, `capture` are public)
 
