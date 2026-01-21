@@ -153,6 +153,28 @@ pub async fn doctor_root(found_config: &FoundConfig, args: &DoctorArgs) -> Resul
 - Refactoring is risky due to tight coupling
 - Hard to add new interfaces (e.g., RPC, HTTP server)
 
+### Mixed UX/Library Concerns (Current Findings)
+
+The following places mix human-facing output or CLI interaction with library/business logic. These should return structured data and leave all printing/formatting to the CLI:
+
+- Shared printing from library:
+    - [src/shared/mod.rs#L53](src/shared/mod.rs#L53) and [src/shared/mod.rs#L74](src/shared/mod.rs#L74): uses `report_stdout!()` and colorized output inside library helper; move to CLI, return data.
+
+- Doctor run/list formatting and interaction:
+    - [src/doctor/commands/run.rs#L111](src/doctor/commands/run.rs#L111), [src/doctor/commands/run.rs#L122](src/doctor/commands/run.rs#L122): printing summary and blank lines; move to CLI formatting.
+    - [src/doctor/runner.rs#L11](src/doctor/runner.rs#L11), [src/doctor/runner.rs#L368](src/doctor/runner.rs#L368), [src/doctor/runner.rs#L370](src/doctor/runner.rs#L370), [src/doctor/runner.rs#L451](src/doctor/runner.rs#L451): colorization and interactive prints; model as options (e.g., `auto_fix`, `ci_mode`) and return results; CLI handles prompts/formatting.
+
+- Models printing:
+    - [src/models/mod.rs#L141](src/models/mod.rs#L141), [src/models/mod.rs#L143](src/models/mod.rs#L143): direct `println!`; return pretty-printed strings or values; CLI prints.
+
+- Logging setup:
+    - [src/shared/logging.rs#L325](src/shared/logging.rs#L325): `println!` on telemetry failure; move logging setup to `cli/logging.rs` and use `tracing` or CLI messages there.
+
+- Capture formatting:
+    - [src/shared/capture.rs#L4](src/shared/capture.rs#L4): `colored::Colorize` import suggests formatting concerns; ensure capture remains pure data and remove colorization from library.
+
+Guideline: library code may use `tracing` for debug logs; user-facing output belongs in CLI. Macros like `report_stdout!` should not be used in library functions.
+
 ---
 
 ## Proposed Library-First Architecture
@@ -165,6 +187,7 @@ pub async fn doctor_root(found_config: &FoundConfig, args: &DoctorArgs) -> Resul
 4. **Type Independence**: Core domain types don't depend on CLI types
 5. **Testability**: Business logic testable without CLI layer
 6. **Explicit Module Boundaries**: Eliminate prelude pattern in favor of clear, explicit module exports
+7. **No Console Output in Library**: Library functions must return structured data; all human-facing printing and formatting lives in the CLI.
 
 ### Proposed Structure
 
@@ -225,6 +248,13 @@ src/
 ```
 
 ### New Module Breakdown
+
+#### **Output & Interaction**
+
+- **Library modules (`doctor`, `analyze`, `report`) do not print to console.** They return domain-specific result types (e.g., `RunResult`, `AnalysisResult`).
+- **CLI module formats and prints** results using human-friendly tables, colors, and messages.
+- **Debug/trace logs** can remain via `tracing`, but avoid `target="user"` from library code; reserve user-facing channels for CLI.
+- **Macros like `report_stdout!`** belong in `internal/` or are used solely by the CLI layer, not by library functions.
 
 #### **`src/doctor/`** - Doctor Module (Public API)
 
@@ -768,12 +798,17 @@ pub(crate) mod internal;
    - Keep existing CLI arg types in current locations temporarily
    - Add conversion functions between CLI args and domain options
 
-3. **Make core functions public**
+4. **Remove console output from library code**
+    - Audit and replace `report_stdout!`, `println!`, and colorized user messages in library modules.
+    - Return structured results from library functions; move all formatting to `cli/`.
+    - Keep `tracing` for debug, but avoid user-targeted logs in library.
+
+5. **Make core functions public**
    - Export public functions directly from modules (e.g., `pub use runner::run` in `doctor/mod.rs`)
    - Keep implementation details `pub(crate)` or private
    - Add comprehensive documentation to public functions
 
-4. **Add library-focused tests**
+6. **Add library-focused tests**
    - Test public module functions
    - Verify they work independently of CLI
    - Test with domain option types, not CLI args
