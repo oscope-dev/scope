@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document describes the current architecture of the Scope project and provides a roadmap for refactoring it to follow Rust best practices where the library (`lib.rs`) exposes most functionality and binaries are thin wrappers around library functions.
+This document is driven by a single goal: enable Scope’s analyze and fix capabilities to be used programmatically from other Rust programs. We outline how to expose clear, stable public functions in the `analyze` and `doctor` modules, move CLI-only code into `cli`, and keep binaries as thin wrappers. The result is a library-first crate that external tools can depend on, while `scope` remains a CLI built on those same APIs.
 
 ---
 
@@ -918,19 +918,34 @@ let result = doctor::run(&cfg, opts).await?;  // Clean library function
 
 ## Recommended Next Steps
 
-1. **Validate approach** - Review this document with team
-2. **Prototype** - Refactor one module (e.g., `doctor`) to validate design:
-   - Remove prelude
-   - Create `options.rs` with public types
-   - Make `run()` function public
-   - Update `cli/` to call it
-3. **Test migration** - Ensure no breakage in binary functionality
-4. **Document patterns** - Create contributor guide for the new structure
-5. **Execute phases** - Roll out changes incrementally
-6. **Measure success** - Track metrics:
-   - Lines of code in binary (should decrease)
-   - Test coverage of public functions (should increase)
-   - External library usage (new capability)
+1. **Prototype library usage for analyze/fix**
+    - Export `analyze::text()` and `analyze::command()` with `Options` and `AnalysisResult` types.
+    - Export `doctor::run()` with `RunOptions` (including `auto_fix`, `groups`, `ci_mode`, `file_cache`) and `RunResult`.
+    - Ensure fix execution is invokable via `RunOptions.auto_fix`; add granular fix hooks if needed (e.g., per-check fix controls).
+
+2. **Decouple CLI from library**
+    - Move all `clap` argument types into `cli/` and convert to library options (`analyze::Options`, `doctor::RunOptions`).
+    - Remove prelude usage; prefer explicit module paths and public exports.
+    - Keep CLI-only utilities (e.g., logging) in `cli/` and internal-only helpers in `internal/`.
+
+3. **Add an example consumer crate**
+    - Create `examples/library-consumer/` demonstrating programmatic use of `analyze` and `doctor` from another Rust program.
+    - Include a minimal README and a runnable example that compiles against the library API.
+
+4. **Tests and documentation**
+    - Add rustdoc examples to `analyze` and `doctor` public functions showing typical usage.
+    - Write unit tests for `analyze::text()`, `analyze::command()`, and `doctor::run()` using domain option types (not CLI).
+    - Add integration tests verifying external consumption (build the example and run a simple scenario).
+
+5. **Incremental execution**
+    - Refactor `analyze` first to validate the pattern, then `doctor`.
+    - Update binaries to call the new public functions; keep binaries thin.
+
+6. **Success criteria**
+    - External crate builds and runs using `analyze` and `doctor` without touching CLI types.
+    - Binary lines of code decrease significantly and remain thin.
+    - Test coverage of public library functions increases and stays stable.
+    - No references to an `api` module; module boundaries are explicit and clear.
 
 ---
 
