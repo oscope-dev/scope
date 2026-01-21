@@ -887,8 +887,11 @@ let result = doctor::run(&cfg, opts).await?;  // Clean library function
 
 ### 1. **Backward Compatibility**
 - Do we need to maintain existing preludes during transition?
+  * No. We have not external consumers of the current "library" code.
 - Are there external consumers of the current library API?
+  * Nope. We have a chance to make whatever breaking changes we need to to create a clean API.
 - Can we do this in multiple releases with deprecation warnings?
+  * Yes, but again, we're not yet publisihing the crate as a library, so we can be pretty liberal with making changes _until_ we release a stable version of the library.
 
 ### 2. **Feature Flags**
 - Should CLI code be behind a `cli` feature flag?
@@ -907,6 +910,7 @@ let result = doctor::run(&cfg, opts).await?;  // Clean library function
 
 ### 5. **Configuration Model**
 - `FoundConfig` is complex - is it the right public type?
+  * Maybe not, but we _know_ it's not a great name.
 - Should we have a simpler builder pattern for library users?
 - Consider separating "search for config" from "use this config"
 
