@@ -1,0 +1,11 @@
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/*'
+
+jobs:
+  build-docs:
+    uses: ./.github/workflows/gh-page.yml
