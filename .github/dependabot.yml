@@ -10,13 +10,3 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
-  - package-ecosystem: "cargo"
-    directory: "/scope"
-    schedule:
-     interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      prod-dependencies:
-        applies-to: version-updates
-        patterns:
-          - "*"
