@@ -1,6 +1,6 @@
 [package]
 name = "dev-scope"
-version = "2026.1.12"
+version = "0.0.0-dev"
 edition = "2024"
 default-run = "scope"
 repository = "https://github.com/oscope-dev/scope"
@@ -12,12 +12,6 @@ description = "A tool to help diagnose errors, setup machines, and report bugs t
 documentation = "https://oscope-dev.github.io/scope/"
 readme = "README.md"
 publish = true
-
-[package.metadata.dist]
-dist = true
-
-[package.metadata.release]
-tag-prefix = ""
 
 [[bin]]
 name = "scope"
@@ -92,8 +86,3 @@ tempfile = "3.0"
 [build-dependencies]
 anyhow = "1.0.90"
 vergen = { version = "8.3", features = ["build", "git", "git2"] }
-
-# The profile that 'cargo dist' will build with
-[profile.dist]
-inherits = "release"
-lto = "thin"
