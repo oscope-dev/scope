@@ -32,19 +32,27 @@
 //!
 //! - [`analyze`] - Log and output analysis for known errors
 //! - [`doctor`] - Health checks and automatic fixes
-//! - [`cli`] - CLI-specific implementations (InquireInteraction)
 //! - [`internal`] - Abstraction traits (UserInteraction, ProgressReporter)
 //! - [`shared`] - Shared utilities and configuration loading
 //! - [`models`] - Data model definitions
+//!
+//! ## CLI Module
+//!
+//! The `cli` module contains CLI-specific implementations and is not exported
+//! as part of the public library API. However, `InquireInteraction` is re-exported
+//! at the crate root for convenience when building CLI applications.
 
 pub mod analyze;
-pub mod cli;
 pub mod doctor;
 pub mod internal;
 pub mod lint;
 pub mod models;
 pub mod report;
 pub mod shared;
+
+// CLI module is internal - not part of public library API
+// Only InquireInteraction is re-exported for CLI usage
+pub(crate) mod cli;
 
 // Re-export key types at crate root for convenience
 // Analyze module

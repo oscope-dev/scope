@@ -1,3 +1,4 @@
+mod api;
 mod check;
 mod cli;
 mod commands;
@@ -17,3 +18,6 @@ pub mod prelude {
 // Re-export key types for library usage
 pub use options::DoctorRunOptions;
 pub use runner::PathRunResult;
+
+// Public API functions
+pub use api::{run, list};

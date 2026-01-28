@@ -4,8 +4,9 @@
 //! without CLI dependencies.
 
 use dx_scope::{
-    AnalyzeInput, AnalyzeOptions, AutoApprove, ConfigLoadOptions, DenyAll, DoctorRunOptions,
-    InquireInteraction, NoOpProgress, ProgressReporter, UserInteraction,
+    AnalyzeInput, AnalyzeOptions, AnalyzeStatus, AutoApprove, ConfigLoadOptions, DenyAll,
+    DoctorRunOptions, FoundConfig, InquireInteraction, NoOpProgress, ProgressReporter,
+    UserInteraction,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -101,4 +102,65 @@ fn test_inquire_interaction_is_send_sync() {
     assert_send_sync::<AutoApprove>();
     assert_send_sync::<DenyAll>();
     assert_send_sync::<NoOpProgress>();
+}
+
+// Integration tests for the new public API
+mod api_tests {
+    use super::*;
+    use dx_scope::{analyze, doctor};
+
+    #[tokio::test]
+    async fn test_analyze_process_text_no_errors() {
+        let options = AnalyzeOptions::default();
+        let text = "This is clean log output\nNo errors here\n";
+
+        let status = analyze::process_text(&options, text, &DenyAll)
+            .await
+            .expect("analyze should succeed");
+
+        assert!(matches!(status, AnalyzeStatus::NoKnownErrorsFound));
+    }
+
+    #[tokio::test]
+    async fn test_analyze_process_input_from_lines() {
+        let options = AnalyzeOptions::default();
+        let lines = vec![
+            "Starting process...".to_string(),
+            "Processing data...".to_string(),
+            "Complete!".to_string(),
+        ];
+
+        let input = AnalyzeInput::from_lines(lines);
+        let status = analyze::process_input(&options, input, &AutoApprove)
+            .await
+            .expect("analyze should succeed");
+
+        assert!(matches!(status, AnalyzeStatus::NoKnownErrorsFound));
+    }
+
+    #[tokio::test]
+    async fn test_doctor_run_with_empty_config() {
+        // Create an empty config
+        let config = FoundConfig::empty(std::env::current_dir().unwrap());
+
+        let options = DoctorRunOptions::ci_mode();
+        let result = doctor::run(&config, options)
+            .await
+            .expect("doctor run should succeed");
+
+        // With empty config, no groups should run
+        assert_eq!(result.succeeded_groups.len(), 0);
+        assert_eq!(result.failed_group.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_doctor_list_with_empty_config() {
+        let config = FoundConfig::empty(std::env::current_dir().unwrap());
+
+        let groups = doctor::list(&config)
+            .await
+            .expect("doctor list should succeed");
+
+        assert_eq!(groups.len(), 0);
+    }
 }
