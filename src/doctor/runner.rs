@@ -385,6 +385,7 @@ fn auto_approve(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
 ///
 /// This bridges the gap between the trait-based UserInteraction interface
 /// and the function pointer interface used by DoctorActionRun.
+#[allow(dead_code)]
 pub fn make_prompt_fn<U: UserInteraction>(user_interaction: &U) -> impl Fn(&str, &Option<String>) -> bool + '_ {
     move |prompt_text: &str, maybe_help_text: &Option<String>| {
         tracing_indicatif::suspend_tracing_indicatif(|| {
