@@ -1,0 +1,25 @@
+{
+  "name": "Scope",
+  "dockerComposeFile": ["docker-compose.yaml"],
+  "service": "devcontainer",
+  "postStartCommand": "ssh-add -l && claude",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "cursor": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vivaxy.vscode-conventional-commits"
+      ],
+      "settings": {
+        "remote.containers.copyGitConfig": true
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/rust:1": {},
+    "ghcr.io/devcontainers-extra/features/claude-code:1": {}
+  }
+}
