@@ -13,10 +13,10 @@
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::internal::prompts::{UserInteraction, AutoApprove};
+/// ```rust
+/// use dx_scope::UserInteraction;
 ///
-/// async fn run_with_auto_approve<U: UserInteraction>(interaction: &U) {
+/// fn run_with_interaction<U: UserInteraction>(interaction: &U) {
 ///     if interaction.confirm("Apply fix?", Some("This will modify files")) {
 ///         // Apply the fix
 ///     }
@@ -49,8 +49,8 @@ pub trait UserInteraction: Send + Sync {
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::internal::prompts::{UserInteraction, AutoApprove};
+/// ```rust
+/// use dx_scope::{UserInteraction, AutoApprove};
 ///
 /// let interaction = AutoApprove;
 /// assert!(interaction.confirm("Apply fix?", None)); // Always returns true
@@ -78,8 +78,8 @@ impl UserInteraction for AutoApprove {
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::internal::prompts::{UserInteraction, DenyAll};
+/// ```rust
+/// use dx_scope::{UserInteraction, DenyAll};
 ///
 /// let interaction = DenyAll;
 /// assert!(!interaction.confirm("Apply fix?", None)); // Always returns false

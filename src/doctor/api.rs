@@ -62,13 +62,14 @@ use tracing::{info, warn};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
-/// use dx_scope::DoctorRunOptions;
+/// ```rust
+/// use dx_scope::{DoctorRunOptions, FoundConfig};
 /// use dx_scope::doctor::run;
 ///
+/// let working_dir = std::env::current_dir().unwrap();
+/// let config = FoundConfig::empty(working_dir);
 /// let options = DoctorRunOptions::with_fixes();
-/// let result = run(&config, options).await?;
-/// assert!(result.did_succeed);
+/// // Call: run(&config, options).await
 /// ```
 ///
 /// # Note on Interaction
@@ -197,14 +198,14 @@ pub async fn run(
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
+/// use dx_scope::FoundConfig;
 /// use dx_scope::doctor::list;
 ///
-/// let groups = list(&config).await?;
-/// for group in groups {
-///     println!("Group: {}", group.name());
-///     println!("  {}", group.description());
-/// }
+/// let working_dir = std::env::current_dir().unwrap();
+/// let config = FoundConfig::empty(working_dir);
+/// // Call: list(&config).await
+/// // Then iterate: for group in groups { ... }
 /// ```
 pub async fn list(config: &FoundConfig) -> Result<Vec<crate::shared::prelude::DoctorGroup>> {
     let order = super::commands::generate_doctor_list(config);

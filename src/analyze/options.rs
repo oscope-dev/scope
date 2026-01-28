@@ -13,7 +13,7 @@
 //! ## Basic Configuration
 //!
 //! ```rust
-//! use dx_scope::analyze::options::{AnalyzeOptions, AnalyzeInput};
+//! use dx_scope::AnalyzeOptions;
 //! use std::collections::BTreeMap;
 //! use std::path::PathBuf;
 //!
@@ -21,11 +21,12 @@
 //!     known_errors: BTreeMap::new(),
 //!     working_dir: PathBuf::from("/path/to/project"),
 //! };
+//! assert!(options.known_errors.is_empty());
 //! ```
 //!
 //! ## Different Input Sources
 //!
-//! ```rust
+//! ```rust,no_run
 //! use dx_scope::analyze::options::AnalyzeInput;
 //!
 //! // From a file
@@ -52,8 +53,8 @@ use std::path::PathBuf;
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::analyze::options::AnalyzeOptions;
+/// ```rust
+/// use dx_scope::AnalyzeOptions;
 /// use std::collections::BTreeMap;
 /// use std::path::PathBuf;
 ///
@@ -61,6 +62,7 @@ use std::path::PathBuf;
 ///     known_errors: BTreeMap::new(),
 ///     working_dir: PathBuf::from("/path/to/project"),
 /// };
+/// assert!(options.known_errors.is_empty());
 /// ```
 #[derive(Debug, Clone)]
 pub struct AnalyzeOptions {

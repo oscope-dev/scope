@@ -35,6 +35,7 @@
 //! instead of crashing. For explicit control in non-interactive environments,
 //! use [`AutoApprove`](crate::AutoApprove) or [`DenyAll`](crate::DenyAll).
 
+
 use crate::internal::prompts::UserInteraction;
 use inquire::InquireError;
 use tracing::warn;

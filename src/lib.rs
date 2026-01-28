@@ -13,19 +13,24 @@
 //!
 //! The library can be used programmatically without CLI dependencies:
 //!
-//! ```rust,ignore
+//! ```rust
 //! use dx_scope::{
-//!     analyze::{AnalyzeOptions, process_lines, AnalyzeStatus},
-//!     doctor::{DoctorRunOptions, PathRunResult},
-//!     internal::prompts::{AutoApprove, DenyAll, UserInteraction},
-//!     internal::progress::{NoOpProgress, ProgressReporter},
-//!     shared::config::ConfigLoadOptions,
+//!     AnalyzeOptions, AnalyzeInput, AutoApprove,
+//!     DoctorRunOptions, FoundConfig,
 //! };
 //!
-//! // Run analysis with auto-approve
-//! let options = AnalyzeOptions::default();
-//! let interaction = AutoApprove;
-//! // ... process_lines(&known_errors, &working_dir, input, &interaction).await
+//! // Create configuration
+//! let working_dir = std::env::current_dir().unwrap();
+//! let config = FoundConfig::empty(working_dir);
+//!
+//! // Configure analyze options
+//! let analyze_options = AnalyzeOptions::default();
+//! let input = AnalyzeInput::from_lines(vec!["test".to_string()]);
+//! // Use dx_scope::analyze::process_input(&analyze_options, input, &AutoApprove).await
+//!
+//! // Configure doctor options for CI mode
+//! let doctor_options = DoctorRunOptions::ci_mode();
+//! // Use dx_scope::doctor::run(&config, doctor_options).await
 //! ```
 //!
 //! ## Modules
@@ -80,12 +85,13 @@ pub use cli::InquireInteraction;
 /// # Migration
 ///
 /// Instead of:
-/// ```rust,ignore
+/// ```rust
+/// # #[allow(deprecated)]
 /// use dx_scope::prelude::*;
 /// ```
 ///
 /// Use explicit imports:
-/// ```rust,ignore
+/// ```rust
 /// use dx_scope::{DoctorRunOptions, AnalyzeOptions, FoundConfig};
 /// use dx_scope::doctor;
 /// use dx_scope::analyze;

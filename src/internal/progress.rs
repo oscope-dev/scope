@@ -14,8 +14,8 @@
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::internal::progress::{ProgressReporter, NoOpProgress};
+/// ```rust
+/// use dx_scope::ProgressReporter;
 ///
 /// fn run_checks<P: ProgressReporter>(progress: &P, groups: &[&str]) {
 ///     for group in groups {
@@ -55,8 +55,8 @@ pub trait ProgressReporter: Send + Sync {
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::internal::progress::{ProgressReporter, NoOpProgress};
+/// ```rust
+/// use dx_scope::{ProgressReporter, NoOpProgress};
 ///
 /// let progress = NoOpProgress;
 /// progress.start_group("test", 5); // Does nothing

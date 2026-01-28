@@ -80,7 +80,7 @@ use std::path::PathBuf;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use dx_scope::shared::config::ConfigLoadOptions;
 /// use std::path::PathBuf;
 ///

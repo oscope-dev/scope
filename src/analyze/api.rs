@@ -80,7 +80,7 @@ use tracing::{debug, info};
 ///
 /// ## Analyze In-Memory Text
 ///
-/// ```rust,ignore
+/// ```rust
 /// use dx_scope::{AnalyzeOptions, AnalyzeInput, AutoApprove};
 /// use dx_scope::analyze::process_input;
 ///
@@ -90,14 +90,18 @@ use tracing::{debug, info};
 /// ];
 /// let input = AnalyzeInput::from_lines(lines);
 /// let options = AnalyzeOptions::default();
-/// let status = process_input(&options, input, &AutoApprove).await?;
+/// // Call: process_input(&options, input, &AutoApprove).await
 /// ```
 ///
 /// ## Analyze a File
 ///
-/// ```rust,ignore
+/// ```rust
+/// use dx_scope::{AnalyzeOptions, AnalyzeInput, DenyAll};
+/// use dx_scope::analyze::process_input;
+///
+/// let options = AnalyzeOptions::default();
 /// let input = AnalyzeInput::from_file("/var/log/build.log");
-/// let status = process_input(&options, input, &interaction).await?;
+/// // Call: process_input(&options, input, &DenyAll).await
 /// ```
 pub async fn process_input<U>(
     options: &AnalyzeOptions,
@@ -162,13 +166,13 @@ where
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```rust
 /// use dx_scope::{AnalyzeOptions, DenyAll};
 /// use dx_scope::analyze::process_text;
 ///
 /// let log_output = "error: compilation failed\nSome other output";
 /// let options = AnalyzeOptions::default();
-/// let status = process_text(&options, log_output, &DenyAll).await?;
+/// // Call: process_text(&options, log_output, &DenyAll).await
 /// ```
 pub async fn process_text<U>(
     options: &AnalyzeOptions,
