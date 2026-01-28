@@ -4,15 +4,18 @@
 //! without using the CLI.
 
 use dx_scope::doctor;
-use dx_scope::DoctorRunOptions;
-use dx_scope::shared::prelude::ConfigOptions;
+use dx_scope::{ConfigLoadOptions, DoctorRunOptions};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load configuration from the current directory
     println!("Loading scope configuration...");
-    let config_opts = ConfigOptions::default();
-    let config = config_opts.load_config().await?;
+    
+    // Note: For library usage, you can either:
+    // 1. Create an empty config and populate it programmatically
+    // 2. Load from disk using your own config loading logic
+    let working_dir = std::env::current_dir()?;
+    let config = dx_scope::FoundConfig::empty(working_dir);
 
     println!("Found {} doctor groups", config.doctor_group.len());
     println!();

@@ -5,14 +5,13 @@
 
 use dx_scope::analyze;
 use dx_scope::{AnalyzeInput, AnalyzeOptions, AnalyzeStatus, AutoApprove, DenyAll};
-use dx_scope::shared::prelude::ConfigOptions;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Load configuration from the current directory
-    println!("Loading scope configuration...");
-    let config_opts = ConfigOptions::default();
-    let config = config_opts.load_config().await?;
+    // For this example, we'll use an empty config
+    // In a real application, you'd load config from your project
+    let working_dir = std::env::current_dir()?;
+    let config = dx_scope::FoundConfig::empty(working_dir);
 
     println!("Found {} known errors", config.known_error.len());
     println!();
