@@ -1,5 +1,6 @@
 use super::check::{ActionRunResult, ActionRunStatus, DoctorActionRun};
 use crate::doctor::check::RuntimeError;
+use crate::internal::prompts::UserInteraction;
 use crate::models::HelpMetadata;
 use crate::prelude::{
     ActionReport, ActionTaskReport, CaptureOpts, ExecutionProvider, GroupReport, OutputDestination,
@@ -350,6 +351,10 @@ where
     }
 }
 
+/// Prompt the user for confirmation using the inquire crate.
+///
+/// This function wraps inquire::Confirm and handles TTY detection.
+/// It's used when `yolo` mode is disabled.
 fn prompt_user(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
     tracing_indicatif::suspend_tracing_indicatif(|| {
         let prompt = {
@@ -364,12 +369,28 @@ fn prompt_user(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
     })
 }
 
+/// Auto-approve all prompts.
+///
+/// This function automatically approves all prompts, used in `yolo` mode
+/// or when running non-interactively.
 fn auto_approve(prompt_text: &str, maybe_help_text: &Option<String>) -> bool {
     println!("{} Yes (auto-approved)", prompt_text);
     if let Some(help_text) = maybe_help_text {
         println!("[{}]", help_text);
     }
     true
+}
+
+/// Create a prompt function from a UserInteraction implementation.
+///
+/// This bridges the gap between the trait-based UserInteraction interface
+/// and the function pointer interface used by DoctorActionRun.
+pub fn make_prompt_fn<U: UserInteraction>(user_interaction: &U) -> impl Fn(&str, &Option<String>) -> bool + '_ {
+    move |prompt_text: &str, maybe_help_text: &Option<String>| {
+        tracing_indicatif::suspend_tracing_indicatif(|| {
+            user_interaction.confirm(prompt_text, maybe_help_text.as_deref())
+        })
+    }
 }
 
 async fn report_action_output<T>(

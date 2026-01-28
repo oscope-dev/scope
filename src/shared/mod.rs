@@ -6,6 +6,7 @@ use std::cmp::max;
 use std::path::Path;
 
 mod capture;
+pub mod config;
 mod config_load;
 mod logging;
 
@@ -23,6 +24,7 @@ pub mod prelude {
         CaptureError, CaptureOpts, DefaultExecutionProvider, ExecutionProvider,
         MockExecutionProvider, OutputCapture, OutputCaptureBuilder, OutputDestination,
     };
+    pub use super::config::ConfigLoadOptions;
     pub use super::config_load::{ConfigOptions, FoundConfig, build_config_path};
     pub use super::logging::{LoggingOpts, STDERR_WRITER, STDOUT_WRITER, progress_bar_without_pos};
     pub use super::models::prelude::*;
