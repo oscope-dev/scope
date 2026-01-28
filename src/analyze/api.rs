@@ -9,17 +9,15 @@
 //!
 //! ```rust,no_run
 //! use dx_scope::{
-//!     AnalyzeOptions, AnalyzeInput, AutoApprove,
-//!     shared::config::ConfigLoadOptions,
+//!     AnalyzeOptions, AnalyzeInput, AutoApprove, FoundConfig,
 //! };
 //! use dx_scope::analyze::process_input;
-//! use dx_scope::shared::prelude::ConfigOptions;
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     // Load configuration
-//!     let config_opts = ConfigOptions::default();
-//!     let config = config_opts.load_config().await?;
+//!     let working_dir = std::env::current_dir()?;
+//!     let config = FoundConfig::empty(working_dir);
 //!
 //!     // Prepare input
 //!     let log_content = std::fs::read_to_string("error.log")?;

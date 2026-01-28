@@ -8,15 +8,14 @@
 //! ## Run All Checks with Auto-Fix
 //!
 //! ```rust,no_run
-//! use dx_scope::DoctorRunOptions;
+//! use dx_scope::{DoctorRunOptions, FoundConfig};
 //! use dx_scope::doctor::run;
-//! use dx_scope::shared::prelude::ConfigOptions;
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     // Load configuration
-//!     let config_opts = ConfigOptions::default();
-//!     let config = config_opts.load_config().await?;
+//!     let working_dir = std::env::current_dir()?;
+//!     let config = FoundConfig::empty(working_dir);
 //!
 //!     // Configure options with auto-fix enabled
 //!     let options = DoctorRunOptions::with_fixes();
