@@ -77,6 +77,37 @@ pub use internal::prompts::{AutoApprove, DenyAll, UserInteraction};
 // CLI implementations
 pub use cli::InquireInteraction;
 
+// Capture module (for CLI tools that intercept commands)
+pub use shared::prelude::{
+    CaptureOpts, DefaultExecutionProvider, OutputCapture, OutputDestination,
+};
+
+// Logging module (for CLI tools)
+pub use shared::prelude::LoggingOpts;
+
+// Config loading (for CLI tools)
+pub use shared::prelude::ConfigOptions;
+
+// Report builders (for CLI tools)
+pub use shared::prelude::{DefaultGroupedReportBuilder, DefaultUnstructuredReportBuilder};
+
+// Report traits (for CLI tools that need to render reports)
+pub use shared::prelude::{ReportRenderer, UnstructuredReportBuilder};
+
+// Model traits (for accessing metadata on config models)
+pub use models::HelpMetadata;
+
+// CLI argument types (for CLI binaries)
+pub use analyze::prelude::{AnalyzeArgs, analyze_root};
+pub use doctor::prelude::{DoctorArgs, doctor_root};
+pub use lint::cli::LintArgs;
+pub use lint::commands::lint_root;
+pub use report::prelude::{ReportArgs, report_root};
+
+// Shared utilities (for CLI binaries)
+pub use shared::prelude::print_details;
+pub use shared::{CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR};
+
 /// Prelude module for convenient glob imports.
 ///
 /// **DEPRECATED**: This module will be removed in a future version.

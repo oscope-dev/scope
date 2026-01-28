@@ -7,7 +7,11 @@ use anyhow::Result;
 use clap::CommandFactory;
 use colored::Colorize;
 use crate::{Cli, Command, VersionArgs};
-use dx_scope::{FoundConfig, report_stdout};
+use dx_scope::{
+    analyze_root, doctor_root, lint_root, print_details, report_root,
+    CaptureOpts, FoundConfig, OutputCapture, OutputDestination,
+    CONFIG_FILE_PATH_ENV, RUN_ID_ENV_VAR, report_stdout,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::BTreeMap;

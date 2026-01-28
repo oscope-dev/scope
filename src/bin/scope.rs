@@ -6,7 +6,9 @@
 mod cli;
 
 use clap::{Parser, Subcommand};
-use dx_scope::{ConfigOptions, LoggingOpts};
+use dx_scope::{
+    AnalyzeArgs, ConfigOptions, DoctorArgs, LintArgs, LoggingOpts, ReportArgs,
+};
 use human_panic::setup_panic;
 use tracing::{Level, enabled, error, info};
 

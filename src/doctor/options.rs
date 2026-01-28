@@ -60,8 +60,8 @@ use std::path::PathBuf;
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::doctor::options::DoctorRunOptions;
+/// ```rust,no_run
+/// use dx_scope::DoctorRunOptions;
 ///
 /// // Run all default groups with fixes enabled
 /// let options = DoctorRunOptions::default();
@@ -73,10 +73,7 @@ use std::path::PathBuf;
 /// };
 ///
 /// // Run in CI mode (no interactive fixes)
-/// let options = DoctorRunOptions {
-///     run_fix: false,
-///     ..Default::default()
-/// };
+/// let options = DoctorRunOptions::ci_mode();
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct DoctorRunOptions {

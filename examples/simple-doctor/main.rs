@@ -4,7 +4,7 @@
 //! without using the CLI.
 
 use dx_scope::doctor;
-use dx_scope::{ConfigLoadOptions, DoctorRunOptions};
+use dx_scope::DoctorRunOptions;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -16,16 +16,16 @@
 //!
 //! ## Interactive CLI Application
 //!
-//! ```rust,ignore
-//! use dx_scope::cli::InquireInteraction;
+//! ```rust
+//! use dx_scope::InquireInteraction;
 //! use dx_scope::internal::prompts::UserInteraction;
 //!
 //! let interaction = InquireInteraction;
 //!
 //! // This will show an interactive prompt in the terminal
-//! if interaction.confirm("Apply this fix?", Some("This will modify files")) {
-//!     // User said yes
-//! }
+//! // In non-TTY environments (like this doc test), it returns false
+//! let result = interaction.confirm("Apply this fix?", Some("This will modify files"));
+//! // result is false in doc test environment (no TTY)
 //! ```
 //!
 //! # TTY Detection
@@ -48,14 +48,13 @@ use tracing::warn;
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use dx_scope::cli::InquireInteraction;
+/// ```rust
+/// use dx_scope::InquireInteraction;
 /// use dx_scope::internal::prompts::UserInteraction;
 ///
 /// let interaction = InquireInteraction;
-/// if interaction.confirm("Apply fix?", Some("This will modify files")) {
-///     // User confirmed the action
-/// }
+/// // In non-TTY environments, confirm() returns false gracefully
+/// let confirmed = interaction.confirm("Apply fix?", Some("This will modify files"));
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InquireInteraction;
