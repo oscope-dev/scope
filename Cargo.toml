@@ -1,7 +1,7 @@
 [package]
-name = "dev-scope"
+name = "dx-scope"
 version = "2026.1.12"
-edition = "2024"
+edition = "2021"
 default-run = "scope"
 repository = "https://github.com/oscope-dev/scope"
 homepage = "https://oscope-dev.github.io/scope/"
@@ -18,6 +18,10 @@ dist = true
 
 [package.metadata.release]
 tag-prefix = ""
+
+[lib]
+name = "dx_scope"
+path = "src/lib.rs"
 
 [[bin]]
 name = "scope"
