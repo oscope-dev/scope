@@ -74,8 +74,26 @@ pub use cli::InquireInteraction;
 
 /// Prelude module for convenient glob imports.
 ///
-/// This module re-exports commonly used types from all submodules.
-/// For new code, prefer explicit imports from the crate root or specific modules.
+/// **DEPRECATED**: This module will be removed in a future version.
+/// For new code, use explicit imports from the crate root or specific modules instead.
+///
+/// # Migration
+///
+/// Instead of:
+/// ```rust,ignore
+/// use dx_scope::prelude::*;
+/// ```
+///
+/// Use explicit imports:
+/// ```rust,ignore
+/// use dx_scope::{DoctorRunOptions, AnalyzeOptions, FoundConfig};
+/// use dx_scope::doctor;
+/// use dx_scope::analyze;
+/// ```
+#[deprecated(
+    since = "2026.1.13",
+    note = "Use explicit imports from crate root or specific modules instead of prelude"
+)]
 pub mod prelude {
     pub use crate::analyze::prelude::*;
     pub use crate::doctor::prelude::*;
