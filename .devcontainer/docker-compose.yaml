@@ -1,6 +1,17 @@
-version: "2"
 name: scope
 services:
+
+  # Development container
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/base:debian
+    command: sleep infinity
+    volumes:
+      - ../:/workspace
+      - ~/.claude:/home/vscode/.claude
+      - ~/.aws:/home/vscode/.aws
+      - ~/.mise:/home/vscode/.mise
+    links:
+      - otel-collector
 
   # Jaeger
   jaeger-all-in-one:
